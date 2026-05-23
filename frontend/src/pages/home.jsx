@@ -1,389 +1,1345 @@
-import { useState, useEffect } from "react";
-import LabBackground from "../components/LabBackground";
+import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
+import { motion, AnimatePresence, useScroll, useTransform, useSpring } from "framer-motion";
+import * as THREE from "three";
 
 export default function Home() {
   const navigate = useNavigate();
-  const [scrolled, setScrolled] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
 
+  const [active, setActive] = useState("hero");
+  const [open, setOpen] = useState(false);
+  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+
+  const heroRef = useRef(null);
+  const dnaCanvasRef = useRef(null);
+  const bloodCanvasRef = useRef(null);
+
+  const { scrollY, scrollYProgress } = useScroll();
+  const smoothProgress = useSpring(scrollYProgress, { stiffness: 100, damping: 30 });
+
+  // Parallax transforms
+  const heroY = useTransform(scrollY, [0, 800], [0, 300]);
+  const heroOpacity = useTransform(scrollY, [0, 600], [1, 0]);
+  const heroScale = useTransform(scrollY, [0, 600], [1, 0.85]);
+  const gridY = useTransform(scrollY, [0, 3000], [0, -500]);
+  const glowY = useTransform(scrollY, [0, 3000], [0, 800]);
+
+  const sections = ["hero", "about", "features", "process", "stats", "reviews", "team", "faq", "contact"];
+
+  // Scroll tracking
   useEffect(() => {
-    const fn = () => setScrolled(window.scrollY > 40);
-    window.addEventListener("scroll", fn);
-    return () => window.removeEventListener("scroll", fn);
+    const onScroll = () => {
+      sections.forEach((id) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        const rect = el.getBoundingClientRect();
+        if (rect.top < window.innerHeight / 2 && rect.bottom > window.innerHeight / 2) {
+          setActive(id);
+        }
+      });
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  const tests = [
-    { name:"Complete Blood Count", code:"CBC", price:"2,500", time:"24h", tag:"Most Popular", icon:"🩸" },
-    { name:"Blood Glucose Fasting", code:"FBS", price:"800",   time:"2h",  tag:"Diabetes",    icon:"💉" },
-    { name:"Lipid Profile",         code:"LIP", price:"1,800", time:"24h", tag:"Heart Health", icon:"❤️" },
-    { name:"Thyroid Profile",       code:"THY", price:"3,200", time:"48h", tag:"Hormones",     icon:"🔬" },
-    { name:"Liver Function Test",   code:"LFT", price:"2,200", time:"24h", tag:"Organ Health", icon:"🧪" },
-    { name:"HbA1c",                 code:"HBA", price:"1,400", time:"4h",  tag:"Diabetes",     icon:"📊" },
+  // Mouse tracking for parallax cursor
+  useEffect(() => {
+    const onMove = (e) => {
+      setMousePos({
+        x: (e.clientX / window.innerWidth - 0.5) * 2,
+        y: (e.clientY / window.innerHeight - 0.5) * 2,
+      });
+    };
+    window.addEventListener("mousemove", onMove);
+    return () => window.removeEventListener("mousemove", onMove);
+  }, []);
+
+  // ============== 3D DNA HELIX ==============
+  useEffect(() => {
+    const canvas = dnaCanvasRef.current;
+    if (!canvas) return;
+
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(45, canvas.clientWidth / canvas.clientHeight, 0.1, 1000);
+    const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
+    renderer.setSize(canvas.clientWidth, canvas.clientHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+    // DNA Helix construction
+    const dnaGroup = new THREE.Group();
+    const helixPoints = 60;
+    const helixRadius = 2;
+    const helixHeight = 18;
+
+    for (let i = 0; i < helixPoints; i++) {
+      const t = i / helixPoints;
+      const angle = t * Math.PI * 6;
+      const y = (t - 0.5) * helixHeight;
+
+      // Strand 1 sphere
+      const sphere1 = new THREE.Mesh(
+        new THREE.SphereGeometry(0.18, 16, 16),
+        new THREE.MeshStandardMaterial({
+          color: 0xff2d55,
+          emissive: 0xff2d55,
+          emissiveIntensity: 0.4,
+          metalness: 0.3,
+          roughness: 0.4,
+        })
+      );
+      sphere1.position.set(Math.cos(angle) * helixRadius, y, Math.sin(angle) * helixRadius);
+      dnaGroup.add(sphere1);
+
+      // Strand 2 sphere
+      const sphere2 = new THREE.Mesh(
+        new THREE.SphereGeometry(0.18, 16, 16),
+        new THREE.MeshStandardMaterial({
+          color: 0x0078ff,
+          emissive: 0x0078ff,
+          emissiveIntensity: 0.4,
+          metalness: 0.3,
+          roughness: 0.4,
+        })
+      );
+      sphere2.position.set(Math.cos(angle + Math.PI) * helixRadius, y, Math.sin(angle + Math.PI) * helixRadius);
+      dnaGroup.add(sphere2);
+
+      // Connecting rung every 3 spheres
+      if (i % 3 === 0) {
+        const rungGeometry = new THREE.CylinderGeometry(0.04, 0.04, helixRadius * 2, 8);
+        const rung = new THREE.Mesh(
+          rungGeometry,
+          new THREE.MeshStandardMaterial({ color: 0xaaaaaa, transparent: true, opacity: 0.4 })
+        );
+        rung.position.set(0, y, 0);
+        rung.rotation.z = Math.PI / 2;
+        rung.rotation.y = -angle;
+        dnaGroup.add(rung);
+      }
+    }
+
+    scene.add(dnaGroup);
+
+    // Lights
+    const ambient = new THREE.AmbientLight(0xffffff, 0.5);
+    scene.add(ambient);
+    const point1 = new THREE.PointLight(0xff2d55, 2, 30);
+    point1.position.set(8, 5, 8);
+    scene.add(point1);
+    const point2 = new THREE.PointLight(0x0078ff, 2, 30);
+    point2.position.set(-8, -5, 8);
+    scene.add(point2);
+
+    camera.position.z = 12;
+
+    let animationId;
+    let mouseX = 0, mouseY = 0;
+
+    const updateMouse = (e) => {
+      mouseX = (e.clientX / window.innerWidth - 0.5);
+      mouseY = (e.clientY / window.innerHeight - 0.5);
+    };
+    window.addEventListener("mousemove", updateMouse);
+
+    const animate = () => {
+      animationId = requestAnimationFrame(animate);
+      dnaGroup.rotation.y += 0.006;
+      dnaGroup.rotation.x += (mouseY * 0.3 - dnaGroup.rotation.x) * 0.05;
+      dnaGroup.rotation.z += (mouseX * 0.2 - dnaGroup.rotation.z) * 0.05;
+      renderer.render(scene, camera);
+    };
+    animate();
+
+    const onResize = () => {
+      if (!canvas.clientWidth) return;
+      camera.aspect = canvas.clientWidth / canvas.clientHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(canvas.clientWidth, canvas.clientHeight);
+    };
+    window.addEventListener("resize", onResize);
+
+    return () => {
+      cancelAnimationFrame(animationId);
+      window.removeEventListener("mousemove", updateMouse);
+      window.removeEventListener("resize", onResize);
+      renderer.dispose();
+    };
+  }, []);
+
+  // ============== 3D BLOOD CELLS ==============
+  useEffect(() => {
+    const canvas = bloodCanvasRef.current;
+    if (!canvas) return;
+
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(50, canvas.clientWidth / canvas.clientHeight, 0.1, 1000);
+    const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
+    renderer.setSize(canvas.clientWidth, canvas.clientHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+    const cellsGroup = new THREE.Group();
+
+    // Red blood cells (donut shape — biconcave-ish)
+    for (let i = 0; i < 18; i++) {
+      const cell = new THREE.Mesh(
+        new THREE.TorusGeometry(0.55, 0.32, 16, 32),
+        new THREE.MeshStandardMaterial({
+          color: 0xff2d55,
+          emissive: 0xcc0033,
+          emissiveIntensity: 0.25,
+          metalness: 0.2,
+          roughness: 0.5,
+        })
+      );
+      cell.position.set(
+        (Math.random() - 0.5) * 14,
+        (Math.random() - 0.5) * 10,
+        (Math.random() - 0.5) * 6
+      );
+      cell.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
+      cell.userData = {
+        speedX: (Math.random() - 0.5) * 0.008,
+        speedY: (Math.random() - 0.5) * 0.008,
+        rotSpeed: (Math.random() - 0.5) * 0.015,
+      };
+      cellsGroup.add(cell);
+    }
+
+    // White blood cells (lumpy spheres)
+    for (let i = 0; i < 5; i++) {
+      const cell = new THREE.Mesh(
+        new THREE.IcosahedronGeometry(0.55, 1),
+        new THREE.MeshStandardMaterial({
+          color: 0xffffff,
+          emissive: 0xeeeeee,
+          emissiveIntensity: 0.1,
+          metalness: 0.3,
+          roughness: 0.7,
+        })
+      );
+      cell.position.set(
+        (Math.random() - 0.5) * 14,
+        (Math.random() - 0.5) * 10,
+        (Math.random() - 0.5) * 6
+      );
+      cell.userData = {
+        speedX: (Math.random() - 0.5) * 0.006,
+        speedY: (Math.random() - 0.5) * 0.006,
+        rotSpeed: (Math.random() - 0.5) * 0.012,
+      };
+      cellsGroup.add(cell);
+    }
+
+    scene.add(cellsGroup);
+
+    // Lights
+    const ambient = new THREE.AmbientLight(0xffffff, 0.6);
+    scene.add(ambient);
+    const dir = new THREE.DirectionalLight(0xffffff, 1);
+    dir.position.set(5, 5, 5);
+    scene.add(dir);
+    const pinkLight = new THREE.PointLight(0xff2d55, 1.5, 25);
+    pinkLight.position.set(-5, 3, 5);
+    scene.add(pinkLight);
+
+    camera.position.z = 10;
+
+    let animationId;
+
+    const animate = () => {
+      animationId = requestAnimationFrame(animate);
+      cellsGroup.children.forEach((cell) => {
+        cell.position.x += cell.userData.speedX;
+        cell.position.y += cell.userData.speedY;
+        cell.rotation.x += cell.userData.rotSpeed;
+        cell.rotation.y += cell.userData.rotSpeed * 0.7;
+
+        // bounce off invisible walls
+        if (cell.position.x > 8 || cell.position.x < -8) cell.userData.speedX *= -1;
+        if (cell.position.y > 6 || cell.position.y < -6) cell.userData.speedY *= -1;
+      });
+      renderer.render(scene, camera);
+    };
+    animate();
+
+    const onResize = () => {
+      if (!canvas.clientWidth) return;
+      camera.aspect = canvas.clientWidth / canvas.clientHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(canvas.clientWidth, canvas.clientHeight);
+    };
+    window.addEventListener("resize", onResize);
+
+    return () => {
+      cancelAnimationFrame(animationId);
+      window.removeEventListener("resize", onResize);
+      renderer.dispose();
+    };
+  }, []);
+
+  const scrollTo = (id) => {
+    document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
+    setOpen(false);
+  };
+
+  // ============== DATA ==============
+  const features = [
+    { icon: "🩸", title: "Home Blood Collection", desc: "Certified phlebotomists arrive at your doorstep with sterile, single-use equipment." },
+    { icon: "⚡", title: "2-Hour Reports", desc: "Verified digital reports delivered with barcode authentication in record time." },
+    { icon: "🔒", title: "Lab-Grade Security", desc: "End-to-end encrypted records. HIPAA-aligned data handling, always." },
+    { icon: "📱", title: "Real-Time Tracking", desc: "Live phlebotomist tracking, instant updates, complete transparency." },
+    { icon: "🧬", title: "200+ Test Panels", desc: "From full blood count to advanced hormone profiles — all from home." },
+    { icon: "🏥", title: "Accredited Labs", desc: "Samples processed at NABL & ISO 15189 certified diagnostic centers." },
   ];
 
-  const steps = [
-    { n:"01", icon:"🔬", title:"Choose Your Test",  desc:"Browse 50+ tests with prep instructions and transparent pricing." },
-    { n:"02", icon:"📅", title:"Pick a Time Slot",  desc:"Morning to evening, 7 days a week. Choose what suits you." },
-    { n:"03", icon:"🚗", title:"We Come to You",    desc:"A certified phlebotomist arrives at your home with sterile equipment." },
-    { n:"04", icon:"📄", title:"Get Your Report",   desc:"Download your verified PDF report with QR code — usually within 24h." },
+  const process = [
+    { step: "01", title: "Book Your Test", desc: "Pick a test panel and time slot in under 60 seconds." },
+    { step: "02", title: "We Arrive", desc: "Your certified phlebotomist arrives with sterile equipment." },
+    { step: "03", title: "Sample Collected", desc: "Quick, painless collection in the comfort of your home." },
+    { step: "04", title: "Get Reports", desc: "Digital report with barcode verification within hours." },
   ];
 
-  const testimonials = [
-    { name:"Priya N.",    role:"Patient, Jaffna",  text:"Rajan arrived on time and was very gentle. My CBC report was ready in 18 hours. Absolutely loved the service!", rating:5 },
-    { name:"Dr. Arjun M.",role:"Cardiologist",     text:"I recommend HemoVisit to all my patients. Reports are accurate, properly formatted, and barcode verification is excellent.", rating:5 },
-    { name:"Sunita R.",   role:"Regular Patient",  text:"Used HemoVisit 6 times. Never had to step out of my home. The phlebotomists are always professional and certified.", rating:5 },
+  const stats = [
+    { value: "15K+", label: "Happy Patients" },
+    { value: "4.9★", label: "Average Rating" },
+    { value: "2h", label: "Report Turnaround" },
+    { value: "200+", label: "Test Panels" },
+  ];
+
+  const reviews = [
+    { name: "Anjali R.", role: "Patient, Jaffna", text: "The phlebotomist was so professional and gentle. I got my results before lunch. This is the future of healthcare.", stars: 5 },
+    { name: "Dr. Suresh M.", role: "Cardiologist", text: "I recommend HemoVisit to all my elderly patients. The accuracy matches any premier lab I've worked with.", stars: 5 },
+    { name: "Priya K.", role: "Patient, Colombo", text: "Booked at 8 AM, results by noon. Clean interface, kind staff, fair pricing. Couldn't ask for more.", stars: 5 },
+  ];
+
+  const team = [
+    { name: "Dr. Ravi Kumaran", role: "Chief Pathologist", icon: "🔬" },
+    { name: "Miss. yathushana Ravichanthran", role: "Head of Phlebotomy", icon: "💉" },
+    { name: "Arjun Devanesan", role: "Technology Lead", icon: "💻" },
+    { name: "Mrs. Meera Dilshan", role: "Quality Assurance", icon: "📋" },
+  ];
+
+  const faqs = [
+    { q: "How early can I book a slot?", a: "You can book up to 7 days in advance. Same-day slots are also available subject to phlebotomist availability." },
+    { q: "Are the phlebotomists certified?", a: "Every phlebotomist on our platform is licensed, background-verified, and trained to international standards." },
+    { q: "What if my report is delayed?", a: "We guarantee 4-hour turnaround for standard panels. Any delay beyond that and the test is on us." },
+    { q: "Do you cover my area?", a: "We currently operate across Jaffna, Colombo, Kandy, and Galle, with expansion planned across the island." },
   ];
 
   return (
-    <div style={{ background:"#fff", color:"var(--text)", fontFamily:"var(--font)", overflowX:"hidden" }}>
-      <LabBackground opacity={0.18} />
+    <div className="app">
+      {/* ================= BACKGROUNDS ================= */}
+      <motion.div className="grid" style={{ y: gridY }} />
+      <motion.div className="glow" style={{ y: glowY }} />
+      <div
+        className="cursor-glow"
+        style={{
+          transform: `translate(${mousePos.x * 30}px, ${mousePos.y * 30}px)`,
+        }}
+      />
+
+      {/* ================= PROGRESS BAR ================= */}
+      <motion.div className="progress" style={{ scaleX: smoothProgress }} />
 
       <style>{`
-        .hero-stat { text-align:center; }
-        .hero-stat-val { font-size:28px; font-weight:800; color:var(--red); }
-        .hero-stat-lbl { font-size:12px; color:var(--text3); margin-top:2px; font-weight:500; }
-
-        .test-card-w {
-          background:#fff; border:1.5px solid var(--border); border-radius:var(--radius-lg);
-          padding:24px; cursor:pointer; transition:all 0.25s;
+        * {
+          margin:0; padding:0; box-sizing:border-box;
+          font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter", sans-serif;
         }
-        .test-card-w:hover { border-color:var(--red); box-shadow:var(--shadow-red); transform:translateY(-3px); }
 
-        .step-card-w { position:relative; }
+        html { scroll-behavior: smooth; }
 
-        .testi-card-w {
-          background:#fff; border:1.5px solid var(--border); border-radius:var(--radius-lg);
-          padding:28px; transition:all 0.25s;
+        .app {
+          background: #fafbfd;
+          color: #0b0f1a;
+          overflow-x: hidden;
+          position: relative;
         }
-        .testi-card-w:hover { border-color:var(--red-mid); box-shadow:var(--shadow-md); }
 
-        .nav-link-w {
-          font-size:14px; font-weight:500; color:var(--text2);
-          cursor:pointer; transition:color 0.2s; border:none; background:none;
-          font-family:var(--font); padding:4px 0;
+        /* Apple soft grid — parallax */
+        .grid {
+          position: fixed;
+          inset: -100px;
+          background-image:
+            linear-gradient(to right, rgba(0,0,0,0.04) 1px, transparent 1px),
+            linear-gradient(to bottom, rgba(0,0,0,0.04) 1px, transparent 1px);
+          background-size: 70px 70px;
+          opacity: 0.6;
+          z-index: 1;
         }
-        .nav-link-w:hover { color:var(--red); }
+
+        /* radial color glow — parallax */
+        .glow {
+          position: fixed;
+          inset: -200px;
+          background:
+            radial-gradient(circle at 20% 20%, rgba(255,45,85,0.12), transparent 40%),
+            radial-gradient(circle at 80% 80%, rgba(0,120,255,0.08), transparent 40%),
+            radial-gradient(circle at 50% 50%, rgba(255,107,107,0.06), transparent 50%);
+          z-index: 1;
+          animation: floatGlow 8s ease-in-out infinite alternate;
+        }
+
+        @keyframes floatGlow {
+          from { transform: scale(1); }
+          to { transform: scale(1.1); }
+        }
+
+        /* Mouse-tracking aurora */
+        .cursor-glow {
+          position: fixed;
+          top: 50%; left: 50%;
+          width: 600px; height: 600px;
+          margin: -300px 0 0 -300px;
+          background: radial-gradient(circle, rgba(255,45,85,0.08), transparent 70%);
+          border-radius: 50%;
+          pointer-events: none;
+          z-index: 2;
+          transition: transform 0.4s ease-out;
+        }
+
+        /* Scroll progress */
+        .progress {
+          position: fixed;
+          top: 0; left: 0;
+          right: 0;
+          height: 3px;
+          background: linear-gradient(90deg, #ff2d55, #ff6b6b);
+          transform-origin: 0%;
+          z-index: 2000;
+        }
+
+        /* ================= NAVBAR ================= */
+        .nav {
+          position: fixed;
+          top: 0;
+          width: 100%;
+          height: 72px;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 0 22px;
+          background: rgba(255,255,255,0.7);
+          backdrop-filter: blur(20px);
+          -webkit-backdrop-filter: blur(20px);
+          border-bottom: 1px solid rgba(0,0,0,0.06);
+          z-index: 1000;
+        }
+
+        .brand {
+          font-weight: 800;
+          letter-spacing: -0.5px;
+          color: #ff2d55;
+          font-size: 18px;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .brand-dot {
+          width: 10px; height: 10px;
+          border-radius: 50%;
+          background: #ff2d55;
+          box-shadow: 0 0 12px #ff2d55;
+          animation: pulse 1.5s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+          0%, 100% { opacity: 1; transform: scale(1); }
+          50% { opacity: 0.5; transform: scale(1.3); }
+        }
+
+        .btn {
+          padding: 10px 18px;
+          border-radius: 12px;
+          border: none;
+          cursor: pointer;
+          font-weight: 600;
+          font-size: 14px;
+          transition: all 0.2s;
+        }
+
+        .btn-primary {
+          background: linear-gradient(135deg, #ff2d55, #ff6b6b);
+          color: white;
+          box-shadow: 0 4px 16px rgba(255,45,85,0.3);
+        }
+
+        .btn-primary:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 8px 24px rgba(255,45,85,0.4);
+        }
+
+        .btn-ghost {
+          background: transparent;
+          border: 1.5px solid rgba(0,0,0,0.12);
+          color: #0b0f1a;
+        }
+
+        .btn-ghost:hover {
+          border-color: #ff2d55;
+          color: #ff2d55;
+        }
+
+        /* ================= HAMBURGER ================= */
+        .hamburger {
+          font-size: 20px;
+          cursor: pointer;
+          padding: 10px 14px;
+          border-radius: 10px;
+          transition: background 0.2s;
+        }
+
+        .hamburger:hover { background: rgba(0,0,0,0.05); }
+
+        /* ================= SLIDE MENU ================= */
+        .overlay {
+          position: fixed;
+          inset: 0;
+          background: rgba(0,0,0,0.25);
+          backdrop-filter: blur(6px);
+          z-index: 1200;
+        }
+
+        .sidebar {
+          position: fixed;
+          top: 0; left: 0;
+          height: 100%;
+          width: 320px;
+          background: rgba(255,255,255,0.92);
+          backdrop-filter: blur(25px);
+          border-right: 1px solid rgba(0,0,0,0.08);
+          padding: 90px 18px;
+          z-index: 1300;
+        }
+
+        .menu-item {
+          padding: 14px 16px;
+          border-radius: 12px;
+          cursor: pointer;
+          font-size: 13px;
+          font-weight: 600;
+          letter-spacing: 1.5px;
+          text-transform: uppercase;
+          color: rgba(0,0,0,0.65);
+          transition: all 0.2s;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        }
+
+        .menu-item:hover, .menu-item.active {
+          background: rgba(255,45,85,0.08);
+          color: #ff2d55;
+        }
+
+        .menu-item .arrow { opacity: 0; transition: opacity 0.2s; }
+        .menu-item:hover .arrow { opacity: 1; }
+
+        /* ================= SECTIONS ================= */
+        section {
+          min-height: 100vh;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 120px 6vw;
+          position: relative;
+          z-index: 10;
+        }
+
+        .container {
+          width: 100%;
+          max-width: 1200px;
+        }
+
+        .eyebrow {
+          display: inline-block;
+          padding: 6px 14px;
+          border-radius: 50px;
+          background: rgba(255,45,85,0.08);
+          color: #ff2d55;
+          font-size: 12px;
+          font-weight: 700;
+          letter-spacing: 1.5px;
+          text-transform: uppercase;
+          margin-bottom: 20px;
+          border: 1px solid rgba(255,45,85,0.15);
+        }
+
+        h1 {
+          font-size: 80px;
+          font-weight: 900;
+          letter-spacing: -2px;
+          line-height: 1.05;
+        }
+
+        h2 {
+          font-size: 48px;
+          font-weight: 800;
+          letter-spacing: -1px;
+          margin-bottom: 14px;
+        }
+
+        h3 {
+          font-size: 22px;
+          font-weight: 700;
+          margin-bottom: 8px;
+        }
+
+        p {
+          color: rgba(0,0,0,0.6);
+          line-height: 1.7;
+          font-size: 15px;
+        }
+
+        .lead {
+          font-size: 18px;
+          color: rgba(0,0,0,0.55);
+          max-width: 600px;
+        }
+
+        /* ================= HERO ================= */
+        .hero-grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 40px;
+          align-items: center;
+        }
+
+        .dna-canvas {
+          width: 100%;
+          height: 600px;
+        }
+
+        /* ================= ABOUT — split layout ================= */
+        .about-grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 60px;
+          align-items: center;
+        }
+
+        .blood-canvas {
+          width: 100%;
+          height: 500px;
+          border-radius: 26px;
+          background: linear-gradient(135deg, rgba(255,45,85,0.04), rgba(255,107,107,0.02));
+          border: 1px solid rgba(0,0,0,0.06);
+        }
+
+        /* ================= FEATURES GRID ================= */
+        .features-grid {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 20px;
+          margin-top: 50px;
+        }
+
+        .feature-card {
+          padding: 32px 28px;
+          border-radius: 20px;
+          background: rgba(255,255,255,0.7);
+          backdrop-filter: blur(15px);
+          border: 1px solid rgba(0,0,0,0.06);
+          transition: all 0.3s;
+          cursor: pointer;
+        }
+
+        .feature-card:hover {
+          transform: translateY(-6px);
+          box-shadow: 0 20px 50px rgba(255,45,85,0.12);
+          border-color: rgba(255,45,85,0.2);
+        }
+
+        .feature-icon {
+          font-size: 36px;
+          margin-bottom: 18px;
+          display: inline-block;
+        }
+
+        /* ================= PROCESS TIMELINE ================= */
+        .process-grid {
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+          gap: 20px;
+          margin-top: 50px;
+          position: relative;
+        }
+
+        .process-line {
+          position: absolute;
+          top: 40px;
+          left: 10%;
+          right: 10%;
+          height: 2px;
+          background: linear-gradient(90deg, transparent, #ff2d55 20%, #ff2d55 80%, transparent);
+          opacity: 0.3;
+        }
+
+        .process-card {
+          text-align: center;
+          padding: 20px;
+          position: relative;
+          z-index: 2;
+        }
+
+        .process-num {
+          width: 80px; height: 80px;
+          margin: 0 auto 20px;
+          border-radius: 50%;
+          background: linear-gradient(135deg, #ff2d55, #ff6b6b);
+          color: white;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-weight: 800;
+          font-size: 22px;
+          box-shadow: 0 10px 30px rgba(255,45,85,0.3);
+        }
+
+        /* ================= STATS ================= */
+        .stats-grid {
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+          gap: 30px;
+          margin-top: 50px;
+        }
+
+        .stat-card {
+          text-align: center;
+          padding: 40px 20px;
+        }
+
+        .stat-value {
+          font-size: 64px;
+          font-weight: 900;
+          background: linear-gradient(135deg, #ff2d55, #ff6b6b);
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+          background-clip: text;
+          letter-spacing: -2px;
+        }
+
+        .stat-label {
+          color: rgba(0,0,0,0.5);
+          font-size: 13px;
+          font-weight: 600;
+          text-transform: uppercase;
+          letter-spacing: 2px;
+          margin-top: 6px;
+        }
+
+        /* ================= REVIEWS ================= */
+        .review-grid {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 20px;
+          margin-top: 50px;
+        }
+
+        .review-card {
+          padding: 32px 28px;
+          border-radius: 20px;
+          background: rgba(255,255,255,0.8);
+          backdrop-filter: blur(15px);
+          border: 1px solid rgba(0,0,0,0.06);
+          transition: all 0.3s;
+        }
+
+        .review-card:hover {
+          transform: translateY(-4px);
+          box-shadow: 0 20px 40px rgba(0,0,0,0.06);
+        }
+
+        .review-stars {
+          color: #ffb300;
+          font-size: 16px;
+          margin-bottom: 12px;
+        }
+
+        .review-text {
+          font-size: 15px;
+          color: rgba(0,0,0,0.75);
+          font-style: italic;
+          line-height: 1.7;
+          margin-bottom: 20px;
+        }
+
+        .review-meta {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+        }
+
+        .review-avatar {
+          width: 44px; height: 44px;
+          border-radius: 50%;
+          background: linear-gradient(135deg, #ff2d55, #ff6b6b);
+          color: white;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-weight: 700;
+        }
+
+        /* ================= TEAM ================= */
+        .team-grid {
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+          gap: 20px;
+          margin-top: 50px;
+        }
+
+        .team-card {
+          text-align: center;
+          padding: 32px 20px;
+          border-radius: 20px;
+          background: rgba(255,255,255,0.7);
+          backdrop-filter: blur(15px);
+          border: 1px solid rgba(0,0,0,0.06);
+          transition: all 0.3s;
+        }
+
+        .team-card:hover {
+          transform: translateY(-6px);
+          background: rgba(255,255,255,0.9);
+        }
+
+        .team-icon {
+          font-size: 48px;
+          width: 90px; height: 90px;
+          margin: 0 auto 18px;
+          border-radius: 50%;
+          background: linear-gradient(135deg, rgba(255,45,85,0.1), rgba(255,107,107,0.05));
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border: 1px solid rgba(255,45,85,0.15);
+        }
+
+        /* ================= FAQ ================= */
+        .faq-list {
+          margin-top: 40px;
+        }
 
         .faq-item {
-          border:1.5px solid var(--border); border-radius:var(--radius-md);
-          overflow:hidden; transition:border-color 0.2s; margin-bottom:10px;
+          padding: 24px 28px;
+          border-radius: 16px;
+          background: rgba(255,255,255,0.7);
+          backdrop-filter: blur(15px);
+          border: 1px solid rgba(0,0,0,0.06);
+          margin-bottom: 14px;
+          cursor: pointer;
+          transition: all 0.3s;
         }
-        .faq-item:hover { border-color:var(--red-mid); }
+
+        .faq-item:hover {
+          border-color: rgba(255,45,85,0.2);
+          background: rgba(255,255,255,0.9);
+        }
+
         .faq-q {
-          width:100%; padding:18px 20px; background:#fff; border:none;
-          display:flex; justify-content:space-between; align-items:center;
-          cursor:pointer; font-family:var(--font); font-size:15px;
-          font-weight:600; color:var(--text); text-align:left;
+          font-weight: 700;
+          font-size: 16px;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
         }
 
-        /* Mobile nav */
-        .mobile-nav {
-          position:fixed; inset:0; background:#fff; zIndex:199;
-          display:flex; flex-direction:column; padding:24px;
-          gap:16px; transform:translateX(100%); transition:transform 0.3s;
+        .faq-toggle {
+          color: #ff2d55;
+          font-size: 22px;
+          font-weight: 300;
+          transition: transform 0.3s;
         }
-        .mobile-nav.open { transform:translateX(0); }
 
-        @media(max-width:768px) {
-          .hero-grid { grid-template-columns:1fr !important; }
-          .features-grid { grid-template-columns:1fr !important; }
-          .tests-grid { grid-template-columns:1fr 1fr !important; }
-          .steps-grid { grid-template-columns:1fr 1fr !important; }
-          .testi-grid { grid-template-columns:1fr !important; }
-          .cta-flex { flex-direction:column !important; text-align:center; }
-          .footer-flex { flex-direction:column !important; gap:8px !important; text-align:center; }
-          .hero-text h1 { font-size:clamp(32px,8vw,52px) !important; }
-          .stats-flex { grid-template-columns:repeat(2,1fr) !important; }
+        .faq-item.open .faq-toggle { transform: rotate(45deg); }
+
+        .faq-a {
+          color: rgba(0,0,0,0.6);
+          line-height: 1.7;
+          margin-top: 12px;
+          font-size: 14px;
+        }
+
+        /* ================= CONTACT ================= */
+        .contact-card {
+          padding: 60px 50px;
+          border-radius: 26px;
+          background: linear-gradient(135deg, #0b0f1a, #1a1d2e);
+          color: white;
+          text-align: center;
+          position: relative;
+          overflow: hidden;
+        }
+
+        .contact-card::before {
+          content: '';
+          position: absolute;
+          top: -50%; left: -50%;
+          width: 200%; height: 200%;
+          background: radial-gradient(circle, rgba(255,45,85,0.2), transparent 50%);
+          animation: floatGlow 6s ease-in-out infinite alternate;
+        }
+
+        .contact-card > * { position: relative; z-index: 1; }
+
+        .contact-card h2 { color: white; }
+        .contact-card p { color: rgba(255,255,255,0.6); }
+
+        .contact-row {
+          display: flex;
+          justify-content: center;
+          gap: 40px;
+          margin-top: 30px;
+          flex-wrap: wrap;
+        }
+
+        .contact-item {
+          color: rgba(255,255,255,0.85);
+          font-weight: 500;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        /* ================= FOOTER ================= */
+        .footer {
+          padding: 50px 6vw 30px;
+          border-top: 1px solid rgba(0,0,0,0.08);
+          background: rgba(255,255,255,0.6);
+          backdrop-filter: blur(10px);
+          z-index: 10;
+          position: relative;
+        }
+
+        .footer-content {
+          max-width: 1200px;
+          margin: 0 auto;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          flex-wrap: wrap;
+          gap: 20px;
+        }
+
+        .footer p { font-size: 13px; }
+
+        /* ================= RESPONSIVE ================= */
+        @media (max-width: 1000px) {
+          h1 { font-size: 56px; }
+          h2 { font-size: 38px; }
+          .hero-grid, .about-grid { grid-template-columns: 1fr; }
+          .dna-canvas { height: 420px; }
+          .features-grid, .review-grid, .team-grid { grid-template-columns: repeat(2, 1fr); }
+          .process-grid, .stats-grid { grid-template-columns: repeat(2, 1fr); }
+          .process-line { display: none; }
+        }
+
+        @media (max-width: 600px) {
+          h1 { font-size: 40px; letter-spacing: -1px; }
+          h2 { font-size: 30px; }
+          .stat-value { font-size: 48px; }
+          .features-grid, .review-grid, .team-grid { grid-template-columns: 1fr; }
+          .process-grid, .stats-grid { grid-template-columns: 1fr; }
+          .sidebar { width: 280px; }
+          section { padding: 100px 5vw; }
+          .contact-card { padding: 40px 24px; }
         }
       `}</style>
 
-      {/* ── NAVBAR ──────────────────────────────────────────────── */}
-      <nav style={{ position:"fixed", top:0, left:0, right:0, zIndex:100, background: scrolled ? "rgba(255,255,255,0.95)" : "#fff", borderBottom: scrolled ? "1px solid var(--border)" : "1px solid transparent", backdropFilter:"blur(12px)", transition:"all 0.3s", padding:"0 5vw", height:64, display:"flex", alignItems:"center", justifyContent:"space-between" }}>
-        <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-          <div style={{ width:34, height:34, borderRadius:10, background:"var(--red)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:18 }}>🩸</div>
-          <span style={{ fontSize:18, fontWeight:800, color:"var(--text)", letterSpacing:-0.5 }}>HemoVisit</span>
+      {/* ================= NAV ================= */}
+      <div className="nav">
+        <div className="hamburger" onClick={() => setOpen(true)}>☰</div>
+        <div className="brand">
+          <span className="brand-dot" />
+          HEMOVISIT
         </div>
-        <div className="hide-mobile" style={{ display:"flex", gap:28 }}>
-          {["Services","Tests","How It Works","About"].map(l=>(
-            <button key={l} className="nav-link-w">{l}</button>
-          ))}
-        </div>
-        <div className="hide-mobile" style={{ display:"flex", gap:10 }}>
-          <button className="btn btn-ghost btn-sm" onClick={()=>navigate("/login")}>Sign In</button>
-          <button className="btn btn-primary btn-sm" onClick={()=>navigate("/login")}>Book Now</button>
-        </div>
-        {/* Mobile menu button */}
-        <button className="hide-desktop" onClick={()=>setMenuOpen(true)} style={{ background:"none", border:"none", fontSize:22, cursor:"pointer", color:"var(--text)" }}>☰</button>
-      </nav>
-
-      {/* Mobile nav drawer */}
-      <div className={`mobile-nav ${menuOpen?"open":""}`} style={{ zIndex:200 }}>
-        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8 }}>
-          <span style={{ fontWeight:800, fontSize:18 }}>🩸 HemoVisit</span>
-          <button onClick={()=>setMenuOpen(false)} style={{ background:"none", border:"none", fontSize:22, cursor:"pointer" }}>✕</button>
-        </div>
-        {["Services","Tests","How It Works","About"].map(l=>(
-          <button key={l} style={{ textAlign:"left", padding:"14px 0", borderBottom:"1px solid var(--border)", background:"none", border:"none", borderBottom:"1px solid var(--border)", fontSize:16, fontWeight:500, color:"var(--text)", cursor:"pointer", fontFamily:"var(--font)", width:"100%" }}>{l}</button>
-        ))}
-        <button className="btn btn-outline btn-full" onClick={()=>{ navigate("/login"); setMenuOpen(false); }}>Sign In</button>
-        <button className="btn btn-primary btn-full" onClick={()=>{ navigate("/login"); setMenuOpen(false); }}>Book Now →</button>
+        <button className="btn btn-primary" onClick={() => navigate("/login")}>
+          Book Now
+        </button>
       </div>
 
-      {/* ── HERO ─────────────────────────────────────────────────── */}
-      <section style={{ paddingTop:64, minHeight:"100vh", display:"flex", alignItems:"center", background:"linear-gradient(160deg, #fff 60%, #FFF5F5 100%)" }}>
-        <div style={{ maxWidth:1200, margin:"0 auto", padding:"60px 5vw", width:"100%" }}>
-          <div className="hero-grid" style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:60, alignItems:"center" }}>
-
-            {/* Left */}
-            <div className="hero-text fade-up">
-              <div style={{ display:"inline-flex", alignItems:"center", gap:8, background:"var(--red-light)", border:"1px solid var(--red-mid)", borderRadius:20, padding:"6px 14px", marginBottom:24 }}>
-                <div style={{ width:6, height:6, borderRadius:"50%", background:"var(--red)" }} />
-                <span style={{ fontSize:12, fontWeight:600, color:"var(--red)" }}>Available in Jaffna, Sri Lanka</span>
-              </div>
-
-              <h1 style={{ fontSize:"clamp(36px,5vw,60px)", fontWeight:800, lineHeight:1.1, letterSpacing:-1.5, marginBottom:20, color:"var(--text)" }}>
-                Blood Tests<br />
-                <span style={{ color:"var(--red)", fontFamily:"var(--font-serif)", fontStyle:"italic" }}>at Your Doorstep</span>
-              </h1>
-
-              <p style={{ fontSize:17, color:"var(--text2)", lineHeight:1.8, marginBottom:36, maxWidth:480 }}>
-                Skip the clinic queue. A certified phlebotomist visits your home, collects your sample, and delivers a verified report with barcode in as little as 2 hours.
-              </p>
-
-              <div style={{ display:"flex", gap:12, flexWrap:"wrap", marginBottom:48 }}>
-                <button className="btn btn-primary btn-lg" onClick={()=>navigate("/login")}>Book a Test — Free</button>
-                <button className="btn btn-ghost btn-lg" onClick={()=>navigate("/login")}>Sign In →</button>
-              </div>
-
-              {/* Stats */}
-              <div className="stats-flex" style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:20, paddingTop:32, borderTop:"1px solid var(--border)" }}>
-                {[["15K+","Patients"],["4.9★","Rating"],["98.7%","Accuracy"],["30min","Arrival"]].map(([v,l])=>(
-                  <div key={l} className="hero-stat">
-                    <div className="hero-stat-val">{v}</div>
-                    <div className="hero-stat-lbl">{l}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Right — visual card stack */}
-            <div className="hide-mobile fade-up" style={{ position:"relative", height:520 }}>
-              {/* Main card */}
-              <div className="card" style={{ position:"absolute", top:40, left:20, right:20, padding:28, boxShadow:"var(--shadow-lg)" }}>
-                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:20 }}>
-                  <div>
-                    <div style={{ fontSize:12, color:"var(--text3)", fontWeight:500, marginBottom:4 }}>Today's appointment</div>
-                    <div style={{ fontSize:18, fontWeight:700 }}>Complete Blood Count</div>
-                  </div>
-                  <span className="tag tag-green">● Confirmed</span>
+      {/* ================= SLIDE MENU ================= */}
+      <AnimatePresence>
+        {open && (
+          <>
+            <motion.div
+              className="overlay"
+              onClick={() => setOpen(false)}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+            />
+            <motion.div
+              className="sidebar"
+              initial={{ x: -320 }}
+              animate={{ x: 0 }}
+              exit={{ x: -320 }}
+              transition={{ type: "spring", stiffness: 120, damping: 18 }}
+            >
+              {sections.map((s) => (
+                <div
+                  key={s}
+                  className={`menu-item ${active === s ? "active" : ""}`}
+                  onClick={() => scrollTo(s)}
+                >
+                  {s}
+                  <span className="arrow">→</span>
                 </div>
-                <div style={{ display:"flex", gap:16, marginBottom:20 }}>
-                  {[["📅","Apr 15, 2026"],["⏰","09:00 AM"],["🧪","Rajan K."]].map(([i,v])=>(
-                    <div key={v} style={{ background:"var(--bg)", borderRadius:10, padding:"10px 14px", flex:1, textAlign:"center" }}>
-                      <div style={{ fontSize:18, marginBottom:4 }}>{i}</div>
-                      <div style={{ fontSize:11, fontWeight:600, color:"var(--text2)" }}>{v}</div>
-                    </div>
-                  ))}
-                </div>
-                {/* Progress */}
-                <div style={{ fontSize:12, fontWeight:600, color:"var(--text2)", marginBottom:8 }}>Sample collected → Processing</div>
-                <div style={{ height:6, background:"var(--surface2)", borderRadius:3, overflow:"hidden" }}>
-                  <div style={{ width:"60%", height:"100%", background:"linear-gradient(90deg,var(--red),#FC8181)", borderRadius:3 }} />
-                </div>
-              </div>
-              {/* Report card */}
-              <div className="card" style={{ position:"absolute", bottom:20, right:0, width:220, padding:20, boxShadow:"var(--shadow-lg)" }}>
-                <div style={{ fontSize:12, color:"var(--text3)", marginBottom:8, fontWeight:500 }}>Report Ready</div>
-                <div style={{ fontSize:15, fontWeight:700, marginBottom:4 }}>Lipid Profile</div>
-                <div style={{ fontSize:11, color:"var(--text3)", marginBottom:12 }}>#BK004821</div>
-                <div style={{ display:"flex", gap:4, alignItems:"flex-end", height:36, marginBottom:10 }}>
-                  {[3,6,2,8,4,7,2,9,3,5,8,2,6,7,3,9,5,2,7,4].map((h,i)=>(
-                    <div key={i} style={{ flex:1, background:i%3===0?"var(--red)":"var(--border2)", height:h*3+"px", borderRadius:1 }} />
-                  ))}
-                </div>
-                <button className="btn btn-primary btn-sm btn-full" style={{ fontSize:11 }}>⬇ Download PDF</button>
-              </div>
-              {/* Rating card */}
-              <div className="card" style={{ position:"absolute", top:20, right:-10, width:180, padding:16, boxShadow:"var(--shadow-md)" }}>
-                <div style={{ fontSize:11, color:"var(--text3)", marginBottom:6 }}>Phlebotomist Rating</div>
-                <div style={{ fontSize:24, fontWeight:800, color:"var(--amber)" }}>4.9 ★</div>
-                <div style={{ fontSize:11, color:"var(--text3)" }}>Rajan K. · 142 reviews</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
+              ))}
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
 
-      {/* ── FEATURES ─────────────────────────────────────────────── */}
-      <section style={{ padding:"80px 5vw", background:"var(--bg)" }}>
-        <div style={{ maxWidth:1200, margin:"0 auto" }}>
-          <div style={{ textAlign:"center", marginBottom:52 }}>
-            <div style={{ fontSize:12, fontWeight:700, letterSpacing:2, color:"var(--red)", textTransform:"uppercase", marginBottom:12 }}>Why HemoVisit</div>
-            <h2 style={{ fontSize:"clamp(26px,4vw,40px)", fontWeight:800, letterSpacing:-0.5 }}>Healthcare that comes to you</h2>
-          </div>
-          <div className="features-grid" style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:20 }}>
-            {[
-              { icon:"🏠", title:"Home Collection",    desc:"No need to visit a lab. We collect samples at your home, office, or anywhere you prefer." },
-              { icon:"🎓", title:"Certified Staff",     desc:"All phlebotomists are licensed, trained, and background-verified for your safety." },
-              { icon:"📄", title:"Verified Reports",    desc:"Every report has a unique barcode and QR code accepted at any hospital in Sri Lanka." },
-              { icon:"⚡", title:"Fast Turnaround",     desc:"Most results ready in 2–24 hours. Get notified instantly via SMS and email." },
-              { icon:"🔒", title:"Secure & Private",    desc:"Your health data is encrypted, HIPAA-compliant, and never shared without consent." },
-              { icon:"💰", title:"Transparent Pricing", desc:"No hidden fees. See the exact price before you book. Pay by cash, card, or online." },
-            ].map((f,i)=>(
-              <div key={i} className="card" style={{ padding:28, transition:"all 0.25s" }}
-                onMouseOver={e=>{ e.currentTarget.style.borderColor="var(--red-mid)"; e.currentTarget.style.boxShadow="var(--shadow-md)"; }}
-                onMouseOut={e=>{ e.currentTarget.style.borderColor="var(--border)"; e.currentTarget.style.boxShadow="var(--shadow-sm)"; }}>
-                <div style={{ width:48, height:48, borderRadius:14, background:"var(--red-light)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:22, marginBottom:16 }}>{f.icon}</div>
-                <div style={{ fontWeight:700, fontSize:16, marginBottom:8 }}>{f.title}</div>
-                <div style={{ fontSize:14, color:"var(--text2)", lineHeight:1.7 }}>{f.desc}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── TEST CATALOG ─────────────────────────────────────────── */}
-      <section style={{ padding:"80px 5vw", background:"#fff" }}>
-        <div style={{ maxWidth:1200, margin:"0 auto" }}>
-          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-end", marginBottom:40, flexWrap:"wrap", gap:16 }}>
-            <div>
-              <div style={{ fontSize:12, fontWeight:700, letterSpacing:2, color:"var(--red)", textTransform:"uppercase", marginBottom:12 }}>Test Catalog</div>
-              <h2 style={{ fontSize:"clamp(24px,4vw,38px)", fontWeight:800, letterSpacing:-0.5 }}>50+ Tests, All From Home</h2>
-            </div>
-            <button className="btn btn-outline" onClick={()=>navigate("/login")}>View All Tests →</button>
-          </div>
-          <div className="tests-grid" style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:16 }}>
-            {tests.map((t,i)=>(
-              <div key={i} className="test-card-w" onClick={()=>navigate("/login")}>
-                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:14 }}>
-                  <div style={{ width:42, height:42, borderRadius:12, background:"var(--red-light)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:20 }}>{t.icon}</div>
-                  <span className="tag tag-red">{t.tag}</span>
-                </div>
-                <div style={{ fontWeight:700, fontSize:15, marginBottom:4 }}>{t.name}</div>
-                <div style={{ fontSize:12, color:"var(--text3)", marginBottom:14 }}>Results in {t.time}</div>
-                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-                  <span style={{ fontSize:18, fontWeight:800, color:"var(--red)" }}>Rs. {t.price}</span>
-                  <span style={{ fontSize:11, fontWeight:600, color:"var(--text3)", background:"var(--bg)", padding:"3px 10px", borderRadius:20 }}>{t.code}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── HOW IT WORKS ─────────────────────────────────────────── */}
-      <section style={{ padding:"80px 5vw", background:"var(--bg)" }}>
-        <div style={{ maxWidth:1200, margin:"0 auto" }}>
-          <div style={{ textAlign:"center", marginBottom:52 }}>
-            <div style={{ fontSize:12, fontWeight:700, letterSpacing:2, color:"var(--red)", textTransform:"uppercase", marginBottom:12 }}>Process</div>
-            <h2 style={{ fontSize:"clamp(24px,4vw,38px)", fontWeight:800, letterSpacing:-0.5 }}>How It Works</h2>
-          </div>
-          <div className="steps-grid" style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:24 }}>
-            {steps.map((s,i)=>(
-              <div key={i} style={{ textAlign:"center" }}>
-                <div style={{ position:"relative", display:"inline-block", marginBottom:20 }}>
-                  <div style={{ width:64, height:64, borderRadius:"50%", background:"#fff", border:"2px solid var(--border)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:26, boxShadow:"var(--shadow-sm)" }}>{s.icon}</div>
-                  <div style={{ position:"absolute", top:-6, right:-6, width:22, height:22, borderRadius:"50%", background:"var(--red)", color:"#fff", fontSize:10, fontWeight:800, display:"flex", alignItems:"center", justifyContent:"center" }}>{s.n}</div>
-                </div>
-                <div style={{ fontWeight:700, fontSize:15, marginBottom:8 }}>{s.title}</div>
-                <div style={{ fontSize:13, color:"var(--text2)", lineHeight:1.7 }}>{s.desc}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── TESTIMONIALS ─────────────────────────────────────────── */}
-      <section style={{ padding:"80px 5vw", background:"#fff" }}>
-        <div style={{ maxWidth:1200, margin:"0 auto" }}>
-          <div style={{ textAlign:"center", marginBottom:52 }}>
-            <div style={{ fontSize:12, fontWeight:700, letterSpacing:2, color:"var(--red)", textTransform:"uppercase", marginBottom:12 }}>Reviews</div>
-            <h2 style={{ fontSize:"clamp(24px,4vw,38px)", fontWeight:800, letterSpacing:-0.5 }}>Trusted by Thousands</h2>
-          </div>
-          <div className="testi-grid" style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:20 }}>
-            {testimonials.map((t,i)=>(
-              <div key={i} className="testi-card-w">
-                <div style={{ display:"flex", gap:2, marginBottom:16 }}>
-                  {Array(t.rating).fill(0).map((_,j)=><span key={j} style={{ color:"var(--amber)", fontSize:16 }}>★</span>)}
-                </div>
-                <p style={{ fontSize:14, color:"var(--text2)", lineHeight:1.8, marginBottom:20 }}>"{t.text}"</p>
-                <div style={{ display:"flex", alignItems:"center", gap:12, paddingTop:16, borderTop:"1px solid var(--border)" }}>
-                  <div style={{ width:38, height:38, borderRadius:"50%", background:"var(--red-light)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:16 }}>👤</div>
-                  <div>
-                    <div style={{ fontWeight:700, fontSize:14 }}>{t.name}</div>
-                    <div style={{ fontSize:12, color:"var(--text3)" }}>{t.role}</div>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── FAQ ──────────────────────────────────────────────────── */}
-      <section style={{ padding:"80px 5vw", background:"var(--bg)" }}>
-        <div style={{ maxWidth:700, margin:"0 auto" }}>
-          <div style={{ textAlign:"center", marginBottom:40 }}>
-            <div style={{ fontSize:12, fontWeight:700, letterSpacing:2, color:"var(--red)", textTransform:"uppercase", marginBottom:12 }}>FAQ</div>
-            <h2 style={{ fontSize:"clamp(24px,4vw,36px)", fontWeight:800, letterSpacing:-0.5 }}>Frequently Asked</h2>
-          </div>
-          {[
-            { q:"How fast will I get my results?", a:"Most tests are delivered within 2–4 hours. Complex panels may take up to 24 hours." },
-            { q:"Are reports accepted by hospitals?", a:"Yes. All reports are verified by certified pathologists with a unique barcode/QR code that any doctor can scan." },
-            { q:"Do I need to fast before my test?", a:"Depends on the test. Tests like FBS or Lipid Profile require 8–12 hours fasting. Prep instructions are shown at booking." },
-            { q:"Is the home collection process safe?", a:"Absolutely. Our phlebotomists use single-use, sterile equipment and follow strict WHO safety guidelines." },
-          ].map((faq,i)=>(
-            <details key={i} className="faq-item">
-              <summary className="faq-q">
-                {faq.q}
-                <span style={{ color:"var(--red)", fontSize:20, fontWeight:300, flexShrink:0 }}>+</span>
-              </summary>
-              <div style={{ padding:"0 20px 18px", fontSize:14, color:"var(--text2)", lineHeight:1.8 }}>{faq.a}</div>
-            </details>
-          ))}
-        </div>
-      </section>
-
-      {/* ── CTA ──────────────────────────────────────────────────── */}
-      <section style={{ padding:"80px 5vw", background:"var(--red)" }}>
-        <div style={{ maxWidth:900, margin:"0 auto" }}>
-          <div className="cta-flex" style={{ display:"flex", justifyContent:"space-between", alignItems:"center", gap:32 }}>
-            <div>
-              <h2 style={{ fontSize:"clamp(24px,4vw,40px)", fontWeight:800, color:"#fff", letterSpacing:-0.5, marginBottom:12 }}>
-                Book your first test<br />in under 2 minutes
-              </h2>
-              <p style={{ fontSize:16, color:"rgba(255,255,255,0.8)", lineHeight:1.7 }}>
-                No clinic visits. No waiting rooms. Just accurate results at your convenience.
-              </p>
-            </div>
-            <div style={{ display:"flex", gap:12, flexWrap:"wrap", flexShrink:0 }}>
-              <button onClick={()=>navigate("/login")} style={{ background:"#fff", color:"var(--red)", border:"none", borderRadius:12, padding:"14px 28px", fontFamily:"var(--font)", fontWeight:800, fontSize:15, cursor:"pointer", transition:"transform 0.2s", whiteSpace:"nowrap" }}
-                onMouseOver={e=>e.target.style.transform="scale(1.03)"}
-                onMouseOut={e=>e.target.style.transform="scale(1)"}>
-                Create Free Account →
+      {/* ================= HERO ================= */}
+      <section id="hero" ref={heroRef}>
+        <motion.div
+          className="container hero-grid"
+          style={{ y: heroY, opacity: heroOpacity, scale: heroScale }}
+        >
+          <motion.div
+            initial={{ opacity: 0, x: -40 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.8 }}
+          >
+            <div className="eyebrow">Apple-Grade Medical UX</div>
+            <h1>
+              Hospital. <br />
+              <span style={{ color: "#ff2d55" }}>At Home.</span>
+            </h1>
+            <p className="lead" style={{ marginTop: 24 }}>
+              A premium home blood testing system designed with precision,
+              clarity, and intelligence. Certified phlebotomists. Verified reports.
+              All in your pocket.
+            </p>
+            <div style={{ marginTop: 36, display: "flex", gap: 12, flexWrap: "wrap" }}>
+              <button className="btn btn-primary" onClick={() => navigate("/login")}>
+                Start Experience →
               </button>
-              <button onClick={()=>navigate("/login")} style={{ background:"rgba(255,255,255,0.15)", color:"#fff", border:"1.5px solid rgba(255,255,255,0.4)", borderRadius:12, padding:"14px 28px", fontFamily:"var(--font)", fontWeight:600, fontSize:15, cursor:"pointer", whiteSpace:"nowrap" }}>
-                Sign In
+              <button className="btn btn-ghost" onClick={() => scrollTo("about")}>
+                Learn More
               </button>
             </div>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 1, delay: 0.3 }}
+          >
+            <canvas ref={dnaCanvasRef} className="dna-canvas" />
+          </motion.div>
+        </motion.div>
+      </section>
+
+      {/* ================= ABOUT ================= */}
+      <section id="about">
+        <div className="container about-grid">
+          <motion.div
+            initial={{ opacity: 0, x: -40 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.7 }}
+          >
+            <canvas ref={bloodCanvasRef} className="blood-canvas" />
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, x: 40 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.7, delay: 0.2 }}
+          >
+            <div className="eyebrow">What We Do</div>
+            <h2>Medical Intelligence, Reimagined.</h2>
+            <p className="lead" style={{ marginBottom: 20 }}>
+              Every drop tells a story. We make sure that story reaches you fast,
+              accurate, and clear — without ever leaving home.
+            </p>
+            <p>
+              HemoVisit connects you with NABL-certified labs and trained phlebotomists
+              across Sri Lanka. From routine blood work to advanced diagnostic panels,
+              we deliver hospital-grade results with the convenience of a tap.
+            </p>
+          </motion.div>
+        </div>
+      </section>
+
+      {/* ================= FEATURES ================= */}
+      <section id="features">
+        <div className="container">
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6 }}
+            style={{ textAlign: "center" }}
+          >
+            <div className="eyebrow">Features</div>
+            <h2>Everything you need.<br />Nothing you don't.</h2>
+            <p className="lead" style={{ margin: "0 auto" }}>
+              Six pillars holding up the smoothest home diagnostics experience in the region.
+            </p>
+          </motion.div>
+
+          <div className="features-grid">
+            {features.map((f, i) => (
+              <motion.div
+                key={f.title}
+                className="feature-card"
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.5, delay: i * 0.08 }}
+              >
+                <div className="feature-icon">{f.icon}</div>
+                <h3>{f.title}</h3>
+                <p>{f.desc}</p>
+              </motion.div>
+            ))}
           </div>
         </div>
       </section>
 
-      {/* ── FOOTER ───────────────────────────────────────────────── */}
-      <footer style={{ background:"var(--text)", padding:"32px 5vw" }}>
-        <div className="footer-flex" style={{ maxWidth:1200, margin:"0 auto", display:"flex", justifyContent:"space-between", alignItems:"center", gap:16 }}>
-          <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-            <div style={{ width:28, height:28, borderRadius:8, background:"var(--red)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:14 }}>🩸</div>
-            <span style={{ fontWeight:700, color:"#fff", fontSize:16 }}>HemoVisit</span>
-            <span style={{ color:"rgba(255,255,255,0.3)", margin:"0 8px" }}>·</span>
-            <span style={{ fontSize:13, color:"rgba(255,255,255,0.4)" }}>Jaffna, Sri Lanka</span>
+      {/* ================= PROCESS ================= */}
+      <section id="process">
+        <div className="container">
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6 }}
+            style={{ textAlign: "center" }}
+          >
+            <div className="eyebrow">How It Works</div>
+            <h2>Four steps. One report.</h2>
+          </motion.div>
+
+          <div className="process-grid">
+            <div className="process-line" />
+            {process.map((p, i) => (
+              <motion.div
+                key={p.step}
+                className="process-card"
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.5, delay: i * 0.12 }}
+              >
+                <div className="process-num">{p.step}</div>
+                <h3>{p.title}</h3>
+                <p>{p.desc}</p>
+              </motion.div>
+            ))}
           </div>
-          <div style={{ fontSize:13, color:"rgba(255,255,255,0.3)" }}>© 2026 HemoVisit · Built by Joyel Dilshan</div>
+        </div>
+      </section>
+
+      {/* ================= STATS ================= */}
+      <section id="stats">
+        <div className="container">
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6 }}
+            style={{ textAlign: "center" }}
+          >
+            <div className="eyebrow">By the Numbers</div>
+            <h2>Trusted across the island.</h2>
+          </motion.div>
+
+          <div className="stats-grid">
+            {stats.map((s, i) => (
+              <motion.div
+                key={s.label}
+                className="stat-card"
+                initial={{ opacity: 0, scale: 0.7 }}
+                whileInView={{ opacity: 1, scale: 1 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.6, delay: i * 0.1, type: "spring" }}
+              >
+                <div className="stat-value">{s.value}</div>
+                <div className="stat-label">{s.label}</div>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ================= REVIEWS ================= */}
+      <section id="reviews">
+        <div className="container">
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6 }}
+            style={{ textAlign: "center" }}
+          >
+            <div className="eyebrow">Reviews</div>
+            <h2>What patients say.</h2>
+          </motion.div>
+
+          <div className="review-grid">
+            {reviews.map((r, i) => (
+              <motion.div
+                key={r.name}
+                className="review-card"
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.5, delay: i * 0.1 }}
+              >
+                <div className="review-stars">{"★".repeat(r.stars)}</div>
+                <p className="review-text">"{r.text}"</p>
+                <div className="review-meta">
+                  <div className="review-avatar">{r.name.charAt(0)}</div>
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: 14 }}>{r.name}</div>
+                    <div style={{ fontSize: 12, color: "rgba(0,0,0,0.5)" }}>{r.role}</div>
+                  </div>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ================= TEAM ================= */}
+      <section id="team">
+        <div className="container">
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6 }}
+            style={{ textAlign: "center" }}
+          >
+            <div className="eyebrow">The Team</div>
+            <h2>Behind every report.</h2>
+          </motion.div>
+
+          <div className="team-grid">
+            {team.map((t, i) => (
+              <motion.div
+                key={t.name}
+                className="team-card"
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.5, delay: i * 0.1 }}
+              >
+                <div className="team-icon">{t.icon}</div>
+                <h3>{t.name}</h3>
+                <p style={{ fontSize: 13 }}>{t.role}</p>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ================= FAQ ================= */}
+      <section id="faq">
+        <div className="container" style={{ maxWidth: 800 }}>
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6 }}
+            style={{ textAlign: "center" }}
+          >
+            <div className="eyebrow">FAQ</div>
+            <h2>Common questions.</h2>
+          </motion.div>
+
+          <div className="faq-list">
+            {faqs.map((f, i) => (
+              <FaqItem key={i} q={f.q} a={f.a} delay={i * 0.08} />
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ================= CONTACT ================= */}
+      <section id="contact">
+        <div className="container">
+          <motion.div
+            className="contact-card"
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.7 }}
+          >
+            <div className="eyebrow" style={{ background: "rgba(255,45,85,0.15)" }}>Get In Touch</div>
+            <h2>Ready when you are.</h2>
+            <p style={{ maxWidth: 500, margin: "10px auto 0" }}>
+              Book your first home blood test today, or reach out with any question.
+              We typically reply within an hour.
+            </p>
+
+            <div className="contact-row">
+              <div className="contact-item">✉️ support@hemovisit.com</div>
+              <div className="contact-item">📞 +44 7565 20619</div>
+              <div className="contact-item">📍 Jaffna, Sri Lanka</div>
+            </div>
+
+            <button
+              className="btn btn-primary"
+              style={{ marginTop: 36, padding: "14px 32px", fontSize: 15 }}
+              onClick={() => navigate("/login")}
+            >
+              Book Your Test →
+            </button>
+          </motion.div>
+        </div>
+      </section>
+
+      {/* ================= FOOTER ================= */}
+      <footer className="footer">
+        <div className="footer-content">
+          <div className="brand">
+            <span className="brand-dot" />
+            HEMOVISIT
+          </div>
+          <p>© 2026 HemoVisit. Built with care in Jaffna.</p>
         </div>
       </footer>
-
     </div>
+  );
+}
+
+// ============== FAQ ITEM (collapsible) ==============
+function FaqItem({ q, a, delay }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <motion.div
+      className={`faq-item ${open ? "open" : ""}`}
+      onClick={() => setOpen(!open)}
+      initial={{ opacity: 0, y: 20 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true }}
+      transition={{ duration: 0.4, delay }}
+    >
+      <div className="faq-q">
+        {q}
+        <span className="faq-toggle">+</span>
+      </div>
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            className="faq-a"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.25 }}
+          >
+            {a}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
   );
 }

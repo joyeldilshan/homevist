@@ -34,11 +34,11 @@ export default function AuthPage() {
     } catch {}
   };
 
-  const toggle = () => {
-    if (toggling) return;
+  const switchTo = (loginMode) => {
+    if (toggling || isLogin === loginMode) return;
     playSound();
     setToggling(true);
-    setTimeout(() => { setIsLogin(v=>!v); setToggling(false); }, 300);
+    setTimeout(() => { setIsLogin(loginMode); setToggling(false); }, 300);
   };
 
   const handleLogin = async (e) => {
@@ -70,18 +70,6 @@ export default function AuthPage() {
     finally { setLoading(false); }
   };
 
-  const demoLogin = async (email, pw) => {
-    setLoading(true);
-    try {
-      const user = await login(email, pw);
-      toast.success(`Demo: ${user.role}`);
-      if      (user.role==="admin")        navigate("/admin");
-      else if (user.role==="phlebotomist") navigate("/phlebotomist");
-      else                                  navigate("/user");
-    } catch { toast.error("Demo login failed."); }
-    finally { setLoading(false); }
-  };
-
   return (
     <div style={{ minHeight:"100vh", background:"var(--bg)", display:"flex", alignItems:"center", justifyContent:"center", padding:"20px", fontFamily:"var(--font)" }}>
       <LabBackground opacity={0.2} />
@@ -92,22 +80,57 @@ export default function AuthPage() {
         .form-enter-l { animation:slideLeft  0.3s ease forwards; }
         .form-exit    { opacity:0; transform:translateX(-10px); transition:all 0.25s; }
 
-        @keyframes glow { 0%,100%{box-shadow:0 0 0 0 rgba(229,62,62,0.3)} 50%{box-shadow:0 0 0 6px rgba(229,62,62,0)} }
-        .toggle-on { animation:glow 2s ease-in-out infinite; }
-
-        .demo-btn-w {
-          flex:1; padding:10px 8px; border:1.5px solid var(--border);
-          border-radius:var(--radius-md); background:#fff; color:var(--text2);
-          font-family:var(--font); font-size:12px; font-weight:600;
-          cursor:pointer; transition:all 0.2s; text-align:center;
+        .home-btn {
+          position:absolute; top:24px; left:24px; z-index:10;
+          display:flex; align-items:center; gap:8px;
+          padding:10px 16px; border:1.5px solid var(--border);
+          border-radius:50px; background:rgba(255,255,255,0.9);
+          backdrop-filter:blur(8px); color:var(--text2);
+          font-family:var(--font); font-size:13px; font-weight:600;
+          cursor:pointer; transition:all 0.2s;
         }
-        .demo-btn-w:hover { border-color:var(--red); color:var(--red); background:var(--red-light); }
+        .home-btn:hover { border-color:var(--red); color:var(--red); transform:translateX(-2px); }
+
+        /* === BOLD SPLIT BLOCK TOGGLE === */
+        .split-block {
+          display: flex; background: var(--bg);
+          border: 1.5px solid var(--border);
+          border-radius: 12px; padding: 4px;
+          position: relative; width: 100%;
+          margin-bottom: 24px;
+        }
+        .split-block .slider {
+          position: absolute; top: 4px; bottom: 4px;
+          width: calc(50% - 4px);
+          background: linear-gradient(135deg, var(--red), #C53030);
+          border-radius: 9px; z-index: 1;
+          transition: left 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+          box-shadow: 0 4px 12px rgba(229,62,62,0.3);
+          left: 4px;
+        }
+        .split-block.right .slider { left: 50%; }
+        .split-btn {
+          flex: 1; background: transparent; border: none;
+          padding: 12px 8px; cursor: pointer;
+          font-family: var(--font); font-size: 13px; font-weight: 700;
+          letter-spacing: 0.8px; color: var(--text3);
+          border-radius: 9px; position: relative; z-index: 2;
+          transition: color 0.3s;
+        }
+        .split-btn.on { color: #fff; }
+        .split-btn:not(.on):hover { color: var(--text); }
 
         @media(max-width:768px) {
           .auth-grid { grid-template-columns:1fr !important; }
           .auth-left  { display:none !important; }
+          .home-btn   { top:16px; left:16px; }
         }
       `}</style>
+
+      {/* Home button */}
+      <button className="home-btn" onClick={()=>navigate("/")}>
+        ← Home
+      </button>
 
       <div className="auth-grid" style={{ width:"100%", maxWidth:900, background:"#fff", borderRadius:24, boxShadow:"0 20px 60px rgba(0,0,0,0.1)", overflow:"hidden", display:"grid", gridTemplateColumns:"1fr 1fr" }}>
 
@@ -157,26 +180,33 @@ export default function AuthPage() {
         {/* Right panel — form */}
         <div style={{ padding:"48px 40px", display:"flex", flexDirection:"column" }}>
 
-          {/* Header + toggle */}
-          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:32 }}>
-            <div>
-              <div style={{ fontSize:11, fontWeight:700, letterSpacing:2, color:"var(--red)", textTransform:"uppercase", marginBottom:8 }}>
-                {isLogin ? "Welcome back" : "Get started"}
-              </div>
-              <h1 style={{ fontSize:28, fontWeight:800, letterSpacing:-0.5, color:"var(--text)" }}>
-                {isLogin ? "Sign In" : "Create Account"}
-              </h1>
+          {/* Header */}
+          <div style={{ marginBottom:24 }}>
+            <div style={{ fontSize:11, fontWeight:700, letterSpacing:2, color:"var(--red)", textTransform:"uppercase", marginBottom:8 }}>
+              {isLogin ? "Welcome back" : "Get started"}
             </div>
+            <h1 style={{ fontSize:28, fontWeight:800, letterSpacing:-0.5, color:"var(--text)" }}>
+              {isLogin ? "Sign In" : "Create Account"}
+            </h1>
+          </div>
 
-            {/* Toggle switch */}
-            <div onClick={toggle} style={{ display:"flex", alignItems:"center", gap:10, cursor:"pointer", background:"var(--bg)", border:"1.5px solid var(--border)", borderRadius:50, padding:"8px 16px 8px 10px", transition:"all 0.3s", userSelect:"none" }}>
-              <div style={{ width:46, height:26, borderRadius:50, background:isLogin?"var(--border)":"var(--red)", position:"relative", transition:"all 0.3s", flexShrink:0 }} className={!isLogin?"toggle-on":""}>
-                <div style={{ position:"absolute", top:3, width:20, height:20, borderRadius:"50%", background:"#fff", transition:"left 0.3s cubic-bezier(0.34,1.56,0.64,1)", left:isLogin?"3px":"23px", boxShadow:"0 2px 6px rgba(0,0,0,0.2)" }} />
-              </div>
-              <span style={{ fontSize:13, fontWeight:600, color:isLogin?"var(--text3)":"var(--red)" }}>
-                {isLogin?"Register":"Login"}
-              </span>
-            </div>
+          {/* Bold split block toggle */}
+          <div className={`split-block ${!isLogin ? "right" : ""}`}>
+            <span className="slider" />
+            <button
+              type="button"
+              className={`split-btn ${isLogin ? "on" : ""}`}
+              onClick={() => switchTo(true)}
+            >
+              LOGIN
+            </button>
+            <button
+              type="button"
+              className={`split-btn ${!isLogin ? "on" : ""}`}
+              onClick={() => switchTo(false)}
+            >
+              REGISTER
+            </button>
           </div>
 
           {/* Forms */}
@@ -201,20 +231,9 @@ export default function AuthPage() {
                   {loading ? "Signing in..." : "Sign In →"}
                 </button>
 
-                <div style={{ display:"flex", alignItems:"center", gap:10, margin:"20px 0 14px" }}>
-                  <div style={{ flex:1, height:1, background:"var(--border)" }} />
-                  <span style={{ fontSize:12, color:"var(--text4)", whiteSpace:"nowrap" }}>Quick demo access</span>
-                  <div style={{ flex:1, height:1, background:"var(--border)" }} />
-                </div>
-                <div style={{ display:"flex", gap:8 }}>
-                  <button type="button" className="demo-btn-w" onClick={()=>demoLogin("user@hemovisit.lk","user123")}>👤 Patient</button>
-                  <button type="button" className="demo-btn-w" onClick={()=>demoLogin("rajan@hemovisit.lk","phlebo123")}>🧪 Phlebotomist</button>
-                  <button type="button" className="demo-btn-w" onClick={()=>demoLogin("admin@hemovisit.lk","admin123")}>🛠 Admin</button>
-                </div>
-
                 <p style={{ marginTop:24, fontSize:13, color:"var(--text3)", textAlign:"center" }}>
                   No account?{" "}
-                  <span onClick={toggle} style={{ color:"var(--red)", cursor:"pointer", fontWeight:600 }}>Register free →</span>
+                  <span onClick={() => switchTo(false)} style={{ color:"var(--red)", cursor:"pointer", fontWeight:600 }}>Register free →</span>
                 </p>
               </form>
             )}
@@ -256,7 +275,7 @@ export default function AuthPage() {
                 </button>
                 <p style={{ marginTop:16, fontSize:13, color:"var(--text3)", textAlign:"center" }}>
                   Already have an account?{" "}
-                  <span onClick={toggle} style={{ color:"var(--red)", cursor:"pointer", fontWeight:600 }}>Sign in →</span>
+                  <span onClick={() => switchTo(true)} style={{ color:"var(--red)", cursor:"pointer", fontWeight:600 }}>Sign in →</span>
                 </p>
               </form>
             )}
