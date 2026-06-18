@@ -104,6 +104,11 @@ const USERS = [
     serviceArea: "Jaffna South", licenseNumber: "HV-PHL-04",
     rating: 4.9, totalRatings: 98, isActive: true, isVerified: true,
   },
+  {
+    name: "Lab Tech One", email: "lab@example.com",
+    phone: "+447700900005", password: "***REMOVED***",
+    role: "mlt", isActive: true, isVerified: true,
+  },
 ];
 
 async function seed() {
@@ -127,9 +132,10 @@ async function seed() {
     }
 
     console.log("\n🎉 Seed complete! Login credentials:");
-    console.log("   Admin       → admin@example.com  / ***REMOVED***");
-    console.log("   Patient     → patient@example.com    / ***REMOVED***");
-    console.log("   Phlebotomist→ phlebotomist1@example.com  / ***REMOVED***");
+    console.log("   Admin        → admin@example.com / ***REMOVED***");
+    console.log("   Patient      → patient@example.com         / ***REMOVED***");
+    console.log("   Phlebotomist → phlebotomist1@example.com         / ***REMOVED***");
+    console.log("   MLT          → lab@example.com          / ***REMOVED***");
 
     process.exit(0);
   } catch (err) {

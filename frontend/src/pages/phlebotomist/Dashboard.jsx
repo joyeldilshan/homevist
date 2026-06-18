@@ -8,7 +8,7 @@ import toast from "react-hot-toast";
 const STATUS_CONFIG = {
   pending:          { color:"#D69E2E", bg:"#FFFFF0", border:"#FEFCBF", label:"Pending"          },
   confirmed:        { color:"#3182CE", bg:"#EBF8FF", border:"#BEE3F8", label:"Confirmed"        },
-  sample_collected: { color:"#805AD5", bg:"#FAF5FF", border:"#E9D8FD", label:"Sample Collected" },
+  sample_collected: { color:"#805AD5", bg:"#FAF5FF", border:"#E9D8FD", label:"Sent to Lab"      },
   processing:       { color:"#D69E2E", bg:"#FFFFF0", border:"#FEFCBF", label:"Lab Processing"   },
   completed:        { color:"#38A169", bg:"#F0FFF4", border:"#C6F6D5", label:"Completed"        },
   cancelled:        { color:"#718096", bg:"#F7FAFC", border:"#E2E8F0", label:"Cancelled"        },
@@ -25,6 +25,9 @@ function StatusBadge({ status }) {
   );
 }
 
+const getTestNames = (b) =>
+  b.testTypes?.length ? b.testTypes.map(t => t.name).join(", ") : (b.testType?.name || "—");
+
 export default function PhleboDashboard() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
@@ -32,6 +35,7 @@ export default function PhleboDashboard() {
   const [bookings,  setBookings]  = useState([]);
   const [available, setAvailable] = useState(user?.isAvailable||false);
   const [sideOpen,  setSideOpen]  = useState(false);
+  const [sending,   setSending]   = useState(null); // bookingId currently being sent
 
   const fetchBookings = async () => {
     try {
@@ -51,6 +55,21 @@ export default function PhleboDashboard() {
     } catch(err) { toast.error(err.response?.data?.message || "Failed to update."); }
   };
 
+  // Create a Sample record → this is what makes it appear in the MLT dashboard.
+  // Backend is idempotent, so clicking on an already-sent booking is safe.
+  const sendToLab = async (bookingId) => {
+    setSending(bookingId);
+    try {
+      const res = await api.post("/samples", { bookingId });
+      toast.success(res.data?.message || "🧫 Sample sent to lab!");
+      fetchBookings();
+    } catch(err) {
+      toast.error(err.response?.data?.message || "Failed to send to lab.");
+    } finally {
+      setSending(null);
+    }
+  };
+
   const toggleAvailability = async () => {
     try {
       await api.put("/auth/update-profile", { isAvailable:!available });
@@ -61,7 +80,6 @@ export default function PhleboDashboard() {
 
   const active    = bookings.filter(b=>!["completed","cancelled","rejected"].includes(b.status));
   const completed = bookings.filter(b=>b.status==="completed");
-  const pending   = bookings.filter(b=>b.status==="pending");
 
   const TABS = [
     { id:"dashboard", icon:"📊", label:"Dashboard" },
@@ -72,12 +90,11 @@ export default function PhleboDashboard() {
 
   const JobCard = ({ b }) => (
     <div style={{ background:"#fff", border:"1.5px solid var(--border)", borderRadius:14, padding:"20px 22px", marginBottom:12, borderLeft:`3px solid ${STATUS_CONFIG[b.status]?.color||"var(--border2)"}` }}>
-      <LabBackground opacity={0.1} />
       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", flexWrap:"wrap", gap:10, marginBottom:14 }}>
         <div>
           <div style={{ fontWeight:700, fontSize:15, marginBottom:5 }}>{b.user?.name||"Patient"}</div>
           <div style={{ fontSize:12, color:"var(--text3)", lineHeight:1.9 }}>
-            🧪 {b.testType?.name||"—"}<br />
+            🧪 {getTestNames(b)}<br />
             📅 {b.appointmentDate?new Date(b.appointmentDate).toDateString():"—"} &nbsp; ⏰ {b.appointmentTime||"—"}<br />
             📍 {b.address||"—"}<br />
             📞 {b.user?.phone||"—"}<br />
@@ -91,15 +108,14 @@ export default function PhleboDashboard() {
       {/* Flow guide */}
       <div style={{ display:"flex", alignItems:"center", gap:4, marginBottom:12, flexWrap:"wrap" }}>
         {["pending","confirmed","sample_collected","processing","completed"].map((s,i,arr)=>{
-          const steps = arr;
-          const cur   = steps.indexOf(b.status);
-          const me    = steps.indexOf(s);
-          const c     = STATUS_CONFIG[s];
+          const cur = arr.indexOf(b.status);
+          const me  = arr.indexOf(s);
+          const c   = STATUS_CONFIG[s];
           return (
             <div key={s} style={{ display:"flex", alignItems:"center", gap:4 }}>
               <div style={{ width:8, height:8, borderRadius:"50%", background:me<=cur?c.color:"var(--border2)", flexShrink:0, transition:"background 0.3s" }} />
               <span style={{ fontSize:10, color:me===cur?c.color:me<cur?"var(--text3)":"var(--text4)", fontWeight:me===cur?700:400 }}>
-                {["Pending","Confirmed","Collected","Processing","Done"][i]}
+                {["Pending","Confirmed","At Lab","Processing","Done"][i]}
               </span>
               {i<arr.length-1 && <span style={{ color:"var(--border2)", fontSize:10 }}>→</span>}
             </div>
@@ -108,7 +124,7 @@ export default function PhleboDashboard() {
       </div>
 
       {/* Action buttons */}
-      <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
+      <div style={{ display:"flex", gap:8, flexWrap:"wrap", alignItems:"center" }}>
         {b.status==="pending" && (
           <>
             <button onClick={()=>updateStatus(b._id,"confirmed","Accepted by phlebotomist")}
@@ -121,28 +137,34 @@ export default function PhleboDashboard() {
             </button>
           </>
         )}
-        {b.status==="confirmed" && (
-          <button onClick={()=>updateStatus(b._id,"sample_collected","Sample collected at patient location")}
-            style={{ padding:"8px 16px", borderRadius:8, border:"1.5px solid #E9D8FD", background:"#FAF5FF", color:"#553C9A", fontFamily:"var(--font)", fontWeight:700, fontSize:13, cursor:"pointer" }}>
-            🩸 Mark Sample Collected
+
+        {/* Show Send-to-Lab on BOTH confirmed AND sample_collected.
+            This guarantees a Sample record gets created and rescues any
+            booking stranded at "sample_collected" without one. The backend
+            is idempotent, so clicking again is always safe. */}
+        {(b.status==="confirmed" || b.status==="sample_collected") && (
+          <button onClick={()=>sendToLab(b._id)} disabled={sending===b._id}
+            style={{ padding:"8px 16px", borderRadius:8, border:"1.5px solid #C3EDDE", background:"#F0FBF7", color:"#1E6F5C", fontFamily:"var(--font)", fontWeight:700, fontSize:13, cursor:"pointer", opacity:sending===b._id?0.6:1 }}>
+            {sending===b._id ? "Sending..." : "🧫 Collect & Send to Lab"}
           </button>
         )}
         {b.status==="sample_collected" && (
-          <button onClick={()=>updateStatus(b._id,"processing","Sample sent to lab")}
-            style={{ padding:"8px 16px", borderRadius:8, border:"1.5px solid #FEFCBF", background:"#FFFFF0", color:"#744210", fontFamily:"var(--font)", fontWeight:700, fontSize:13, cursor:"pointer" }}>
-            🔬 Mark Lab Processing
-          </button>
+          <span style={{ fontSize:12, color:"#805AD5", fontWeight:600, display:"flex", alignItems:"center", gap:5 }}>
+            <span style={{ width:7, height:7, borderRadius:"50%", background:"#805AD5", display:"inline-block" }} />
+            At lab
+          </span>
         )}
+
         {b.status==="processing" && (
-          <button onClick={()=>updateStatus(b._id,"completed","Report ready for patient")}
-            style={{ padding:"8px 16px", borderRadius:8, border:"1.5px solid #C6F6D5", background:"#F0FFF4", color:"#276749", fontFamily:"var(--font)", fontWeight:700, fontSize:13, cursor:"pointer" }}>
-            📄 Mark Report Ready
-          </button>
+          <span style={{ fontSize:12, color:"#D69E2E", fontWeight:700, display:"flex", alignItems:"center", gap:5 }}>
+            <span style={{ width:7, height:7, borderRadius:"50%", background:"#D69E2E", display:"inline-block" }} />
+            Lab is processing the sample
+          </span>
         )}
         {b.status==="completed" && (
           <span style={{ fontSize:12, color:"var(--green)", fontWeight:700, display:"flex", alignItems:"center", gap:5 }}>
             <span style={{ width:7, height:7, borderRadius:"50%", background:"var(--green)", display:"inline-block" }} />
-            Report delivered
+            Report delivered to patient
           </span>
         )}
       </div>
@@ -156,7 +178,6 @@ export default function PhleboDashboard() {
         <span style={{ fontWeight:800, fontSize:16, letterSpacing:-0.3 }}>HemoVisit</span>
       </div>
 
-      {/* Availability toggle */}
       <div style={{ margin:"0 4px 16px", padding:"14px", borderRadius:12, background:available?"#F0FFF4":"var(--bg)", border:`1.5px solid ${available?"#C6F6D5":"var(--border)"}`, transition:"all 0.3s" }}>
         <div style={{ fontSize:11, fontWeight:700, color:"var(--text3)", textTransform:"uppercase", letterSpacing:0.5, marginBottom:8 }}>Availability</div>
         <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
@@ -187,21 +208,22 @@ export default function PhleboDashboard() {
   );
 
   return (
-    <div style={{ minHeight:"100vh", background:"var(--bg)", display:"flex", fontFamily:"var(--font)" }}>
+    <div style={{ minHeight:"100vh", background:"var(--bg)", display:"flex", fontFamily:"var(--font)", position:"relative" }}>
+      <LabBackground opacity={0.1} />
+
       <style>{`
         @keyframes fadeUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
         .fade-up { animation:fadeUp 0.4s ease forwards; }
         @media(max-width:768px) {
           .phle-sidebar { display:none !important; }
           .phle-topbar  { display:flex !important; }
-          .phle-pad     { padding:20px 16px !important; }
+          .phle-pad     { padding:20px 16px !important; padding-top:76px !important; }
           .phle-stats   { grid-template-columns:repeat(2,1fr) !important; }
         }
       `}</style>
 
-      <div className="phle-sidebar hide-mobile"><Sidebar /></div>
+      <div className="phle-sidebar hide-mobile" style={{ position:"relative", zIndex:10 }}><Sidebar /></div>
 
-      {/* Mobile topbar */}
       <div className="phle-topbar" style={{ display:"none", position:"fixed", top:0, left:0, right:0, height:56, background:"#fff", borderBottom:"1px solid var(--border)", zIndex:100, alignItems:"center", justifyContent:"space-between", padding:"0 16px" }}>
         <span style={{ fontWeight:800, fontSize:15 }}>🩸 HemoVisit</span>
         <button onClick={()=>setSideOpen(true)} style={{ background:"none", border:"none", fontSize:20, cursor:"pointer" }}>☰</button>
@@ -220,10 +242,9 @@ export default function PhleboDashboard() {
         </div>
       )}
 
-      <main className="phle-pad" style={{ flex:1, padding:"32px 40px", overflowY:"auto" }}>
+      <main className="phle-pad" style={{ flex:1, padding:"32px 40px", overflowY:"auto", position:"relative", zIndex:1 }}>
         <div style={{ maxWidth:860, margin:"0 auto" }}>
 
-          {/* DASHBOARD */}
           {tab==="dashboard" && (
             <div className="fade-up">
               <div style={{ marginBottom:28 }}>
@@ -237,10 +258,10 @@ export default function PhleboDashboard() {
 
               <div className="phle-stats" style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:14, marginBottom:24 }}>
                 {[
-                  { icon:"📋", label:"Total Jobs",  value:bookings.length,               color:"var(--blue)"  },
-                  { icon:"🔄", label:"Active",       value:active.length,                 color:"var(--amber)" },
-                  { icon:"✅", label:"Completed",    value:completed.length,              color:"var(--green)" },
-                  { icon:"⭐", label:"Rating",       value:user?.rating?.toFixed(1)||"5.0",color:"var(--amber)" },
+                  { icon:"📋", label:"Total Jobs",  value:bookings.length,                color:"var(--blue)"  },
+                  { icon:"🔄", label:"Active",       value:active.length,                  color:"var(--amber)" },
+                  { icon:"✅", label:"Completed",    value:completed.length,               color:"var(--green)" },
+                  { icon:"⭐", label:"Rating",       value:user?.rating?.toFixed(1)||"5.0", color:"var(--amber)" },
                 ].map(s=>(
                   <div key={s.label} style={{ background:"#fff", border:"1.5px solid var(--border)", borderRadius:14, padding:20, boxShadow:"var(--shadow-sm)" }}>
                     <div style={{ fontSize:22, marginBottom:10 }}>{s.icon}</div>
@@ -251,7 +272,7 @@ export default function PhleboDashboard() {
               </div>
 
               <div style={{ marginBottom:16, display:"flex", alignItems:"center", gap:8 }}>
-                <h3 style={{ fontSize:16, fontWeight:700 }}>Upcoming & Active Jobs ({active.length})</h3>
+                <h3 style={{ fontSize:16, fontWeight:700 }}>Upcoming &amp; Active Jobs ({active.length})</h3>
               </div>
               {active.length===0 ? (
                 <div style={{ background:"#fff", border:"1.5px solid var(--border)", borderRadius:14, padding:"48px 24px", textAlign:"center" }}>
@@ -263,7 +284,6 @@ export default function PhleboDashboard() {
             </div>
           )}
 
-          {/* JOBS */}
           {tab==="jobs" && (
             <div className="fade-up">
               <div style={{ marginBottom:28 }}>
@@ -280,7 +300,6 @@ export default function PhleboDashboard() {
             </div>
           )}
 
-          {/* HISTORY */}
           {tab==="history" && (
             <div className="fade-up">
               <div style={{ marginBottom:28 }}>
@@ -298,7 +317,7 @@ export default function PhleboDashboard() {
                     <div>
                       <div style={{ fontWeight:700, fontSize:15, marginBottom:4 }}>{b.user?.name||"—"}</div>
                       <div style={{ fontSize:12, color:"var(--text3)" }}>
-                        🧪 {b.testType?.name||"—"} &nbsp; 📅 {b.appointmentDate?new Date(b.appointmentDate).toDateString():"—"} &nbsp; 💰 Rs. {b.amount?.toLocaleString()||"—"}
+                        🧪 {getTestNames(b)} &nbsp; 📅 {b.appointmentDate?new Date(b.appointmentDate).toDateString():"—"} &nbsp; 💰 Rs. {b.amount?.toLocaleString()||"—"}
                       </div>
                     </div>
                     <StatusBadge status="completed" />
@@ -308,7 +327,6 @@ export default function PhleboDashboard() {
             </div>
           )}
 
-          {/* PROFILE */}
           {tab==="profile" && (
             <div className="fade-up">
               <div style={{ marginBottom:28 }}>

@@ -23,6 +23,8 @@ const io = new Server(server, {
   },
 });
 
+app.set("etag", false);
+
 app.use((req, _res, next) => { req.io = io; next(); });
 
 io.on("connection", (socket) => {
@@ -43,6 +45,8 @@ app.use("/api/auth",          authRoutes);
 app.use("/api/bookings",      bookingRoutes);
 app.use("/api/phlebotomists", phlebotomistRoutes);
 app.use("/api/test-types",    testTypeRoutes);
+app.use("/api/samples", require("./routes/sample.routes"));
+app.use("/api/reports", require("./routes/labReport.routes"));
 
 app.get("/api/health", (_req, res) => {
   res.json({ status: "OK", project: "HemoVisit", version: "1.0.0" });
