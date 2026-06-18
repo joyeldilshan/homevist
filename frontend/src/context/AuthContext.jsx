@@ -1,49 +1,87 @@
 import { createContext, useContext, useState, useEffect } from "react";
 import api from "../utils/api";
 
+// ── Auth context ───────────────────────────────────────────────
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
-  const [user,    setUser]    = useState(null);
+  // Restore user from localStorage on first load
+  const [user, setUser] = useState(() => {
+    try {
+      const stored = localStorage.getItem("user");
+      return stored ? JSON.parse(stored) : null;
+    } catch {
+      return null;
+    }
+  });
   const [loading, setLoading] = useState(true);
 
-  // Restore session from localStorage on page refresh
+  // On mount, if a token exists, the stored user is trusted.
+  // (api.js auto-attaches the token to every request.)
   useEffect(() => {
-    const savedUser  = localStorage.getItem("hv_user");
-    const savedToken = localStorage.getItem("hv_token");
-    if (savedUser && savedToken) {
-      setUser(JSON.parse(savedUser));
+    const token = localStorage.getItem("token");
+    if (!token) {
+      setUser(null);
     }
     setLoading(false);
   }, []);
 
+  // Save auth data consistently
+  const persist = (data) => {
+    const token = data.token || data.accessToken;
+    const u     = data.user  || data.data?.user || data.data || null;
+    if (token) localStorage.setItem("token", token);
+    if (u) {
+      localStorage.setItem("user", JSON.stringify(u));
+      setUser(u);
+    }
+    return u;
+  };
+
+  // ── Login ──
   const login = async (email, password) => {
-    const { data } = await api.post("/auth/login", { email, password });
-    localStorage.setItem("hv_token", data.token);
-    localStorage.setItem("hv_user",  JSON.stringify(data.user));
-    setUser(data.user);
-    return data.user;
+    const res = await api.post("/auth/login", { email, password });
+    const u = persist(res.data);
+    if (!u) throw new Error("Login response missing user.");
+    return u;
   };
 
+  // ── Register ──
   const register = async (payload) => {
-    const { data } = await api.post("/auth/register", payload);
-    localStorage.setItem("hv_token", data.token);
-    localStorage.setItem("hv_user",  JSON.stringify(data.user));
-    setUser(data.user);
-    return data.user;
+    const res = await api.post("/auth/register", payload);
+    const u = persist(res.data);
+    if (!u) throw new Error("Register response missing user.");
+    return u;
   };
 
+  // ── Logout ──
   const logout = () => {
-    localStorage.removeItem("hv_token");
-    localStorage.removeItem("hv_user");
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
     setUser(null);
   };
 
+  // ── Update local user object (e.g. after profile/availability change) ──
+  const updateUser = (patch) => {
+    setUser(prev => {
+      const next = { ...prev, ...patch };
+      localStorage.setItem("user", JSON.stringify(next));
+      return next;
+    });
+  };
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, register, logout, updateUser }}>
       {children}
     </AuthContext.Provider>
   );
 }
 
-export const useAuth = () => useContext(AuthContext);
+// ── Hook ──
+export function useAuth() {
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error("useAuth must be used inside <AuthProvider>.");
+  return ctx;
+}
+
+export default AuthContext;

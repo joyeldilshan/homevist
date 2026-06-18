@@ -104,6 +104,11 @@ const USERS = [
     serviceArea: "Jaffna South", licenseNumber: "HV-PHL-04",
     rating: 4.9, totalRatings: 98, isActive: true, isVerified: true,
   },
+  {
+    name: "Lab Tech One", email: "max@gmail.com",
+    phone: "+94770000001", password: "Max@200014",
+    role: "mlt", isActive: true, isVerified: true,
+  },
 ];
 
 async function seed() {
@@ -127,9 +132,10 @@ async function seed() {
     }
 
     console.log("\n🎉 Seed complete! Login credentials:");
-    console.log("   Admin       → joyeldilshan@gmail.com  / Dil@200014");
-    console.log("   Patient     → jack@gmail.com    / Jack@200014");
-    console.log("   Phlebotomist→ niro@gmail.com  / Niro@200014");
+    console.log("   Admin        → joyeldilshan@gmail.com / Dil@200014");
+    console.log("   Patient      → jack@gmail.com         / Jack@200014");
+    console.log("   Phlebotomist → niro@gmail.com         / Niro@200014");
+    console.log("   MLT          → mlt@gmail.com          / Mlt@200014");
 
     process.exit(0);
   } catch (err) {

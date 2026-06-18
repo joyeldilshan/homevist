@@ -7,7 +7,7 @@ const userSchema = new mongoose.Schema(
     email:    { type: String, required: [true, "Email is required"], unique: true, lowercase: true, trim: true },
     phone:    { type: String, required: [true, "Phone is required"], trim: true },
     password: { type: String, required: [true, "Password is required"], minlength: 6, select: false },
-    role:     { type: String, enum: ["user", "phlebotomist", "admin"], default: "user" },
+    role:     { type: String, enum: ["user", "phlebotomist", "admin","mlt"], default: "user" },
 
     // Profile
     age:     { type: Number },

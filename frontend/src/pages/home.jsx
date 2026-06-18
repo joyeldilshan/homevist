@@ -314,9 +314,9 @@ export default function Home() {
 
   const team = [
     { name: "Dr. Ravi Kumaran", role: "Chief Pathologist", icon: "🔬" },
-    { name: "Miss. yathushana Ravichanthran", role: "Head of Phlebotomy", icon: "💉" },
+    { name: "Miss. Helan", role: "Head of Phlebotomy", icon: "💉" },
     { name: "Arjun Devanesan", role: "Technology Lead", icon: "💻" },
-    { name: "Mrs. Meera Dilshan", role: "Quality Assurance", icon: "📋" },
+    { name: "Mr. Mark JOhn", role: "Quality Assurance", icon: "📋" },
   ];
 
   const faqs = [
