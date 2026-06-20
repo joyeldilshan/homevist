@@ -9,10 +9,10 @@ const api = axios.create({
   headers: { "Content-Type": "application/json" },
 });
 
-// ── Request: attach JWT from localStorage ──────────────────────
+// ── Request: attach JWT from sessionStorage ────────────────────
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem("token");
+    const token = sessionStorage.getItem("token");
     if (token) config.headers.Authorization = `Bearer ${token}`;
     return config;
   },
@@ -27,8 +27,8 @@ api.interceptors.response.use(
 
     if (status === 401) {
       // Clear stale auth so App won't bounce us back to a dashboard
-      localStorage.removeItem("token");
-      localStorage.removeItem("user");
+      sessionStorage.removeItem("token");
+      sessionStorage.removeItem("user");
 
       // Only redirect if we're NOT already on the login page.
       // This single guard is what stops the infinite reload loop.

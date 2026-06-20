@@ -316,7 +316,7 @@ export default function Home() {
     { name: "Dr. Ravi Kumaran", role: "Chief Pathologist", icon: "🔬" },
     { name: "Miss. Helan", role: "Head of Phlebotomy", icon: "💉" },
     { name: "Arjun Devanesan", role: "Technology Lead", icon: "💻" },
-    { name: "Mr. Mark JOhn", role: "Quality Assurance", icon: "📋" },
+    { name: "Mr. Mark John", role: "Quality Assurance", icon: "📋" },
   ];
 
   const faqs = [
