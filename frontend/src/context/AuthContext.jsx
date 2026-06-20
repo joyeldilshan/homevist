@@ -5,10 +5,12 @@ import api from "../utils/api";
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
-  // Restore user from localStorage on first load
+  // Restore user from sessionStorage on first load.
+  // sessionStorage is cleared when the tab is closed, so a new visitor
+  // always starts logged-out on the home page.
   const [user, setUser] = useState(() => {
     try {
-      const stored = localStorage.getItem("user");
+      const stored = sessionStorage.getItem("user");
       return stored ? JSON.parse(stored) : null;
     } catch {
       return null;
@@ -19,7 +21,7 @@ export function AuthProvider({ children }) {
   // On mount, if a token exists, the stored user is trusted.
   // (api.js auto-attaches the token to every request.)
   useEffect(() => {
-    const token = localStorage.getItem("token");
+    const token = sessionStorage.getItem("token");
     if (!token) {
       setUser(null);
     }
@@ -30,9 +32,9 @@ export function AuthProvider({ children }) {
   const persist = (data) => {
     const token = data.token || data.accessToken;
     const u     = data.user  || data.data?.user || data.data || null;
-    if (token) localStorage.setItem("token", token);
+    if (token) sessionStorage.setItem("token", token);
     if (u) {
-      localStorage.setItem("user", JSON.stringify(u));
+      sessionStorage.setItem("user", JSON.stringify(u));
       setUser(u);
     }
     return u;
@@ -56,8 +58,8 @@ export function AuthProvider({ children }) {
 
   // ── Logout ──
   const logout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
+    sessionStorage.removeItem("token");
+    sessionStorage.removeItem("user");
     setUser(null);
   };
 
@@ -65,7 +67,7 @@ export function AuthProvider({ children }) {
   const updateUser = (patch) => {
     setUser(prev => {
       const next = { ...prev, ...patch };
-      localStorage.setItem("user", JSON.stringify(next));
+      sessionStorage.setItem("user", JSON.stringify(next));
       return next;
     });
   };
