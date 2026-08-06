@@ -8,8 +8,8 @@ import {
  * HemoVisit — landing page (colour + parallax edition).
  *
  * PHOTOS live in  frontend/public/images/  as:
- *   image1.png   → hero (right column)
- *   image 2.png  → about section
+ *   image1.jpg   → hero (right column)
+ *   image 2.jpg  → about section
  *   image 3.jpg  → full-width band above the stats
  *   image 4.jpg  → contact card background
  * A missing file falls back to a labelled placeholder.
@@ -50,7 +50,9 @@ export default function Home() {
   const heroFade  = useTransform(scrollY, [0, 560], [1, 0]);
 
   useEffect(() => {
-    const onScroll = () => {
+    let ticking = false;
+    const checkSections = () => {
+      ticking = false;
       SECTIONS.forEach(({ id }) => {
         const el = document.getElementById(id);
         if (!el) return;
@@ -58,8 +60,13 @@ export default function Home() {
         if (r.top < window.innerHeight / 2 && r.bottom > window.innerHeight / 2) setActive(id);
       });
     };
+    const onScroll = () => {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(checkSections);
+    };
     window.addEventListener("scroll", onScroll, { passive: true });
-    onScroll();
+    checkSections();
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
@@ -633,6 +640,12 @@ export default function Home() {
           .hv .ghost { display: none; }
         }
 
+        /* ---------- mobile perf: drop GPU-heavy fixed blur layers ---------- */
+        @media (max-width: 780px), (hover: none) and (pointer: coarse) {
+          .hv .blob, .hv .cells, .hv .cursor-glow { display: none; }
+          .hv .nav { backdrop-filter: none; background: rgba(243,240,234,0.97); }
+        }
+
         @media (prefers-reduced-motion: reduce) {
           .hv * { animation: none !important; transition: none !important; }
           .hv .btn:hover, .hv .cell:hover, .hv .stat:hover,
@@ -705,11 +718,12 @@ export default function Home() {
           <motion.div style={{ y: heroImgY }}>
             <Reveal delay={0.15}>
               <ParallaxPlate
-                src="/images/image1.png"
+                src="/images/image1.jpg"
                 alt="A HemoVisit phlebotomist collecting a sample at a patient's home"
                 caption="Plate 01 — Home collection"
-                frameClass="hero-frame" slot="image1.png"
+                frameClass="hero-frame" slot="image1.jpg"
                 tape="Specimen 01" tint={CAP.crimson}
+                eager
               />
             </Reveal>
           </motion.div>
@@ -731,10 +745,10 @@ export default function Home() {
         <div className="wrap about-grid">
           <Reveal>
             <ParallaxPlate
-              src="/images/image 2.png"
+              src="/images/image 2.jpg"
               alt="Samples being processed in an accredited laboratory"
               caption="Plate 02 — Accredited lab"
-              frameClass="about-frame" slot="image 2.png"
+              frameClass="about-frame" slot="image 2.jpg"
               tape="Specimen 02" tint={CAP.lavender}
             />
           </Reveal>
@@ -951,7 +965,7 @@ function SpecimenLabel({ section }) {
 }
 
 /* ============== photo plate with internal parallax drift ============== */
-function ParallaxPlate({ src, alt, caption, frameClass, slot, tape, tint }) {
+function ParallaxPlate({ src, alt, caption, frameClass, slot, tape, tint, eager }) {
   const [failed, setFailed] = useState(false);
   const ref = useRef(null);
   const { scrollYProgress } = useScroll({ target: ref, offset: ["start end", "end start"] });
@@ -966,6 +980,9 @@ function ParallaxPlate({ src, alt, caption, frameClass, slot, tape, tint }) {
         ) : (
           <motion.img
             src={src} alt={alt} className="plate-img" style={{ y }}
+            loading={eager ? "eager" : "lazy"}
+            decoding="async"
+            fetchPriority={eager ? "high" : "auto"}
             onError={() => setFailed(true)}
           />
         )}
@@ -989,7 +1006,11 @@ function ParallaxBand({ src, alt, slot, children }) {
           <span>Add public/images/{slot}</span>
         </div>
       ) : (
-        <motion.img src={src} alt={alt} className="band-img" style={{ y }} onError={() => setFailed(true)} />
+        <motion.img
+          src={src} alt={alt} className="band-img" style={{ y }}
+          loading="lazy" decoding="async"
+          onError={() => setFailed(true)}
+        />
       )}
       <div className="band-veil"><div>{children}</div></div>
     </div>
@@ -1006,7 +1027,13 @@ function BgImage({ src, slot, className }) {
       </div>
     );
   }
-  return <img src={src} alt="" className={className} onError={() => setFailed(true)} />;
+  return (
+    <img
+      src={src} alt="" className={className}
+      loading="lazy" decoding="async"
+      onError={() => setFailed(true)}
+    />
+  );
 }
 
 /* ============== scroll reveal ============== */
