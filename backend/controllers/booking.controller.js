@@ -55,7 +55,7 @@ exports.createBooking = async (req, res, next) => {
     if (req.user?.phone) {
       const testNames = testTypes.map(t => t.name).join(", ");
       await sendSMS(req.user.phone,
-        `HemoVisit: Booking #${booking.bookingId} for ${testNames} on ${appointmentDate} at ${appointmentTime} received. Phlebotomist will be assigned shortly.`);
+        `Home Visit: Booking #${booking.bookingId} for ${testNames} on ${appointmentDate} at ${appointmentTime} received. Phlebotomist will be assigned shortly.`);
     }
 
     sendBookingEmails(booking, req.user).catch(err => console.error("📧 Email error:", err.message));
@@ -158,7 +158,7 @@ exports.updateStatus = async (req, res, next) => {
     // SMS (guarded — booking.user may be null if the patient was deleted)
     if (booking.user?.phone) {
       await sendSMS(booking.user.phone,
-        `HemoVisit: Booking #${booking.bookingId} status updated to ${status.toUpperCase()}.`);
+        `Home Visit: Booking #${booking.bookingId} status updated to ${status.toUpperCase()}.`);
     }
 
     if (req.io) {
@@ -192,7 +192,7 @@ exports.assignPhlebotomist = async (req, res, next) => {
     // SMS to phlebotomist (guarded)
     if (phlebo.phone) {
       await sendSMS(phlebo.phone,
-        `HemoVisit: New assignment #${booking.bookingId}. Patient: ${booking.user?.name || "Unknown"}. Address: ${booking.address}`);
+        `Home Visit: New assignment #${booking.bookingId}. Patient: ${booking.user?.name || "Unknown"}. Address: ${booking.address}`);
     }
 
     // Email to phlebotomist — only if we still have a valid patient

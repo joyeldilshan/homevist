@@ -10,6 +10,7 @@ const bookingSchema = new mongoose.Schema({
 
   user:         { type: mongoose.Schema.Types.ObjectId, ref:"User", required:true },
   phlebotomist: { type: mongoose.Schema.Types.ObjectId, ref:"User" },
+  subscription: { type: mongoose.Schema.Types.ObjectId, ref:"Subscription" },
 
   // ── Multiple tests ──────────────────────────────────────────
   testTypes: [{ type: mongoose.Schema.Types.ObjectId, ref:"TestType" }],

@@ -41,19 +41,19 @@ exports.sendEmail = async (to, subject, htmlBody) => {
       },
     });
     await transporter.sendMail({
-      from:    process.env.EMAIL_FROM || "HemoVisit <noreply@hemovisit.lk>",
+      from:    process.env.EMAIL_FROM || "Home Visit <noreply@homevisit.lk>",
       to,
       subject,
       html: `
         <div style="font-family:sans-serif;max-width:600px;margin:auto">
           <div style="background:#C62828;padding:20px;text-align:center">
-            <h1 style="color:white;margin:0">HemoVisit</h1>
+            <h1 style="color:white;margin:0">Home Visit</h1>
           </div>
           <div style="padding:24px;background:#fff">
             ${htmlBody}
           </div>
           <div style="background:#f5f5f5;padding:12px;text-align:center;font-size:12px;color:#888">
-            HemoVisit Laboratory, Jaffna, Sri Lanka
+            Home Visit Laboratory, Jaffna, Sri Lanka
           </div>
         </div>
       `,

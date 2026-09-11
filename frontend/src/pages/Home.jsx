@@ -5,7 +5,7 @@ import {
 } from "framer-motion";
 
 /**
- * HemoVisit — landing page (colour + parallax edition).
+ * Home Visit — landing page (colour + parallax edition).
  *
  * PHOTOS live in  frontend/public/images/  as:
  *   image1.jpg   → hero (right column)
@@ -111,7 +111,7 @@ export default function Home() {
 
   const reviews = [
     { name: "Rachel T.",     role: "Patient, Jaffna",  text: "The phlebotomist was so professional and gentle. I got my results before lunch. This is the future of healthcare.", stars: 5, tint: "crimson"  },
-    { name: "Dr. Owen M.", role: "Cardiologist",     text: "I recommend HemoVisit to all my elderly patients. The accuracy matches any premier lab I've worked with.",          stars: 5, tint: "teal"     },
+    { name: "Dr. Owen M.", role: "Cardiologist",     text: "I recommend Home Visit to all my elderly patients. The accuracy matches any premier lab I've worked with.",          stars: 5, tint: "teal"     },
     { name: "Megan K.",      role: "Patient, Colombo", text: "Booked at 8 AM, results by noon. Clean interface, kind staff, fair pricing. Couldn't ask for more.",               stars: 5, tint: "lavender" },
   ];
 
@@ -657,7 +657,7 @@ export default function Home() {
       {/* ================= NAV ================= */}
       <nav className="nav">
         <button className="burger" onClick={() => setOpen(true)} aria-label="Open menu">☰</button>
-        <div className="brand"><span className="brand-dot" />HemoVisit</div>
+        <div className="brand"><span className="brand-dot" />Home Visit</div>
         <div className="nav-links">
           {SECTIONS.slice(1, 6).map((s) => (
             <button key={s.id} className={`nav-link ${active === s.id ? "on" : ""}`} onClick={() => scrollTo(s.id)}>
@@ -677,7 +677,7 @@ export default function Home() {
             <motion.div className="drawer"
               initial={{ x: -300 }} animate={{ x: 0 }} exit={{ x: -300 }}
               transition={{ type: "spring", stiffness: 140, damping: 20 }}>
-              <div className="brand" style={{ marginBottom: 22 }}><span className="brand-dot" />HemoVisit</div>
+              <div className="brand" style={{ marginBottom: 22 }}><span className="brand-dot" />Home Visit</div>
               {SECTIONS.map((s) => (
                 <button key={s.id} className={`drawer-item ${active === s.id ? "on" : ""}`} onClick={() => scrollTo(s.id)}>
                   <span>{s.name}</span>
@@ -719,7 +719,7 @@ export default function Home() {
             <Reveal delay={0.15}>
               <ParallaxPlate
                 src="/images/image1.jpg"
-                alt="A HemoVisit phlebotomist collecting a sample at a patient's home"
+                alt="A Home Visit phlebotomist collecting a sample at a patient's home"
                 caption="Plate 01 — Home collection"
                 frameClass="hero-frame" slot="image1.jpg"
                 tape="Specimen 01" tint={CAP.crimson}
@@ -756,7 +756,7 @@ export default function Home() {
             <SpecimenLabel section={SECTIONS[1]} />
             <h2>Every drop tells a story. We make sure it reaches you.</h2>
             <p className="lead" style={{ margin: "20px 0 16px" }}>
-              HemoVisit connects you with NABL-certified labs and trained phlebotomists across Sri Lanka.
+              Home Visit connects you with NABL-certified labs and trained phlebotomists across Sri Lanka.
             </p>
             <p>
               From a routine full blood count to advanced hormone profiles, every sample is barcoded at
@@ -819,7 +819,7 @@ export default function Home() {
       {/* ================= BAND ================= */}
       <ParallaxBand
         src="/images/image 3.jpg"
-        alt="HemoVisit phlebotomists on a home visit"
+        alt="Home Visit phlebotomists on a home visit"
         slot="image 3.jpg"
       >
         <h2>Booked at 8am.<br />Results before lunch.</h2>
@@ -928,7 +928,7 @@ export default function Home() {
                 We usually reply within the hour.
               </p>
               <div className="contact-row">
-                <span className="contact-item">support@hemovisit.com</span>
+                <span className="contact-item">support@homevisit.com</span>
                 <span className="contact-item">+44 7565 20619</span>
                 <span className="contact-item">Jaffna, Sri Lanka</span>
               </div>
@@ -943,8 +943,8 @@ export default function Home() {
 
       {/* ================= FOOTER ================= */}
       <footer className="foot">
-        <div className="brand"><span className="brand-dot" />HemoVisit</div>
-        <p>© 2026 HemoVisit — built with care in Jaffna.</p>
+        <div className="brand"><span className="brand-dot" />Home Visit</div>
+        <p>© 2026 Home Visit — built with care in Jaffna.</p>
       </footer>
     </div>
   );

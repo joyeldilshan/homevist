@@ -4,7 +4,7 @@ import { useAuth } from "../context/AuthContext";
 import toast from "react-hot-toast";
 
 /**
- * HemoVisit — Sign in / Register (lab-label edition).
+ * Home Visit — Sign in / Register (lab-label edition).
  * PHOTO: save one image as  frontend/public/images/image5.jpg
  * (shown in the left panel; falls back to a gradient if missing).
  */
@@ -319,7 +319,7 @@ export default function AuthPage() {
           {imgOk ? (
             <img
               src="/images/image 5.png"
-              alt="A HemoVisit phlebotomist preparing a home blood collection"
+              alt="A Home Visit phlebotomist preparing a home blood collection"
               className="panel-img"
               onError={() => setImgOk(false)}
             />
@@ -329,7 +329,7 @@ export default function AuthPage() {
           <div className="panel-veil" />
           <div className="panel-in">
             <div className="panel-brand-row">
-              <div className="brand"><span className="brand-dot" />HemoVisit</div>
+              <div className="brand"><span className="brand-dot" />Home Visit</div>
             </div>
             <div>
               <div className="panel-title">Your health,<br />at your doorstep.</div>

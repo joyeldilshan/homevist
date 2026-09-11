@@ -44,6 +44,13 @@ const StatusBadge = ({ status }) => {
 
 const Lbl = ({ c }) => <label className="lbl">{c}</label>;
 
+const FI = ({ label, fkey, type="text", placeholder, val, setter }) => (
+  <div style={{ marginBottom:12 }}>
+    <Lbl c={label} />
+    <input className="inp" type={type} placeholder={placeholder} value={val} onChange={e=>setter(p=>({...p,[fkey]:e.target.value}))} />
+  </div>
+);
+
 const Modal = ({ title, onClose, children }) => (
   <div style={{ position:"fixed", inset:0, background:"rgba(23,19,16,0.5)", backdropFilter:"blur(4px)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:300, padding:20 }}>
     <div style={{ background:"#FBF9F5", border:"1px solid rgba(23,19,16,0.13)", borderRadius:14, padding:28, width:"100%", maxWidth:480, maxHeight:"85vh", overflowY:"auto", boxShadow:"0 30px 70px rgba(23,19,16,0.3)" }}>
@@ -78,6 +85,8 @@ export default function AdminDashboard() {
   const [bookings,      setBookings]      = useState([]);
   const [phlebotomists, setPhlebotomists] = useState([]);
   const [testTypes,     setTestTypes]     = useState([]);
+  const [plans,         setPlans]         = useState([]);
+  const [subscriptions, setSubscriptions] = useState([]);
   const [sideOpen,      setSideOpen]      = useState(false);
 
   const [assignModal,   setAssignModal]   = useState(null);
@@ -85,23 +94,63 @@ export default function AdminDashboard() {
   const [editTestModal, setEditTestModal] = useState(null);
   const [phleModal,     setPhleModal]     = useState(false);
   const [editPhleModal, setEditPhleModal] = useState(null);
+  const [planModal,     setPlanModal]     = useState(false);
+  const [editPlanModal, setEditPlanModal] = useState(null);
 
   const [newTest,  setNewTest]  = useState({ name:"", code:"", price:"", duration:"24h", category:"haematology", preparation:"", description:"" });
   const [editTest, setEditTest] = useState({});
   const [newPhle,  setNewPhle]  = useState({ name:"", email:"", phone:"", password:"", serviceArea:"", licenseNumber:"" });
   const [editPhle, setEditPhle] = useState({});
+  const [newPlan,  setNewPlan]  = useState({ name:"", description:"", testTypeIds:[], visitsPerCycle:"4", cycleLengthDays:"30", price:"" });
+  const [editPlan, setEditPlan] = useState({});
 
   useEffect(() => { fetchAll(); }, [tab]);
 
   const fetchAll = async () => {
     try {
-      const [bRes, tRes, pRes] = await Promise.all([
+      const [bRes, tRes, pRes, plRes, subRes] = await Promise.all([
         api.get("/bookings"), api.get("/test-types"), api.get("/phlebotomists"),
+        api.get("/plans/all"), api.get("/subscriptions"),
       ]);
       setBookings(bRes.data.bookings||[]);
       setTestTypes(tRes.data.testTypes||[]);
       setPhlebotomists(pRes.data.phlebotomists||[]);
+      setPlans(plRes.data.plans||[]);
+      setSubscriptions(subRes.data.subscriptions||[]);
     } catch(err) { console.error(err?.response?.data||err.message); }
+  };
+
+  const toggleTestId = (setter, id) =>
+    setter(p => ({ ...p, testTypeIds: p.testTypeIds?.includes(id) ? p.testTypeIds.filter(x=>x!==id) : [...(p.testTypeIds||[]), id] }));
+
+  const createPlan = async () => {
+    if (!newPlan.name || !newPlan.testTypeIds.length || !newPlan.visitsPerCycle || !newPlan.cycleLengthDays || !newPlan.price) {
+      toast.error("Name, tests, visits/cycle, cycle length and price required."); return;
+    }
+    try {
+      await api.post("/plans", { ...newPlan, visitsPerCycle:Number(newPlan.visitsPerCycle), cycleLengthDays:Number(newPlan.cycleLengthDays), price:Number(newPlan.price) });
+      toast.success("Plan added! ✅"); setPlanModal(false);
+      setNewPlan({ name:"", description:"", testTypeIds:[], visitsPerCycle:"4", cycleLengthDays:"30", price:"" });
+      fetchAll();
+    } catch(err) { toast.error(err?.response?.data?.message||"Failed."); }
+  };
+
+  const saveEditPlan = async () => {
+    try {
+      await api.put(`/plans/${editPlanModal._id}`, { ...editPlan, visitsPerCycle:Number(editPlan.visitsPerCycle), cycleLengthDays:Number(editPlan.cycleLengthDays), price:Number(editPlan.price) });
+      toast.success("Plan updated! ✅"); setEditPlanModal(null); fetchAll();
+    } catch(err) { toast.error(err?.response?.data?.message||"Failed."); }
+  };
+
+  const deactivatePlan = async (id) => {
+    if (!window.confirm("Deactivate this plan?")) return;
+    try { await api.delete(`/plans/${id}`); toast.success("Deactivated."); fetchAll(); }
+    catch { toast.error("Failed."); }
+  };
+
+  const markSubPaid = async (id) => {
+    try { await api.patch(`/subscriptions/${id}/mark-paid`); toast.success("Marked as paid."); fetchAll(); }
+    catch { toast.error("Failed."); }
   };
 
   const createTest = async () => {
@@ -168,21 +217,16 @@ export default function AdminDashboard() {
     { id:"bookings",      icon:"📋", label:"All Bookings",  cap:TEAL     },
     { id:"assign",        icon:"🎯", label:"Assign Jobs",   cap:GOLD,    badge:unassigned.length },
     { id:"tests",         icon:"🔬", label:"Test Catalog",  cap:LAVENDER },
+    { id:"plans",         icon:"🔁", label:"Plans",         cap:LAVENDER },
+    { id:"subscriptions", icon:"📋", label:"Subscriptions", cap:GOLD     },
     { id:"phlebotomists", icon:"🧪", label:"Phlebotomists", cap:BLUE     },
     { id:"analytics",     icon:"📈", label:"Analytics",     cap:GREEN    },
     { id:"audit",         icon:"🗂", label:"Email & Audit", cap:GOLD     },
   ];
 
-  const FI = ({ label, fkey, type="text", placeholder, val, setter }) => (
-    <div style={{ marginBottom:12 }}>
-      <Lbl c={label} />
-      <input className="inp" type={type} placeholder={placeholder} value={val} onChange={e=>setter(p=>({...p,[fkey]:e.target.value}))} />
-    </div>
-  );
-
   const Sidebar = () => (
     <aside className="side">
-      <div className="brand"><span className="brand-dot" />HemoVisit</div>
+      <div className="brand"><span className="brand-dot" />Home Visit</div>
       <div className="console-chip">
         <div className="console-chip-t">Admin console</div>
         <div className="console-chip-s">Full access</div>
@@ -432,7 +476,7 @@ export default function AdminDashboard() {
       <div className="desktop-side"><Sidebar /></div>
 
       <div className="topbar">
-        <div className="brand" style={{ padding:0, marginBottom:0 }}><span className="brand-dot" />HemoVisit · Admin</div>
+        <div className="brand" style={{ padding:0, marginBottom:0 }}><span className="brand-dot" />Home Visit · Admin</div>
         <button onClick={()=>setSideOpen(true)} style={{ background:"none", border:"none", fontSize:20, cursor:"pointer", color:INK }}>☰</button>
       </div>
 
@@ -609,6 +653,83 @@ export default function AdminDashboard() {
             </div>
           )}
 
+          {/* PLANS */}
+          {tab==="plans" && (
+            <div className="fade-up">
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-end", marginBottom:26, flexWrap:"wrap", gap:12 }}>
+                <div>
+                  <SpecimenLabel code="HV-36" name="Plans" cap={LAVENDER} />
+                  <h1>Subscription plans.</h1>
+                  <p className="sub">{plans.length} plan{plans.length!==1?"s":""}</p>
+                </div>
+                <button className="btn btn-primary btn-sm" onClick={()=>setPlanModal(true)}>+ Add plan</button>
+              </div>
+              <div className="table scrollx">
+                <div>
+                  <TH cols="1.6fr 1.6fr 0.8fr 0.9fr 0.8fr 0.6fr 1.2fr" heads={["Plan name","Tests included","Visits","Cycle","Price","Active","Actions"]} />
+                  {plans.map(p=>(
+                    <div key={p._id} className="trow" style={{ display:"grid", gridTemplateColumns:"1.6fr 1.6fr 0.8fr 0.9fr 0.8fr 0.6fr 1.2fr" }}>
+                      <div>
+                        <div style={{ fontSize:13, fontWeight:600 }}>{p?.name||"—"}</div>
+                        {p?.description && <div style={{ fontSize:11, color:"var(--ink-60)" }}>{p.description.slice(0,40)}</div>}
+                      </div>
+                      <div style={{ fontSize:12, color:"var(--ink-60)" }}>{p?.testTypes?.map(t=>t.name).join(", ")||"—"}</div>
+                      <div style={{ fontSize:12 }}>{p?.visitsPerCycle||"—"}</div>
+                      <div style={{ fontSize:12 }}>{p?.cycleLengthDays||"—"}d</div>
+                      <div style={{ fontFamily:"var(--monof)", fontSize:12.5, color:TEAL }}>Rs.{p?.price?.toLocaleString()||"—"}</div>
+                      <div style={{ fontSize:12, fontWeight:700, color:p?.isActive?GREEN:"var(--ink-40)" }}>{p?.isActive?"✓":"✕"}</div>
+                      <div style={{ display:"flex", gap:6 }}>
+                        <button className="act act-blue"
+                          onClick={()=>{ setEditPlan({ name:p.name, description:p.description||"", testTypeIds:p.testTypes?.map(t=>t._id)||[], visitsPerCycle:p.visitsPerCycle, cycleLengthDays:p.cycleLengthDays, price:p.price, isActive:p.isActive }); setEditPlanModal(p); }}>
+                          Edit
+                        </button>
+                        <button className="act act-red" onClick={()=>deactivatePlan(p._id)}>Off</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* SUBSCRIPTIONS */}
+          {tab==="subscriptions" && (
+            <div className="fade-up">
+              <div className="head">
+                <SpecimenLabel code="HV-37" name="Subscriptions" cap={GOLD} />
+                <h1>All subscriptions.</h1>
+                <p className="sub">{subscriptions.length} subscription{subscriptions.length!==1?"s":""}</p>
+              </div>
+              {subscriptions.length===0
+                ? <div className="card" style={{ padding:"60px", textAlign:"center" }}>
+                    <div style={{ fontSize:40, marginBottom:12 }}>🔁</div>
+                    <div style={{ fontWeight:600, color:"var(--ink-60)" }}>No subscriptions yet</div>
+                  </div>
+                : subscriptions.map(s=>(
+                  <div key={s._id} className="prow" style={{ borderLeft:`4px solid ${s.status==="active"?LAVENDER:s.status==="paused"?GOLD:"var(--rule)"}` }}>
+                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", flexWrap:"wrap", gap:12 }}>
+                      <div>
+                        <div style={{ fontWeight:700, fontSize:15, marginBottom:3 }}>{s.plan?.name||"Plan"} — {s.user?.name||"Unknown"}</div>
+                        <div style={{ fontSize:12, color:"var(--ink-60)", lineHeight:1.8 }}>
+                          📧 {s.user?.email||"—"} &nbsp; 📞 {s.user?.phone||"—"}<br />
+                          🔁 {s.cycleVisitsUsed}/{s.visitsPerCycle} visits this cycle &nbsp; 📅 Next: {s.nextVisitDate?new Date(s.nextVisitDate).toDateString():"—"}<br />
+                          💰 Rs. {s.price?.toLocaleString()}/cycle
+                        </div>
+                      </div>
+                      <div style={{ display:"flex", alignItems:"center", gap:10, flexWrap:"wrap" }}>
+                        <span style={{ fontFamily:"var(--monof)", fontSize:10, letterSpacing:"0.1em", textTransform:"uppercase", color:s.status==="active"?LAVENDER:"var(--ink-40)" }}>{s.status}</span>
+                        <span style={{ fontFamily:"var(--monof)", fontSize:10, letterSpacing:"0.1em", textTransform:"uppercase", color:s.paymentStatus==="paid"?GREEN:GOLD }}>{s.paymentStatus}</span>
+                        {s.paymentStatus!=="paid" && (
+                          <button className="act act-blue" onClick={()=>markSubPaid(s._id)}>Mark paid</button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))
+              }
+            </div>
+          )}
+
           {/* PHLEBOTOMISTS */}
           {tab==="phlebotomists" && (
             <div className="fade-up">
@@ -780,6 +901,55 @@ export default function AdminDashboard() {
           <div style={{ display:"flex", gap:10 }}>
             <button className="btn btn-ghost" style={{ flex:1 }} onClick={()=>setEditTestModal(null)}>Cancel</button>
             <button className="btn btn-primary" style={{ flex:2 }} onClick={saveEditTest}>Save changes</button>
+          </div>
+        </Modal>
+      )}
+
+      {/* ADD PLAN MODAL */}
+      {planModal && (
+        <Modal title="Add subscription plan" onClose={()=>setPlanModal(false)}>
+          <FI label="Plan name"        fkey="name"            type="text"   placeholder="e.g. Monthly Care Plan" val={newPlan.name}            setter={setNewPlan} />
+          <FI label="Description"      fkey="description"     type="text"   placeholder="Optional short blurb"   val={newPlan.description}     setter={setNewPlan} />
+          <FI label="Visits per cycle" fkey="visitsPerCycle"  type="number" placeholder="e.g. 4"                 val={newPlan.visitsPerCycle}  setter={setNewPlan} />
+          <FI label="Cycle length (days)" fkey="cycleLengthDays" type="number" placeholder="e.g. 30"             val={newPlan.cycleLengthDays} setter={setNewPlan} />
+          <FI label="Price per cycle (Rs.)" fkey="price"      type="number" placeholder="e.g. 8000"              val={newPlan.price}           setter={setNewPlan} />
+          <div style={{ marginBottom:16 }}>
+            <Lbl c="Tests included in every visit" />
+            <div style={{ display:"flex", flexWrap:"wrap", gap:8, maxHeight:160, overflowY:"auto" }}>
+              {testTypes.map(t=>(
+                <label key={t._id} style={{ display:"flex", alignItems:"center", gap:6, fontSize:12, background:newPlan.testTypeIds.includes(t._id)?"rgba(124,107,174,0.1)":"rgba(23,19,16,0.04)", border:`1px solid ${newPlan.testTypeIds.includes(t._id)?LAVENDER:"var(--rule)"}`, borderRadius:20, padding:"5px 10px", cursor:"pointer" }}>
+                  <input type="checkbox" checked={newPlan.testTypeIds.includes(t._id)} onChange={()=>toggleTestId(setNewPlan, t._id)} />
+                  {t.name}
+                </label>
+              ))}
+            </div>
+          </div>
+          <button className="btn btn-primary btn-full" onClick={createPlan}>Add plan</button>
+        </Modal>
+      )}
+
+      {/* EDIT PLAN MODAL */}
+      {editPlanModal && (
+        <Modal title="Edit plan" onClose={()=>setEditPlanModal(null)}>
+          <FI label="Plan name"        fkey="name"            type="text"   placeholder="Plan name"  val={editPlan.name||""}            setter={setEditPlan} />
+          <FI label="Description"      fkey="description"     type="text"   placeholder="Description" val={editPlan.description||""}     setter={setEditPlan} />
+          <FI label="Visits per cycle" fkey="visitsPerCycle"  type="number" placeholder="Visits"      val={editPlan.visitsPerCycle||""}  setter={setEditPlan} />
+          <FI label="Cycle length (days)" fkey="cycleLengthDays" type="number" placeholder="Days"     val={editPlan.cycleLengthDays||""} setter={setEditPlan} />
+          <FI label="Price per cycle (Rs.)" fkey="price"      type="number" placeholder="Price"       val={editPlan.price||""}           setter={setEditPlan} />
+          <div style={{ marginBottom:16 }}>
+            <Lbl c="Tests included in every visit" />
+            <div style={{ display:"flex", flexWrap:"wrap", gap:8, maxHeight:160, overflowY:"auto" }}>
+              {testTypes.map(t=>(
+                <label key={t._id} style={{ display:"flex", alignItems:"center", gap:6, fontSize:12, background:editPlan.testTypeIds?.includes(t._id)?"rgba(124,107,174,0.1)":"rgba(23,19,16,0.04)", border:`1px solid ${editPlan.testTypeIds?.includes(t._id)?LAVENDER:"var(--rule)"}`, borderRadius:20, padding:"5px 10px", cursor:"pointer" }}>
+                  <input type="checkbox" checked={editPlan.testTypeIds?.includes(t._id)||false} onChange={()=>toggleTestId(setEditPlan, t._id)} />
+                  {t.name}
+                </label>
+              ))}
+            </div>
+          </div>
+          <div style={{ display:"flex", gap:10 }}>
+            <button className="btn btn-ghost" style={{ flex:1 }} onClick={()=>setEditPlanModal(null)}>Cancel</button>
+            <button className="btn btn-primary" style={{ flex:2 }} onClick={saveEditPlan}>Save changes</button>
           </div>
         </Modal>
       )}

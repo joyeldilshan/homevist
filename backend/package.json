@@ -1,7 +1,7 @@
 {
-  "name": "hemovisit-backend",
+  "name": "homevisit-backend",
   "version": "1.0.0",
-  "description": "HemoVisit Mobile Blood Testing Platform — Backend API",
+  "description": "Home Visit Mobile Blood Testing Platform — Backend API",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

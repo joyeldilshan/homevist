@@ -195,7 +195,7 @@ export default function PhleboDashboard() {
 
   const Sidebar = () => (
     <aside className="side">
-      <div className="brand"><span className="brand-dot" />HemoVisit</div>
+      <div className="brand"><span className="brand-dot" />Home Visit</div>
 
       {/* Availability toggle */}
       <div className="avail" style={{ borderColor: available ? `${GREEN}55` : "var(--rule)", background: available ? "rgba(46,125,87,0.06)" : "var(--paper)" }}>
@@ -421,7 +421,7 @@ export default function PhleboDashboard() {
       <div className="desktop-side"><Sidebar /></div>
 
       <div className="topbar">
-        <div className="brand" style={{ padding:0, marginBottom:0 }}><span className="brand-dot" />HemoVisit</div>
+        <div className="brand" style={{ padding:0, marginBottom:0 }}><span className="brand-dot" />Home Visit</div>
         <button onClick={()=>setSideOpen(true)} style={{ background:"none", border:"none", fontSize:20, cursor:"pointer", color:INK }}>☰</button>
       </div>
 

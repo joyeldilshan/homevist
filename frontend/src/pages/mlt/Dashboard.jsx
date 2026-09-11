@@ -210,7 +210,7 @@ export default function MLTDashboard() {
 
   const Sidebar = () => (
     <aside className="side">
-      <div className="brand"><span className="brand-dot" style={{ background:`radial-gradient(circle at 35% 35%, #35a893, ${TEAL})` }} />HemoVisit Lab</div>
+      <div className="brand"><span className="brand-dot" style={{ background:`radial-gradient(circle at 35% 35%, #35a893, ${TEAL})` }} />Home Visit Lab</div>
       <div className="console-chip">
         <div className="console-chip-t">MLT console</div>
         <div className="console-chip-s">Lab technician</div>
@@ -472,7 +472,7 @@ export default function MLTDashboard() {
       <div className="topbar">
         <div className="brand" style={{ padding:0, marginBottom:0 }}>
           <span className="brand-dot" style={{ background:`radial-gradient(circle at 35% 35%, #35a893, ${TEAL})` }} />
-          HemoVisit Lab
+          Home Visit Lab
         </div>
         <button onClick={() => setSideOpen(true)} style={{ background:"none", border:"none", fontSize:20, cursor:"pointer", color:INK }}>☰</button>
       </div>

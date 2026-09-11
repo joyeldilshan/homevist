@@ -55,7 +55,7 @@ const adminTemplate = (booking, patient) => `
   <tr><td style="background:#E53E3E;border-radius:14px 14px 0 0;padding:24px 32px;text-align:center;">
     <div style="font-size:28px;margin-bottom:6px;">🩸</div>
     <h1 style="color:#fff;margin:0;font-size:20px;font-weight:700;">New Booking Request</h1>
-    <p style="color:rgba(255,255,255,0.8);margin:5px 0 0;font-size:13px;">HemoVisit · Home Blood Collection Service</p>
+    <p style="color:rgba(255,255,255,0.8);margin:5px 0 0;font-size:13px;">Home Visit · Home Blood Collection Service</p>
   </td></tr>
 
   <!-- Alert -->
@@ -99,7 +99,7 @@ const adminTemplate = (booking, patient) => `
   </td></tr>
 
   <tr><td style="padding:16px 0;text-align:center;">
-    <p style="font-size:11px;color:#A0AEC0;margin:0;">🩸 HemoVisit · Jaffna, Sri Lanka · 2026</p>
+    <p style="font-size:11px;color:#A0AEC0;margin:0;">🩸 Home Visit · Jaffna, Sri Lanka · 2026</p>
   </td></tr>
 </table>
 </td></tr>
@@ -156,7 +156,7 @@ const patientTemplate = (booking, patient) => `
   </td></tr>
 
   <tr><td style="padding:16px 0;text-align:center;">
-    <p style="font-size:11px;color:#A0AEC0;margin:0;">🩸 HemoVisit · Jaffna, Sri Lanka · 2026</p>
+    <p style="font-size:11px;color:#A0AEC0;margin:0;">🩸 Home Visit · Jaffna, Sri Lanka · 2026</p>
   </td></tr>
 </table>
 </td></tr>
@@ -211,7 +211,7 @@ const phlebotomistTemplate = (booking, patient, phlebotomist) => `
   </td></tr>
 
   <tr><td style="padding:16px 0;text-align:center;">
-    <p style="font-size:11px;color:#A0AEC0;margin:0;">🩸 HemoVisit · Jaffna, Sri Lanka · 2026</p>
+    <p style="font-size:11px;color:#A0AEC0;margin:0;">🩸 Home Visit · Jaffna, Sri Lanka · 2026</p>
   </td></tr>
 </table>
 </td></tr>
@@ -222,7 +222,7 @@ const phlebotomistTemplate = (booking, patient, phlebotomist) => `
 
 const sendAdminBookingAlert = async (booking, patient) => {
   await getTransporter().sendMail({
-    from:    `"HemoVisit 🩸" <${process.env.EMAIL_USER}>`,
+    from:    `"Home Visit 🩸" <${process.env.EMAIL_USER}>`,
     to:      process.env.ADMIN_EMAIL,
     subject: `🩸 New Booking: ${booking.bookingId} — ${patient.name}`,
     html:    adminTemplate(booking, patient),
@@ -232,9 +232,9 @@ const sendAdminBookingAlert = async (booking, patient) => {
 
 const sendPatientConfirmation = async (booking, patient) => {
   await getTransporter().sendMail({
-    from:    `"HemoVisit 🩸" <${process.env.EMAIL_USER}>`,
+    from:    `"Home Visit 🩸" <${process.env.EMAIL_USER}>`,
     to:      patient.email,
-    subject: `✅ Booking Confirmed — ${booking.bookingId} | HemoVisit`,
+    subject: `✅ Booking Confirmed — ${booking.bookingId} | Home Visit`,
     html:    patientTemplate(booking, patient),
   });
   console.log(`📧 Patient confirmation sent to ${patient.email}`);
@@ -243,9 +243,9 @@ const sendPatientConfirmation = async (booking, patient) => {
 const sendPhlebotomistAssignment = async (booking, patient, phlebotomist) => {
   if (!phlebotomist?.email) return;
   await getTransporter().sendMail({
-    from:    `"HemoVisit 🩸" <${process.env.EMAIL_USER}>`,
+    from:    `"Home Visit 🩸" <${process.env.EMAIL_USER}>`,
     to:      phlebotomist.email,
-    subject: `🧪 New Job Assigned — ${booking.bookingId} | HemoVisit`,
+    subject: `🧪 New Job Assigned — ${booking.bookingId} | Home Visit`,
     html:    phlebotomistTemplate(booking, patient, phlebotomist),
   });
   console.log(`📧 Assignment email sent to ${phlebotomist.email}`);

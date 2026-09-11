@@ -1,11 +1,11 @@
-# 🩸 HemoVisit — Mobile Blood Testing Platform
+# 🩸 Home Visit — Mobile Blood Testing Platform
 
 A full-stack web platform connecting patients with phlebotomists for at-home blood sample collection.
 
 ## Project Structure
 
 ```
-hemovisit/
+homevisit/
 ├── backend/          Node.js + Express + MongoDB API
 │   ├── config/       DB connection
 │   ├── controllers/  Route handlers

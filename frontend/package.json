@@ -1,7 +1,7 @@
 {
-  "name": "hemovisit-frontend",
+  "name": "homevisit-frontend",
   "version": "1.0.0",
-  "description": "HemoVisit Mobile Blood Testing Platform — React Frontend",
+  "description": "Home Visit Mobile Blood Testing Platform — React Frontend",
   "type": "module",
   "scripts": {
     "dev": "vite",

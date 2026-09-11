@@ -35,12 +35,12 @@ async function generateReport(booking) {
     .fillColor("white")
     .fontSize(22)
     .font("Helvetica-Bold")
-    .text("HemoVisit", 65, 64);
+    .text("Home Visit", 65, 64);
   doc
     .fontSize(9)
     .font("Helvetica")
     .text("Mobile Blood Testing Laboratory", 65, 92)
-    .text("Jaffna Central Lab · +94 21 222 1234 · www.hemovisit.lk", 65, 106);
+    .text("Jaffna Central Lab · +94 21 222 1234 · www.homevisit.lk", 65, 106);
 
   doc
     .fontSize(8)
@@ -77,7 +77,7 @@ async function generateReport(booking) {
 
   // Generate QR PNG buffer
   const qrPayload = [
-    "HEMOVISIT PATIENT RECORD",
+    "HOME VISIT PATIENT RECORD",
     `Booking ID  : ${booking.bookingId}`,
     `Patient     : ${booking.user.name}`,
     `Age/Gender  : ${booking.user.age || "—"} / ${booking.user.gender || "—"}`,
@@ -86,7 +86,7 @@ async function generateReport(booking) {
     `Date        : ${new Date(booking.appointmentDate).toDateString()} ${booking.appointmentTime}`,
     `Phlebotomist: ${booking.phlebotomist?.name || "—"}`,
     `Status      : ${booking.status.toUpperCase()}`,
-    `Verify      : ${process.env.VERIFY_BASE_URL || "https://hemovisit.lk/verify"}/${booking.bookingId}`,
+    `Verify      : ${process.env.VERIFY_BASE_URL || "https://homevisit.lk/verify"}/${booking.bookingId}`,
   ].join("\n");
 
   let qrBuf;
@@ -258,9 +258,9 @@ async function generateReport(booking) {
   doc.moveTo(50, rowY).lineTo(50 + usable, rowY).strokeColor(RED).lineWidth(1.5).stroke();
   rowY += 6;
   doc.rect(50, rowY, usable, 36).fill(GREY);
-  doc.fillColor(DARK).font("Helvetica-Bold").fontSize(8).text("HemoVisit Laboratory", 58, rowY + 6);
+  doc.fillColor(DARK).font("Helvetica-Bold").fontSize(8).text("Home Visit Laboratory", 58, rowY + 6);
   doc.fillColor(MUTED).font("Helvetica").fontSize(7.5)
-     .text("123 Hospital Road, Jaffna 40000, Sri Lanka  |  Tel: +94 21 222 1234  |  www.hemovisit.lk", 58, rowY + 18);
+     .text("123 Hospital Road, Jaffna 40000, Sri Lanka  |  Tel: +94 21 222 1234  |  www.homevisit.lk", 58, rowY + 18);
   doc.fillColor(MUTED).font("Helvetica-Oblique").fontSize(7)
      .text(`Report ID: HV-RPT-${booking._id.toString().slice(-6).toUpperCase()}  |  Booking: ${booking.bookingId}  |  Electronically verified.`,
        0, rowY + 18, { align: "right", width: W - 65 });
@@ -269,7 +269,7 @@ async function generateReport(booking) {
   // Disclaimer
   doc.fillColor(MUTED).font("Helvetica-Oblique").fontSize(6.5)
      .text(
-       "DISCLAIMER: This report is based on samples collected via HemoVisit's mobile phlebotomy service. " +
+       "DISCLAIMER: This report is based on samples collected via Home Visit's mobile phlebotomy service. " +
        "Results must be interpreted by a qualified medical professional. Valid only with authorised signature.",
        50, rowY, { width: usable, align: "center" }
      );

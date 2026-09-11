@@ -11,7 +11,10 @@ const authRoutes         = require("./routes/auth.routes");
 const bookingRoutes      = require("./routes/booking.routes");
 const phlebotomistRoutes = require("./routes/phlebotomist.routes");
 const testTypeRoutes      = require("./routes/testType.routes");
+const planRoutes          = require("./routes/plan.routes");
+const subscriptionRoutes  = require("./routes/subscription.routes");
 const { errorHandler }   = require("./middleware/error.middleware");
+const { startSubscriptionScheduler } = require("./jobs/subscriptionScheduler");
 
 const app    = express();
 const server = http.createServer(app);
@@ -45,11 +48,13 @@ app.use("/api/auth",          authRoutes);
 app.use("/api/bookings",      bookingRoutes);
 app.use("/api/phlebotomists", phlebotomistRoutes);
 app.use("/api/test-types",    testTypeRoutes);
+app.use("/api/plans",         planRoutes);
+app.use("/api/subscriptions", subscriptionRoutes);
 app.use("/api/samples", require("./routes/sample.routes"));
 app.use("/api/reports", require("./routes/labReport.routes"));
 
 app.get("/api/health", (_req, res) => {
-  res.json({ status: "OK", project: "HemoVisit", version: "1.0.0" });
+  res.json({ status: "OK", project: "Home Visit", version: "1.0.0" });
 });
 
 app.use(errorHandler);
@@ -58,9 +63,10 @@ mongoose
   .connect(process.env.MONGO_URI)
   .then(() => {
     console.log("Connected to MongoDB");
+    startSubscriptionScheduler(io);
     const PORT = process.env.PORT || 5000;
     server.listen(PORT, () => {
-      console.log("HemoVisit API running on http://localhost:" + PORT);
+      console.log("Home Visit API running on http://localhost:" + PORT);
     });
   })
   .catch((err) => {

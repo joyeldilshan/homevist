@@ -110,6 +110,12 @@ export default function UserDashboard() {
   const [form,    setForm]    = useState({ date:"", time:"09:00", address:user?.address||"", notes:"" });
   const setF = (k,v) => setForm(p=>({...p,[k]:v}));
 
+  const [plans,        setPlans]        = useState([]);
+  const [mySubs,        setMySubs]      = useState([]);
+  const [subscribingId, setSubscribingId] = useState(null);
+  const [subForm,       setSubForm]     = useState({ address:user?.address||"", appointmentTime:"09:00" });
+  const [subLoading,    setSubLoading]  = useState(false);
+
   const load = async () => {
     try {
       const r = await api.get("/bookings");
@@ -121,11 +127,22 @@ export default function UserDashboard() {
     } catch(e) { console.error("reports:", e?.response?.data || e.message); }
   };
 
+  const loadSubs = async () => {
+    try {
+      const r = await api.get("/subscriptions/mine");
+      setMySubs(r.data.subscriptions || []);
+    } catch(e) { console.error(e?.response?.data || e.message); }
+  };
+
   useEffect(() => { load(); }, []);
   useEffect(() => {
     load();
     if (tab === "book") {
       api.get("/test-types").then(r => setTests(r.data.testTypes || [])).catch(()=>{});
+    }
+    if (tab === "plans") {
+      api.get("/plans").then(r => setPlans(r.data.plans || [])).catch(()=>{});
+      loadSubs();
     }
   }, [tab]);
 
@@ -185,6 +202,25 @@ export default function UserDashboard() {
     } catch { toast.error("Could not cancel."); }
   };
 
+  const handleSubscribe = async (planId) => {
+    if (!subForm.address) { toast.error("Enter your address."); return; }
+    setSubLoading(true);
+    try {
+      await api.post("/subscriptions", { planId, address:subForm.address, appointmentTime:subForm.appointmentTime });
+      toast.success("🔁 Subscribed! Your first visit will be scheduled shortly.");
+      setSubscribingId(null); loadSubs();
+    } catch(e) { toast.error(e.response?.data?.message || "Subscription failed."); }
+    finally { setSubLoading(false); }
+  };
+
+  const SUB_ACTION_LABEL = { pause:"paused", resume:"resumed", cancel:"cancelled" };
+  const handleSubAction = async (id, action) => {
+    try {
+      await api.patch(`/subscriptions/${id}/${action}`);
+      toast.success(`Subscription ${SUB_ACTION_LABEL[action]}.`); loadSubs();
+    } catch { toast.error("Could not update subscription."); }
+  };
+
   const upcoming  = bookings.filter(b => ["pending","confirmed","sample_collected","processing"].includes(b.status));
   const completed = bookings.filter(b => b.status === "completed");
 
@@ -193,12 +229,13 @@ export default function UserDashboard() {
     { id:"book",     icon:"📅", label:"Book a Test", cap:GOLD     },
     { id:"bookings", icon:"📋", label:"My Bookings", cap:TEAL,     badge:upcoming.length },
     { id:"reports",  icon:"📄", label:"My Reports",  cap:LAVENDER, badge:reports.length  },
+    { id:"plans",    icon:"🔁", label:"Subscriptions", cap:LAVENDER, badge:mySubs.filter(s=>s.status==="active").length },
     { id:"profile",  icon:"👤", label:"Profile",     cap:BLUE     },
   ];
 
   const Sidebar = () => (
     <aside className="side">
-      <div className="brand"><span className="brand-dot" />HemoVisit</div>
+      <div className="brand"><span className="brand-dot" />Home Visit</div>
       <div className="side-sep" />
       {TABS.map(t => (
         <button key={t.id} onClick={() => { setTab(t.id); setStep(0); setSideOpen(false); }}
@@ -510,7 +547,7 @@ export default function UserDashboard() {
 
       {/* Mobile topbar */}
       <div className="topbar">
-        <div className="brand" style={{ padding:0 }}><span className="brand-dot" />HemoVisit</div>
+        <div className="brand" style={{ padding:0 }}><span className="brand-dot" />Home Visit</div>
         <button onClick={() => setSideOpen(true)} style={{ background:"none", border:"none", fontSize:20, cursor:"pointer", color:INK }}>☰</button>
       </div>
 
@@ -874,6 +911,102 @@ export default function UserDashboard() {
                     </div>
                   );
                 })
+              )}
+            </div>
+          )}
+
+          {/* ══ SUBSCRIPTIONS ══ */}
+          {tab === "plans" && (
+            <div className="fade-up">
+              <div className="head">
+                <SpecimenLabel code="HV-25" name="Plans" cap={LAVENDER} />
+                <h1>Subscriptions.</h1>
+                <p className="sub">Recurring home visits, scheduled automatically</p>
+              </div>
+
+              {mySubs.length > 0 && (
+                <div style={{ marginBottom:36 }}>
+                  <div style={{ fontFamily:"var(--monof)", fontSize:10.5, letterSpacing:"0.14em", textTransform:"uppercase", color:"var(--ink-40)", marginBottom:12 }}>My subscriptions</div>
+                  {mySubs.map(s => (
+                    <div key={s._id} className="booking-row" style={{ borderLeft:`4px solid ${s.status==="active"?LAVENDER:s.status==="paused"?GOLD:"var(--rule)"}` }}>
+                      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", flexWrap:"wrap", gap:10 }}>
+                        <div style={{ flex:1 }}>
+                          <div style={{ fontWeight:700, fontSize:15, marginBottom:4 }}>{s.plan?.name || "Plan"}</div>
+                          <div style={{ fontSize:12, color:"var(--ink-60)", lineHeight:1.9, marginTop:4 }}>
+                            🔁 {s.cycleVisitsUsed}/{s.visitsPerCycle} visits this cycle &nbsp;
+                            📅 Next visit: {s.nextVisitDate ? new Date(s.nextVisitDate).toDateString() : "—"}<br />
+                            📍 {s.address} &nbsp; ⏰ {s.appointmentTime}<br />
+                            💰 Rs. {s.price?.toLocaleString()}/cycle &nbsp;
+                            <span style={{ fontFamily:"var(--monof)", fontSize:10.5, color: s.paymentStatus==="paid"?GREEN:GOLD }}>
+                              {s.paymentStatus==="paid" ? "PAID" : "PAYMENT PENDING"}
+                            </span>
+                          </div>
+                        </div>
+                        <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:8 }}>
+                          <span style={{ display:"inline-flex", alignItems:"center", gap:6, padding:"4px 11px", borderRadius:20, fontSize:10.5, fontWeight:600, letterSpacing:"0.08em", textTransform:"uppercase", fontFamily:"var(--monof)", color: s.status==="active"?LAVENDER:s.status==="paused"?GOLD:"var(--ink-40)" }}>
+                            {s.status}
+                          </span>
+                          <div style={{ display:"flex", gap:6 }}>
+                            {s.status === "active" && (
+                              <button className="btn btn-sm" onClick={()=>handleSubAction(s._id,"pause")} style={{ background:"rgba(184,137,46,0.08)", color:GOLD, border:"1px solid rgba(184,137,46,0.3)" }}>Pause</button>
+                            )}
+                            {s.status === "paused" && (
+                              <button className="btn btn-sm" onClick={()=>handleSubAction(s._id,"resume")} style={{ background:"rgba(124,107,174,0.08)", color:LAVENDER, border:"1px solid rgba(124,107,174,0.3)" }}>Resume</button>
+                            )}
+                            {["active","paused"].includes(s.status) && (
+                              <button className="btn btn-sm" onClick={()=>handleSubAction(s._id,"cancel")} style={{ background:"rgba(164,19,60,0.06)", color:CRIMSON, border:"1px solid rgba(164,19,60,0.3)" }}>Cancel</button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div style={{ fontFamily:"var(--monof)", fontSize:10.5, letterSpacing:"0.14em", textTransform:"uppercase", color:"var(--ink-40)", marginBottom:12 }}>Available plans</div>
+              {plans.length === 0 ? (
+                <div className="card" style={{ padding:"60px 24px", textAlign:"center" }}>
+                  <div style={{ fontSize:48, marginBottom:16 }}>🔁</div>
+                  <div style={{ fontSize:16, fontWeight:600, color:"var(--ink-60)" }}>No subscription plans available yet</div>
+                </div>
+              ) : (
+                <div className="tests-grid" style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(260px,1fr))", gap:12 }}>
+                  {plans.map(p => (
+                    <div key={p._id} className="card" style={{ padding:20 }}>
+                      <div style={{ fontWeight:700, fontSize:16, marginBottom:4 }}>{p.name}</div>
+                      {p.description && <div style={{ fontSize:12, color:"var(--ink-60)", marginBottom:10 }}>{p.description}</div>}
+                      <div style={{ fontSize:12, color:"var(--ink-60)", lineHeight:1.9, marginBottom:12 }}>
+                        🧪 {p.testTypes?.map(t=>t.name).join(", ") || "—"}<br />
+                        🔁 {p.visitsPerCycle} visits every {p.cycleLengthDays} days
+                      </div>
+                      <div style={{ fontFamily:"var(--display)", fontSize:20, fontWeight:900, color:LAVENDER, marginBottom:14 }}>
+                        Rs. {p.price?.toLocaleString()}<span style={{ fontSize:12, fontWeight:500, color:"var(--ink-40)" }}> /cycle</span>
+                      </div>
+
+                      {subscribingId === p._id ? (
+                        <div>
+                          <div style={{ marginBottom:10 }}>
+                            <FieldLabel>Home address</FieldLabel>
+                            <textarea className="inp" rows={2} value={subForm.address} onChange={e=>setSubForm(f=>({...f,address:e.target.value}))} style={{ resize:"vertical" }} />
+                          </div>
+                          <div style={{ marginBottom:14 }}>
+                            <FieldLabel>Preferred time</FieldLabel>
+                            <input className="inp" type="time" value={subForm.appointmentTime} onChange={e=>setSubForm(f=>({...f,appointmentTime:e.target.value}))} />
+                          </div>
+                          <div style={{ display:"flex", gap:8 }}>
+                            <button className="btn btn-ghost btn-sm" onClick={()=>setSubscribingId(null)}>Cancel</button>
+                            <button className="btn btn-primary btn-sm" disabled={subLoading} onClick={()=>handleSubscribe(p._id)} style={{ flex:1 }}>
+                              {subLoading ? "Subscribing..." : "Confirm subscription"}
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <button className="btn btn-primary" style={{ width:"100%" }} onClick={()=>setSubscribingId(p._id)}>Subscribe</button>
+                      )}
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
           )}
