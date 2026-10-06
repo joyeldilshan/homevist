@@ -1,4 +1,5 @@
-const mongoose = require("mongoose");
+const mongoose     = require("mongoose");
+const addressParts = require("./addressParts.schema");
 
 const bookingSchema = new mongoose.Schema({
   bookingId: {
@@ -19,7 +20,8 @@ const bookingSchema = new mongoose.Schema({
 
   appointmentDate: { type: Date,    required: true },
   appointmentTime: { type: String,  default: "09:00" },
-  address:         { type: String,  required: true },
+  address:         { type: String,  required: true },   // legacy free-text
+  addressParts,                                          // structured UK address, all optional
   coordinates:     { lat: Number,   lng: Number },
   isHomeVisit:     { type: Boolean, default: true },
 

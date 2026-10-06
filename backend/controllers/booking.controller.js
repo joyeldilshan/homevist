@@ -10,7 +10,7 @@ exports.createBooking = async (req, res, next) => {
     const {
       testTypeIds, testTypeId,
       appointmentDate, appointmentTime,
-      address, coordinates, isHomeVisit, paymentMethod, notes,
+      address, addressParts, coordinates, isHomeVisit, paymentMethod, notes,
     } = req.body;
 
     const ids = testTypeIds?.length ? testTypeIds : testTypeId ? [testTypeId] : [];
@@ -28,7 +28,7 @@ exports.createBooking = async (req, res, next) => {
       user:            req.user._id,
       testTypes:       ids,
       testType:        ids[0],
-      appointmentDate, appointmentTime, address, coordinates,
+      appointmentDate, appointmentTime, address, addressParts, coordinates,
       isHomeVisit:     isHomeVisit !== undefined ? isHomeVisit : true,
       amount:          totalAmount,
       paymentMethod:   paymentMethod || "cash",

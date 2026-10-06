@@ -4,7 +4,7 @@ const Plan          = require("../models/Plan");
 // POST /api/subscriptions — patient subscribes to a plan
 exports.subscribe = async (req, res, next) => {
   try {
-    const { planId, address, appointmentTime } = req.body;
+    const { planId, address, addressParts, appointmentTime } = req.body;
     if (!planId || !address) {
       return res.status(400).json({ success: false, message: "Plan and address are required." });
     }
@@ -23,6 +23,7 @@ exports.subscribe = async (req, res, next) => {
       cycleLengthDays: plan.cycleLengthDays,
       price:           plan.price,
       address,
+      addressParts,
       appointmentTime: appointmentTime || "09:00",
       startDate:      today,
       nextVisitDate:  today,

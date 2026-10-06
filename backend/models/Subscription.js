@@ -1,4 +1,5 @@
-const mongoose = require("mongoose");
+const mongoose     = require("mongoose");
+const addressParts = require("./addressParts.schema");
 
 const subscriptionSchema = new mongoose.Schema(
   {
@@ -12,7 +13,8 @@ const subscriptionSchema = new mongoose.Schema(
     cycleLengthDays: { type: Number, required: true },
     price:           { type: Number, required: true },
 
-    address:         { type: String, required: true },
+    address:         { type: String, required: true },   // legacy free-text
+    addressParts,                                         // structured UK address, all optional
     appointmentTime: { type: String, default: "09:00" },
 
     startDate:     { type: Date, required: true },

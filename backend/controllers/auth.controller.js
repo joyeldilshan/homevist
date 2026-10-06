@@ -28,7 +28,7 @@ const sendToken = (user, statusCode, res) => {
 // Phlebotomists and admins are created by admin only.
 exports.register = async (req, res, next) => {
   try {
-    const { name, email, phone, password, age, gender, address } = req.body;
+    const { name, email, phone, password, age, gender, address, addressParts } = req.body;
 
     // Check if email already exists
     const existing = await User.findOne({ email });
@@ -48,6 +48,7 @@ exports.register = async (req, res, next) => {
       age,
       gender,
       address,
+      addressParts,
       role: "user",
     });
 
@@ -125,7 +126,7 @@ exports.getMe = async (req, res) => {
 exports.updateProfile = async (req, res, next) => {
   try {
     // Only allow safe fields to be updated — never role or password here
-    const allowed = ["name", "phone", "age", "gender", "address", "avatar"];
+    const allowed = ["name", "phone", "age", "gender", "address", "addressParts", "avatar"];
     const updates = {};
     allowed.forEach((field) => {
       if (req.body[field] !== undefined) updates[field] = req.body[field];

@@ -1,5 +1,6 @@
-const mongoose = require("mongoose");
-const bcrypt   = require("bcryptjs");
+const mongoose     = require("mongoose");
+const bcrypt       = require("bcryptjs");
+const addressParts = require("./addressParts.schema");
 
 const userSchema = new mongoose.Schema(
   {
@@ -12,7 +13,8 @@ const userSchema = new mongoose.Schema(
     // Profile
     age:     { type: Number },
     gender:  { type: String, enum: ["male", "female", "other"] },
-    address: { type: String },
+    address: { type: String },        // legacy free-text, still populated
+    addressParts,                     // structured UK address, all optional
     avatar:  { type: String },
 
     // Phlebotomist-specific fields
