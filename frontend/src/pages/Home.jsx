@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
+import { useRichMotion } from "../hooks/useRichMotion";
 import {
   motion, AnimatePresence, useScroll, useSpring, useTransform,
 } from "framer-motion";
@@ -35,19 +36,36 @@ export default function Home() {
   const [open, setOpen] = useState(false);
   const [mouse, setMouse] = useState({ x: 0, y: 0 });
 
+  // Single gate for the rich motion. False on narrow viewports, touch
+  // devices and when reduced motion is requested — see useRichMotion.
+  const rich = useRichMotion();
+
   const { scrollY, scrollYProgress } = useScroll();
   const progress = useSpring(scrollYProgress, { stiffness: 120, damping: 30 });
 
-  // Global parallax layers (fixed backgrounds moving at different speeds)
-  const blobA = useTransform(scrollY, [0, 4000], [0, 620]);
-  const blobB = useTransform(scrollY, [0, 4000], [0, -480]);
-  const blobC = useTransform(scrollY, [0, 4000], [0, 300]);
-  const cellsY = useTransform(scrollY, [0, 4000], [0, -900]);
+  /*
+   * Global parallax layers.
+   *
+   * Hooks must run unconditionally, so the transforms are always created;
+   * `depth` collapses their range to zero when rich motion is off. That
+   * keeps the subscription cheap instead of animating elements the CSS has
+   * already hidden on mobile.
+   */
+  const depth  = rich ? 1 : 0;
+  const blobA  = useTransform(scrollY, [0, 4000], [0,  620 * depth]);
+  const blobB  = useTransform(scrollY, [0, 4000], [0, -480 * depth]);
+  const blobC  = useTransform(scrollY, [0, 4000], [0,  300 * depth]);
+  const cellsY = useTransform(scrollY, [0, 4000], [0, -900 * depth]);
 
-  // Hero-specific parallax
-  const heroTextY = useTransform(scrollY, [0, 700], [0, 110]);
-  const heroImgY  = useTransform(scrollY, [0, 700], [0, -70]);
+  // Hero parallax — text sinks, image rises, both fade out on scroll.
+  const heroTextY = useTransform(scrollY, [0, 700], [0,  110 * depth]);
+  const heroImgY  = useTransform(scrollY, [0, 700], [0,  -70 * depth]);
   const heroFade  = useTransform(scrollY, [0, 560], [1, 0]);
+
+  // Desktop-only extras: the hero image settles back as you scroll past,
+  // and the backdrop drifts sideways so the depth reads on a wide screen.
+  const heroScale = useTransform(scrollY, [0, 700], [1, rich ? 1.06 : 1]);
+  const driftX    = useTransform(scrollY, [0, 4000], [0, rich ? 160 : 0]);
 
   useEffect(() => {
     let ticking = false;
@@ -157,9 +175,9 @@ export default function Home() {
       <motion.div className="hv-progress" style={{ scaleX: progress }} />
 
       {/* ============ FIXED PARALLAX BACKDROP ============ */}
-      <motion.div className="blob blob-a" style={{ y: blobA }} />
+      <motion.div className="blob blob-a" style={{ y: blobA, x: driftX }} />
       <motion.div className="blob blob-b" style={{ y: blobB }} />
-      <motion.div className="blob blob-c" style={{ y: blobC }} />
+      <motion.div className="blob blob-c" style={{ y: blobC, x: driftX }} />
       <motion.div className="cells" style={{ y: cellsY }} aria-hidden="true">
         {[...Array(16)].map((_, i) => (
           <span
@@ -734,8 +752,8 @@ export default function Home() {
             </Reveal>
           </motion.div>
 
-          <motion.div style={{ y: heroImgY }}>
-            <Reveal delay={0.15}>
+          <motion.div style={{ y: heroImgY, scale: heroScale }}>
+            <Reveal delay={0.1} from="right">
               <ParallaxPlate
                 src="/images/image1.jpg"
                 alt="A Home Visit phlebotomist collecting a sample at a patient's home"
@@ -771,7 +789,7 @@ export default function Home() {
               tape="Specimen 02" tint={CAP.lavender}
             />
           </Reveal>
-          <Reveal delay={0.15}>
+          <Reveal delay={0.1} from="right">
             <SpecimenLabel section={SECTIONS[1]} />
             <h2>Every drop tells a story. We make sure it reaches you.</h2>
             <p className="lead" style={{ margin: "20px 0 16px" }}>
@@ -799,7 +817,7 @@ export default function Home() {
           </Reveal>
           <div className="grid-3">
             {features.map((f, i) => (
-              <Reveal key={f.title} delay={i * 0.06}>
+              <Reveal key={f.title} index={i} from="scale">
                 <div className="cell" style={{ "--tint": CAP[f.tint] }}>
                   <span className="cell-icon">{f.icon}</span>
                   <h3>{f.title}</h3>
@@ -821,7 +839,7 @@ export default function Home() {
           </Reveal>
           <div className="steps">
             {process.map((p, i) => (
-              <Reveal key={p.step} delay={i * 0.08}>
+              <Reveal key={p.step} index={i} from="left">
                 <div className="step" style={{ "--tint": CAP[p.tint] }}>
                   <div className="step-n">{p.step}</div>
                   <div>
@@ -855,7 +873,7 @@ export default function Home() {
           </Reveal>
           <div className="stats-row">
             {stats.map((s, i) => (
-              <Reveal key={s.label} delay={i * 0.07}>
+              <Reveal key={s.label} index={i} from="scale">
                 <div className="stat" style={{ "--tint": CAP[s.tint] }}>
                   <div className="stat-v">{s.value}</div>
                   <div className="stat-l">{s.label}</div>
@@ -876,7 +894,7 @@ export default function Home() {
           </Reveal>
           <div className="quotes">
             {reviews.map((r, i) => (
-              <Reveal key={r.name} delay={i * 0.08}>
+              <Reveal key={r.name} index={i} from="up">
                 <div className="quote" style={{ "--tint": CAP[r.tint] }}>
                   <div>
                     <div className="quote-stars">{"★".repeat(r.stars)}</div>
@@ -906,7 +924,7 @@ export default function Home() {
           </Reveal>
           <div className="team-row">
             {team.map((t, i) => (
-              <Reveal key={t.name} delay={i * 0.07}>
+              <Reveal key={t.name} index={i} from="scale">
                 <div className="member" style={{ "--tint": CAP[t.tint] }}>
                   <div className="member-in">{t.initials}</div>
                   <h3>{t.name}</h3>
@@ -1059,14 +1077,45 @@ function BgImage({ src, slot, className }) {
   );
 }
 
-/* ============== scroll reveal ============== */
-function Reveal({ children, delay = 0 }) {
+/* ============== scroll reveal ==============
+ * Reveals once as the element enters view.
+ *
+ * `from` picks the direction it travels in ("up" | "left" | "right" |
+ * "scale"), so a row of cards can fan in rather than all sliding the same
+ * way. `index` applies the 40ms stagger from the motion spec without each
+ * caller having to do the arithmetic.
+ *
+ * On touch, narrow screens or reduced-motion this collapses to a plain
+ * fade with no transform, so nothing moves on the devices where the
+ * mobile perf fix matters.
+ */
+const REVEAL_FROM = {
+  up:    { y: 24,  x: 0,   scale: 1    },
+  left:  { y: 0,   x: -28, scale: 1    },
+  right: { y: 0,   x: 28,  scale: 1    },
+  scale: { y: 12,  x: 0,   scale: 0.97 },
+};
+
+function Reveal({ children, delay = 0, index = 0, from = "up" }) {
+  const rich = useRichMotion();
+  const offset = REVEAL_FROM[from] || REVEAL_FROM.up;
+
+  // 40ms stagger per the motion spec, capped so a long list never crawls.
+  const wait = delay + Math.min(index, 6) * 0.04;
+
+  const hidden = rich
+    ? { opacity: 0, ...offset }
+    : { opacity: 0 };
+  const shown = rich
+    ? { opacity: 1, y: 0, x: 0, scale: 1 }
+    : { opacity: 1 };
+
   return (
     <motion.div
-      initial={{ opacity: 0, y: 24 }}
-      whileInView={{ opacity: 1, y: 0 }}
+      initial={hidden}
+      whileInView={shown}
       viewport={{ once: true, margin: "-60px" }}
-      transition={{ duration: 0.2, delay, ease: [0.22, 1, 0.36, 1] }}
+      transition={{ duration: rich ? 0.2 : 0.12, delay: wait, ease: [0.22, 1, 0.36, 1] }}
     >
       {children}
     </motion.div>
