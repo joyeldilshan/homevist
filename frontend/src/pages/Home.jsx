@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import {
   motion, AnimatePresence, useScroll, useSpring, useTransform,
 } from "framer-motion";
@@ -962,6 +962,10 @@ export default function Home() {
       {/* ================= FOOTER ================= */}
       <footer className="foot">
         <div className="brand"><span className="brand-dot" />Home Visit</div>
+        <p style={{ marginBottom: 10 }}>
+          <Link to="/privacy" style={{ color: "inherit", textDecoration: "underline", marginRight: 16 }}>Privacy Policy</Link>
+          <Link to="/terms" style={{ color: "inherit", textDecoration: "underline" }}>Terms of Service</Link>
+        </p>
         <p>© 2026 Home Visit — built with care in Cardiff.</p>
       </footer>
     </div>

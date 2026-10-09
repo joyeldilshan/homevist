@@ -5,7 +5,10 @@ import AuthPage        from "./pages/Login";
 import UserDashboard   from "./pages/user/Dashboard";
 import PhleboDashboard from "./pages/phlebotomist/Dashboard";
 import AdminDashboard  from "./pages/admin/Dashboard";
-import MLTDashboard from "./pages/mlt/Dashboard"; 
+import MLTDashboard from "./pages/mlt/Dashboard";
+import Privacy         from "./pages/Privacy";
+import Terms           from "./pages/Terms";
+import StorageNotice   from "./components/StorageNotice";
 
 // Maps each role to its dashboard path. Unknown roles → null (no redirect).
 const DASHBOARDS = {
@@ -38,19 +41,26 @@ export default function App() {
   const dash = user ? DASHBOARDS[user.role] : null;
 
   return (
-    <Routes>
-      <Route path="/" element={ dash ? <Navigate to={dash} replace /> : <Home /> } />
+    <>
+      <Routes>
+        <Route path="/" element={ dash ? <Navigate to={dash} replace /> : <Home /> } />
 
-      <Route path="/home"     element={<Home />} />
-      <Route path="/login"    element={ dash ? <Navigate to={dash} replace /> : <AuthPage /> } />
-      <Route path="/register" element={ dash ? <Navigate to={dash} replace /> : <AuthPage /> } />
+        <Route path="/home"     element={<Home />} />
+        <Route path="/login"    element={ dash ? <Navigate to={dash} replace /> : <AuthPage /> } />
+        <Route path="/register" element={ dash ? <Navigate to={dash} replace /> : <AuthPage /> } />
 
-      <Route path="/user"         element={<RoleRoute role="user"><UserDashboard /></RoleRoute>} />
-      <Route path="/phlebotomist" element={<RoleRoute role="phlebotomist"><PhleboDashboard /></RoleRoute>} />
-      <Route path="/admin"        element={<RoleRoute role="admin"><AdminDashboard /></RoleRoute>} />
-      <Route path="/mlt" element={<RoleRoute role="mlt"><MLTDashboard /></RoleRoute>} />
+        {/* Public — reachable while signed out and while signed in */}
+        <Route path="/privacy" element={<Privacy />} />
+        <Route path="/terms"   element={<Terms />} />
 
-      <Route path="*" element={<Navigate to={dash || "/"} replace />} />
-    </Routes>
+        <Route path="/user"         element={<RoleRoute role="user"><UserDashboard /></RoleRoute>} />
+        <Route path="/phlebotomist" element={<RoleRoute role="phlebotomist"><PhleboDashboard /></RoleRoute>} />
+        <Route path="/admin"        element={<RoleRoute role="admin"><AdminDashboard /></RoleRoute>} />
+        <Route path="/mlt" element={<RoleRoute role="mlt"><MLTDashboard /></RoleRoute>} />
+
+        <Route path="*" element={<Navigate to={dash || "/"} replace />} />
+      </Routes>
+      <StorageNotice />
+    </>
   );
 }

@@ -29,6 +29,18 @@ const userSchema = new mongoose.Schema(
     isActive:   { type: Boolean, default: true },
     isVerified: { type: Boolean, default: false },
 
+    /*
+     * Record of the patient agreeing to the privacy policy at registration.
+     * Optional so accounts created before this existed still load and save;
+     * an absent record means consent was never captured, not that it was
+     * refused. Storing the version lets you tell which text they agreed to.
+     */
+    consent: {
+      privacyPolicyAccepted: { type: Boolean },
+      acceptedAt:            { type: Date },
+      policyVersion:         { type: String },
+    },
+
     // GPS location (for phlebotomists)
     location: {
       type:        { type: String, enum: ["Point"], default: "Point" },

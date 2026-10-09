@@ -23,6 +23,13 @@ module.exports = {
   serviceAreaPrefixes: ["CF"],
 
   /*
+   * Version recorded against a patient's privacy-policy consent.
+   * Bump this whenever the policy text changes so you can tell which
+   * version each patient actually agreed to.
+   */
+  policyVersion: "1.0-draft",
+
+  /*
    * Organisation details printed on reports and emails.
    *
    * The originals were invented. Do not print a fabricated address or

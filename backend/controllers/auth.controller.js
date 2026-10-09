@@ -3,6 +3,7 @@ const {
   isValidUkPhone, PHONE_MESSAGE,
   normaliseUkPhone, normaliseUkPostcode, POSTCODE_MESSAGE,
 } = require("../utils/validators");
+const locale = require("../config/locale");
 const User = require("../models/User");
 
 // ── Helper: generate JWT token ────────────────────────────────────
@@ -21,7 +22,7 @@ const sendToken = (user, statusCode, res) => {
   const token = signToken(user._id);
   res.status(statusCode).json({
     success: true,
-    token,   // frontend stores this in localStorage
+    token,   // frontend stores this in sessionStorage (cleared on tab close)
     user,    // user object (password already removed by toJSON())
   });
 };
@@ -32,10 +33,20 @@ const sendToken = (user, statusCode, res) => {
 // Phlebotomists and admins are created by admin only.
 exports.register = async (req, res, next) => {
   try {
-    const { name, email, phone, password, age, gender, address, addressParts } = req.body;
+    const {
+      name, email, phone, password, age, gender, address, addressParts,
+      privacyPolicyAccepted,
+    } = req.body;
 
     if (!isValidUkPhone(phone)) {
       return res.status(400).json({ success: false, message: PHONE_MESSAGE });
+    }
+
+    if (privacyPolicyAccepted !== true) {
+      return res.status(400).json({
+        success: false,
+        message: "Please confirm you have read the Privacy Policy before creating an account.",
+      });
     }
 
     // Check if email already exists
@@ -58,6 +69,11 @@ exports.register = async (req, res, next) => {
       address,
       addressParts,
       role: "user",
+      consent: {
+        privacyPolicyAccepted: true,
+        acceptedAt:            new Date(),
+        policyVersion:         locale.policyVersion,
+      },
     });
 
     sendToken(user, 201, res);

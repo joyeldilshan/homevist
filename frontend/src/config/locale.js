@@ -16,6 +16,9 @@ const locale = {
   // Postcode prefixes the service currently covers.
   serviceAreaPrefixes: ["CF"],
 
+  // Must match backend/config/locale.js — recorded against consent.
+  policyVersion: "1.0-draft",
+
   // Example values used in form placeholders.
   examplePhone:    "07700 900123",
   examplePostcode: "CF10 1AA",

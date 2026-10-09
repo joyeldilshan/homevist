@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import toast from "react-hot-toast";
 import { isValidUkPhone, normaliseUkPhone, PHONE_MESSAGE } from "../utils/validators";
@@ -23,6 +23,7 @@ export default function AuthPage() {
 
   const [lForm, setLForm] = useState({ email:"", password:"" });
   const [rForm, setRForm] = useState({ name:"", email:"", phone:"", password:"", confirm:"" });
+  const [consent, setConsent] = useState(false);
   const setL = (k,v) => setLForm(p=>({...p,[k]:v}));
   const setR = (k,v) => setRForm(p=>({...p,[k]:v}));
 
@@ -70,9 +71,13 @@ export default function AuthPage() {
     if (password !== confirm) { toast.error("Passwords do not match."); return; }
     if (password.length < 6)  { toast.error("Password must be at least 6 characters."); return; }
     if (!isValidUkPhone(phone)) { toast.error(PHONE_MESSAGE); return; }
+    if (!consent) { toast.error("Please confirm you have read the Privacy Policy."); return; }
     setLoading(true);
     try {
-      const user = await register({ name, email, phone: normaliseUkPhone(phone), password });
+      const user = await register({
+        name, email, phone: normaliseUkPhone(phone), password,
+        privacyPolicyAccepted: true,
+      });
       toast.success(`Welcome, ${user.name.split(" ")[0]}!`);
       navigate("/user");
     } catch (err) { toast.error(err.response?.data?.message || "Registration failed."); }
@@ -427,7 +432,23 @@ export default function AuthPage() {
                     {rForm.password===rForm.confirm ? "✓ Passwords match" : "✗ Passwords do not match"}
                   </div>
                 )}
-                <button className="cta" type="submit" disabled={loading}>
+                <label style={{ display:"flex", alignItems:"flex-start", gap:10, margin:"4px 0 16px", fontSize:13, lineHeight:1.6, cursor:"pointer" }}>
+                  <input
+                    type="checkbox"
+                    required
+                    checked={consent}
+                    onChange={e => setConsent(e.target.checked)}
+                    style={{ marginTop:3, width:16, height:16, flexShrink:0, cursor:"pointer" }}
+                  />
+                  <span>
+                    I have read the{" "}
+                    <Link to="/privacy" target="_blank" rel="noopener noreferrer" style={{ color:"var(--teal)", textDecoration:"underline" }}>
+                      Privacy Policy
+                    </Link>{" "}
+                    and understand how my health information will be handled.
+                  </span>
+                </label>
+                <button className="cta" type="submit" disabled={loading || !consent}>
                   {loading ? "Creating account..." : "Create account →"}
                 </button>
                 <p className="swap">
