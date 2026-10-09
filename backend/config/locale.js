@@ -22,6 +22,22 @@ module.exports = {
    */
   serviceAreaPrefixes: ["CF"],
 
+  /*
+   * Organisation details printed on reports and emails.
+   *
+   * The originals were invented. Do not print a fabricated address or
+   * phone number on a patient report — fill these in with real details,
+   * or leave the placeholder visible so it is obvious they are missing.
+   */
+  organisation: {
+    name:        "Home Visit",
+    cityCountry: "Cardiff, Wales",
+    addressLine: "[PLACEHOLDER - add registered address]",
+    phone:       "[PLACEHOLDER - add contact number]",
+    website:     "[PLACEHOLDER - add website]",
+    email:       "noreply@homevisit.co.uk",
+  },
+
   // ── Test prices ───────────────────────────────────────────────
   /*
    * =====================================================================

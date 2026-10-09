@@ -32,11 +32,11 @@ const reportTemplate = (data) => `
   <tr><td style="background:#1E6F5C;border-radius:14px 14px 0 0;padding:28px 34px;text-align:center;">
     <div style="font-size:34px;margin-bottom:6px;">🧬</div>
     <h1 style="color:#fff;margin:0;font-size:21px;font-weight:700;">Your Lab Report is Ready</h1>
-    <p style="color:rgba(255,255,255,.85);margin:6px 0 0;font-size:13px;">Home Visit Laboratory · Verified Results</p>
+    <p style="color:rgba(255,255,255,.85);margin:6px 0 0;font-size:13px;">Home Visit · Your Test Results</p>
   </td></tr>
   <tr><td style="background:#fff;padding:30px 34px;border-radius:0 0 14px 14px;box-shadow:0 4px 18px rgba(0,0,0,.07);">
     <p style="font-size:15px;color:#1A202C;margin:0 0 22px;">
-      Dear <strong>${data.patientName}</strong>, your test results have been processed and verified by our laboratory team. Your report is attached to this email as a PDF.
+      Dear <strong>${data.patientName}</strong>, your test results have been processed by the laboratory. Your report is attached to this email as a PDF.
     </p>
     <div style="background:#F0FBF7;border:1.5px solid #C3EDDE;border-radius:10px;padding:18px 22px;margin-bottom:24px;">
       <table width="100%" cellpadding="0" cellspacing="0">
@@ -59,7 +59,7 @@ const reportTemplate = (data) => `
     </div>
   </td></tr>
   <tr><td style="padding:16px 0;text-align:center;">
-    <p style="font-size:11px;color:#A0AEC0;margin:0;">🩸 Home Visit · Jaffna, Sri Lanka · ${new Date().getFullYear()}</p>
+    <p style="font-size:11px;color:#A0AEC0;margin:0;">🩸 Home Visit · Cardiff, Wales · ${new Date().getFullYear()}</p>
   </td></tr>
 </table>
 </td></tr>

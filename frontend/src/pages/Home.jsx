@@ -86,52 +86,70 @@ export default function Home() {
   };
 
   // ============== CONTENT ==============
+  /*
+   * COPY RULES FOR THIS PAGE
+   * Do not state or imply that this service, any laboratory or any member
+   * of staff is accredited, registered, certified or compliant with any
+   * standard or regulation. Those are claims only the business can make,
+   * and only once they are true and evidenced.
+   *
+   * Anything that cannot be verified from the codebase is marked
+   * [PLACEHOLDER - add only if true] and must be either substantiated or
+   * deleted before this page goes live.
+   */
+  const PH = "[PLACEHOLDER - add only if true]";
+
   const features = [
-    { icon: "🩸", tint: "crimson",  title: "Home Blood Collection", desc: "Certified phlebotomists arrive at your doorstep with sterile, single-use equipment." },
-    { icon: "⚡", tint: "gold",     title: "2-Hour Reports",        desc: "Verified digital reports delivered with barcode authentication in record time." },
-    { icon: "🔒", tint: "teal",     title: "Lab-Grade Security",    desc: "End-to-end encrypted records. HIPAA-aligned data handling, always." },
-    { icon: "📱", tint: "lavender", title: "Real-Time Tracking",    desc: "Live phlebotomist tracking, instant updates, complete transparency." },
-    { icon: "🧬", tint: "crimson",  title: "200+ Test Panels",      desc: "From full blood count to advanced hormone profiles — all from home." },
-    { icon: "🏥", tint: "teal",     title: "Accredited Labs",       desc: "Samples processed at NABL & ISO 15189 certified diagnostic centers." },
+    { icon: "🩸", tint: "crimson",  title: "Home Blood Collection", desc: "A phlebotomist comes to your home and collects your sample using sterile, single-use equipment." },
+    { icon: "⚡", tint: "gold",     title: "Digital Reports",       desc: `Your report is delivered digitally with a barcode reference. Typical turnaround: ${PH}` },
+    { icon: "🔒", tint: "teal",     title: "Your Data",             desc: "We handle your health information in line with our Privacy Policy." },
+    { icon: "📱", tint: "lavender", title: "Track Your Booking",    desc: "Follow your booking from request through to report, with status updates at each stage." },
+    { icon: "🧬", tint: "crimson",  title: "Blood Test Panels",     desc: "Routine panels including full blood count, lipids, thyroid, liver function and HbA1c." },
+    { icon: "🏥", tint: "teal",     title: "Laboratory Processing", desc: `Samples are processed by an external laboratory. Accreditation (for example UKAS): ${PH}` },
   ];
 
   const process = [
-    { step: "01", tint: "crimson",  title: "Book Your Test",   desc: "Pick a test panel and time slot in under 60 seconds." },
-    { step: "02", tint: "gold",     title: "We Arrive",        desc: "Your certified phlebotomist arrives with sterile equipment." },
-    { step: "03", tint: "lavender", title: "Sample Collected", desc: "Quick, painless collection in the comfort of your home." },
-    { step: "04", tint: "teal",     title: "Get Reports",      desc: "Digital report with barcode verification within hours." },
+    { step: "01", tint: "crimson",  title: "Book Your Test",   desc: "Choose your tests, a date and a time slot." },
+    { step: "02", tint: "gold",     title: "We Arrive",        desc: "Your phlebotomist arrives at the agreed time with sterile equipment." },
+    { step: "03", tint: "lavender", title: "Sample Collected", desc: "Collection is quick and done in the comfort of your own home." },
+    { step: "04", tint: "teal",     title: "Get Your Report",  desc: "Your digital report arrives by email with a barcode reference." },
   ];
 
+  // Figures must come from real data before this block is shown publicly.
   const stats = [
-    { value: "15K+", tint: "crimson",  label: "Patients served"   },
-    { value: "4.9",  tint: "gold",     label: "Average rating"    },
-    { value: "2h",   tint: "teal",     label: "Report turnaround" },
-    { value: "200+", tint: "lavender", label: "Test panels"       },
+    { value: PH, tint: "crimson",  label: "Patients served"   },
+    { value: PH, tint: "gold",     label: "Average rating"    },
+    { value: PH, tint: "teal",     label: "Report turnaround" },
+    { value: "6", tint: "lavender", label: "Test panels"      },
   ];
 
+  // Illustrative sample content only — not real patient feedback.
+  // Replace with genuine, consented testimonials or delete this section.
   const reviews = [
-    { name: "Rachel T.",     role: "Patient, Jaffna",  text: "The phlebotomist was so professional and gentle. I got my results before lunch. This is the future of healthcare.", stars: 5, tint: "crimson"  },
-    { name: "Dr. Owen M.", role: "Cardiologist",     text: "I recommend Home Visit to all my elderly patients. The accuracy matches any premier lab I've worked with.",          stars: 5, tint: "teal"     },
-    { name: "Megan K.",      role: "Patient, Colombo", text: "Booked at 8 AM, results by noon. Clean interface, kind staff, fair pricing. Couldn't ask for more.",               stars: 5, tint: "lavender" },
+    { name: `Sample review ${PH}`, role: "Patient, Cardiff",  text: "Example testimonial text. Replace with a genuine, consented review before launch.", stars: 5, tint: "crimson"  },
+    { name: `Sample review ${PH}`, role: "Patient, Newport",  text: "Example testimonial text. Replace with a genuine, consented review before launch.", stars: 5, tint: "teal"     },
+    { name: `Sample review ${PH}`, role: "Patient, Barry",    text: "Example testimonial text. Replace with a genuine, consented review before launch.", stars: 5, tint: "lavender" },
   ];
 
+  // Illustrative placeholders — replace with real, named staff or delete.
   const team = [
-    { name: "Dr. Rachel Kent", role: "Chief Pathologist",  initials: "RK", tint: "crimson"  },
-    { name: "Miss. Harper",      role: "Head of Phlebotomy", initials: "H",  tint: "lavender" },
-    { name: "Alex Dunn",  role: "Technology Lead",    initials: "AD", tint: "teal"     },
-    { name: "Mr. Martin Jones",    role: "Quality Assurance",  initials: "MJ", tint: "gold"     },
+    { name: PH, role: "Lead Pathologist",     initials: "—", tint: "crimson"  },
+    { name: PH, role: "Head of Phlebotomy",   initials: "—", tint: "lavender" },
+    { name: PH, role: "Technology Lead",      initials: "—", tint: "teal"     },
+    { name: PH, role: "Quality Assurance",    initials: "—", tint: "gold"     },
   ];
 
   const faqs = [
-    { q: "How early can I book a slot?",     a: "You can book up to 7 days in advance. Same-day slots are also available subject to phlebotomist availability." },
-    { q: "Are the phlebotomists certified?", a: "Every phlebotomist on our platform is licensed, background-verified, and trained to international standards." },
-    { q: "What if my report is delayed?",    a: "We guarantee 4-hour turnaround for standard panels. Any delay beyond that and the test is on us." },
-    { q: "Do you cover my area?",            a: "We currently operate across Jaffna, Colombo, Kandy, and Galle, with expansion planned across the island." },
+    { q: "How early can I book a slot?",       a: "You can book up to 7 days in advance. Same-day slots may be available depending on phlebotomist availability." },
+    { q: "What are the phlebotomists' qualifications?", a: `Details of our phlebotomists' training and registration: ${PH}` },
+    { q: "How long will my report take?",      a: `Expected turnaround for each test is shown when you book. Service-level commitments: ${PH}` },
+    { q: "Do you cover my area?",              a: "We currently visit postcodes starting CF, covering Cardiff and the surrounding South Wales area. Enter your postcode when booking and we will tell you straight away if we can reach you." },
+    { q: "How is my health information handled?", a: "We handle your health information in line with our Privacy Policy, which explains what we collect, why, and how long we keep it." },
   ];
 
   const ticker = [
-    "NABL-certified labs", "2-hour reports", "Home collection", "Barcode verified",
-    "ISO 15189", "Jaffna · Colombo · Kandy · Galle", "200+ panels", "Live tracking",
+    "Home collection", "Digital reports", "Barcode reference", "Cardiff & South Wales",
+    "CF postcodes", "Routine blood panels", "Track your booking",
   ];
 
   return (
@@ -710,7 +728,7 @@ export default function Home() {
               <div className="hero-meta">
                 <div className="hero-meta-item"><span className="hero-meta-v">2h</span><span className="hero-meta-l">Report time</span></div>
                 <div className="hero-meta-item"><span className="hero-meta-v">200+</span><span className="hero-meta-l">Test panels</span></div>
-                <div className="hero-meta-item"><span className="hero-meta-v">4 cities</span><span className="hero-meta-l">Sri Lanka</span></div>
+                <div className="hero-meta-item"><span className="hero-meta-v">Cardiff</span><span className="hero-meta-l">& South Wales</span></div>
               </div>
             </Reveal>
           </motion.div>
@@ -756,7 +774,7 @@ export default function Home() {
             <SpecimenLabel section={SECTIONS[1]} />
             <h2>Every drop tells a story. We make sure it reaches you.</h2>
             <p className="lead" style={{ margin: "20px 0 16px" }}>
-              Home Visit connects you with NABL-certified labs and trained phlebotomists across Sri Lanka.
+              Home Visit brings blood sample collection to your home across Cardiff and South Wales, and sends your sample to a laboratory for processing.
             </p>
             <p>
               From a routine full blood count to advanced hormone profiles, every sample is barcoded at
@@ -832,7 +850,7 @@ export default function Home() {
         <div className="wrap">
           <Reveal>
             <SpecimenLabel section={SECTIONS[4]} />
-            <h2>Trusted across the island.</h2>
+            <h2>Serving Cardiff and South Wales.</h2>
           </Reveal>
           <div className="stats-row">
             {stats.map((s, i) => (
@@ -930,7 +948,7 @@ export default function Home() {
               <div className="contact-row">
                 <span className="contact-item">support@homevisit.com</span>
                 <span className="contact-item">+44 7565 20619</span>
-                <span className="contact-item">Jaffna, Sri Lanka</span>
+                <span className="contact-item">Cardiff, Wales</span>
               </div>
               <button className="btn btn-primary" style={{ marginTop: 34, padding: "15px 34px", fontSize: 15 }}
                 onClick={() => navigate("/login")}>
@@ -944,7 +962,7 @@ export default function Home() {
       {/* ================= FOOTER ================= */}
       <footer className="foot">
         <div className="brand"><span className="brand-dot" />Home Visit</div>
-        <p>© 2026 Home Visit — built with care in Jaffna.</p>
+        <p>© 2026 Home Visit — built with care in Cardiff.</p>
       </footer>
     </div>
   );

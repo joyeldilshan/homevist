@@ -217,7 +217,7 @@ export default function AdminDashboard() {
     { id:"overview",      icon:"📊", label:"Overview",      cap:CRIMSON  },
     { id:"bookings",      icon:"📋", label:"All Bookings",  cap:TEAL     },
     { id:"assign",        icon:"🎯", label:"Assign Jobs",   cap:GOLD,    badge:unassigned.length },
-    { id:"tests",         icon:"🔬", label:"Test Catalog",  cap:LAVENDER },
+    { id:"tests",         icon:"🔬", label:"Test Catalogue",  cap:LAVENDER },
     { id:"plans",         icon:"🔁", label:"Plans",         cap:LAVENDER },
     { id:"subscriptions", icon:"📋", label:"Subscriptions", cap:GOLD     },
     { id:"phlebotomists", icon:"🧪", label:"Phlebotomists", cap:BLUE     },
@@ -620,8 +620,8 @@ export default function AdminDashboard() {
             <div className="fade-up">
               <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-end", marginBottom:26, flexWrap:"wrap", gap:12 }}>
                 <div>
-                  <SpecimenLabel code="HV-33" name="Catalog" cap={LAVENDER} />
-                  <h1>Test catalog.</h1>
+                  <SpecimenLabel code="HV-33" name="Catalogue" cap={LAVENDER} />
+                  <h1>Test catalogue.</h1>
                   <p className="sub">{testTypes.length} test types</p>
                 </div>
                 <button className="btn btn-primary btn-sm" onClick={()=>setTestModal(true)}>+ Add test</button>
@@ -855,7 +855,7 @@ export default function AdminDashboard() {
                   <div style={{ width:40, height:40, borderRadius:"50%", background:"rgba(164,19,60,0.07)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:18 }}>🧪</div>
                   <div>
                     <div style={{ fontWeight:700, fontSize:14 }}>{p?.name||"—"}</div>
-                    <div style={{ fontSize:12, color:"rgba(23,19,16,0.55)" }}>⭐ {p?.rating?.toFixed(1)||"5.0"} · {p?.serviceArea||"Jaffna"}</div>
+                    <div style={{ fontSize:12, color:"rgba(23,19,16,0.55)" }}>⭐ {p?.rating?.toFixed(1)||"5.0"} · {p?.serviceArea||"CF"}</div>
                   </div>
                 </div>
                 <span style={{ fontFamily:"var(--monof)", fontSize:10, letterSpacing:"0.08em", textTransform:"uppercase", color:p?.isAvailable?GREEN:"rgba(23,19,16,0.4)" }}>
@@ -962,7 +962,7 @@ export default function AdminDashboard() {
           <FI label="Email"        fkey="email"         type="email"    placeholder="email@example.com"   val={newPhle.email}         setter={setNewPhle} />
           <FI label="Phone"        fkey="phone"         type="tel"      placeholder="+94 77 123 4567"     val={newPhle.phone}         setter={setNewPhle} />
           <FI label="Password"     fkey="password"      type="password" placeholder="Min 6 characters"   val={newPhle.password}      setter={setNewPhle} />
-          <FI label="Service area" fkey="serviceArea"   type="text"     placeholder="e.g. Jaffna North"  val={newPhle.serviceArea}   setter={setNewPhle} />
+          <FI label="Service area" fkey="serviceArea"   type="text"     placeholder="e.g. CF10"  val={newPhle.serviceArea}   setter={setNewPhle} />
           <FI label="License no."  fkey="licenseNumber" type="text"     placeholder="e.g. HV-PHL-05"     val={newPhle.licenseNumber} setter={setNewPhle} />
           <button className="btn btn-primary btn-full" onClick={createPhle}>Create account</button>
         </Modal>

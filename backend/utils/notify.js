@@ -1,4 +1,5 @@
 const nodemailer = require("nodemailer");
+const locale = require("../config/locale");
 
 // SMS via Twilio
 // If credentials are not set, runs in mock mode (prints to console)
@@ -41,7 +42,7 @@ exports.sendEmail = async (to, subject, htmlBody) => {
       },
     });
     await transporter.sendMail({
-      from:    process.env.EMAIL_FROM || "Home Visit <noreply@homevisit.lk>",
+      from:    process.env.EMAIL_FROM || `Home Visit <${locale.organisation.email}>`,
       to,
       subject,
       html: `
@@ -53,7 +54,7 @@ exports.sendEmail = async (to, subject, htmlBody) => {
             ${htmlBody}
           </div>
           <div style="background:#f5f5f5;padding:12px;text-align:center;font-size:12px;color:#888">
-            Home Visit Laboratory, Jaffna, Sri Lanka
+            Home Visit · Cardiff, Wales
           </div>
         </div>
       `,

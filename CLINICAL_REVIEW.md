@@ -5,7 +5,7 @@
 This file lists every test, parameter, unit and reference range currently in
 the seed catalogue ([backend/utils/seed.js](backend/utils/seed.js)).
 
-These values were **inherited from the original Sri Lanka build and carried
+These values were **inherited from the original pre-UK build and carried
 over unchanged**. Nothing here has been converted, recalculated or verified.
 No clinical judgement has been applied to any of it.
 
@@ -100,7 +100,46 @@ Preparation: No fasting required.
 
 ---
 
-**17 parameters across 6 tests. 0 reviewed.**
+## 7. Patient preparation instructions
+
+Added during the UK localisation review. These are **clinical instructions
+given directly to patients** and carry the same risk as a reference range —
+a wrong fasting window invalidates the result. They were inherited unchanged
+and have not been reviewed.
+
+| Test | Instruction shown to the patient | Reviewed? |
+|---|---|---|
+| Complete Blood Count (CBC) | No special preparation required. | ☐ |
+| Blood Glucose (Fasting) | Fast for at least 8 hours before the test. Water is allowed. | ☐ |
+| Lipid Profile | Fast for 9–12 hours before the test. | ☐ |
+| Thyroid Profile | No special preparation required. | ☐ |
+| Liver Function Test (LFT) | Fast for 4–6 hours before the test. | ☐ |
+| HbA1c | No fasting required. | ☐ |
+
+## 8. Result turnaround times
+
+Shown to patients when booking. Not clinical values, but they set an
+expectation about when results arrive, so they should be confirmed against
+what the processing laboratory actually commits to.
+
+| Test | Stated turnaround | Confirmed? |
+|---|---|---|
+| CBC | 24h | ☐ |
+| Blood Glucose (Fasting) | 2h | ☐ |
+| Lipid Profile | 24h | ☐ |
+| Thyroid Profile | 48h | ☐ |
+| Liver Function Test | 24h | ☐ |
+| HbA1c | 4h | ☐ |
+
+---
+
+**17 parameters, 6 preparation instructions and 6 turnaround times
+across 6 tests. 0 reviewed.**
+
+No clinical value, unit, reference range or preparation instruction was
+changed during UK localisation. Only prices (moved to
+[backend/config/locale.js](backend/config/locale.js)) and non-clinical
+copy were touched.
 
 Prices are held separately in [backend/config/locale.js](backend/config/locale.js)
 and are placeholders — they are a commercial decision, not a clinical one.

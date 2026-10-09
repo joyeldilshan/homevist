@@ -100,7 +100,7 @@ const adminTemplate = (booking, patient) => `
   </td></tr>
 
   <tr><td style="padding:16px 0;text-align:center;">
-    <p style="font-size:11px;color:#A0AEC0;margin:0;">🩸 Home Visit · Jaffna, Sri Lanka · 2026</p>
+    <p style="font-size:11px;color:#A0AEC0;margin:0;">🩸 Home Visit · Cardiff, Wales · ${new Date().getFullYear()}</p>
   </td></tr>
 </table>
 </td></tr>
@@ -139,10 +139,10 @@ const patientTemplate = (booking, patient) => `
 
     <h3 style="font-size:11px;font-weight:700;color:#718096;text-transform:uppercase;letter-spacing:1px;margin:0 0 14px;">What Happens Next?</h3>
     <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
-      ${stepRow("1", "Phlebotomist Assignment", "Our admin will assign a certified phlebotomist shortly.")}
+      ${stepRow("1", "Phlebotomist Assignment", "We will assign a phlebotomist to your booking shortly.")}
       ${stepRow("2", "Confirmation",            "You will receive phlebotomist details via email.")}
       ${stepRow("3", "Home Visit",              "Phlebotomist arrives at your scheduled date and time.")}
-      ${stepRow("4", "Report Ready",            "Download your verified PDF report within 24 hours.")}
+      ${stepRow("4", "Report Ready",            "Your PDF report will be available to download once the laboratory has processed your sample.")}
     </table>
 
     ${booking.testType?.preparation ? `
@@ -157,7 +157,7 @@ const patientTemplate = (booking, patient) => `
   </td></tr>
 
   <tr><td style="padding:16px 0;text-align:center;">
-    <p style="font-size:11px;color:#A0AEC0;margin:0;">🩸 Home Visit · Jaffna, Sri Lanka · 2026</p>
+    <p style="font-size:11px;color:#A0AEC0;margin:0;">🩸 Home Visit · Cardiff, Wales · ${new Date().getFullYear()}</p>
   </td></tr>
 </table>
 </td></tr>
@@ -212,7 +212,7 @@ const phlebotomistTemplate = (booking, patient, phlebotomist) => `
   </td></tr>
 
   <tr><td style="padding:16px 0;text-align:center;">
-    <p style="font-size:11px;color:#A0AEC0;margin:0;">🩸 Home Visit · Jaffna, Sri Lanka · 2026</p>
+    <p style="font-size:11px;color:#A0AEC0;margin:0;">🩸 Home Visit · Cardiff, Wales · ${new Date().getFullYear()}</p>
   </td></tr>
 </table>
 </td></tr>

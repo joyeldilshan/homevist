@@ -62,7 +62,7 @@ npm run dev               # starts on http://localhost:5173
 ## Roles
 - **User** — Book tests, view history, download PDF reports
 - **Phlebotomist** — Accept jobs, update sample status, toggle availability  
-- **Admin** — Assign phlebotomists, manage catalog, view analytics
+- **Admin** — Assign phlebotomists, manage catalogue, view analytics
 
 ## Barcode / QR Scan
 Every completed report includes a CODE-128 barcode and QR code.  

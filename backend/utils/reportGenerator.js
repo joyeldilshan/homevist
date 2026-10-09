@@ -4,6 +4,7 @@ const QRCode      = require("qrcode");
 const path        = require("path");
 const fs          = require("fs");
 const { formatDate, formatAppointment } = require("./format");
+const locale = require("../config/locale");
 
 const UPLOAD_DIR = path.join(__dirname, "../uploads/reports");
 if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
@@ -41,7 +42,7 @@ async function generateReport(booking) {
     .fontSize(9)
     .font("Helvetica")
     .text("Mobile Blood Testing Laboratory", 65, 92)
-    .text("Jaffna Central Lab · +94 21 222 1234 · www.homevisit.lk", 65, 106);
+    .text(`${locale.organisation.cityCountry} · ${locale.organisation.phone} · ${locale.organisation.website}`, 65, 106);
 
   doc
     .fontSize(8)
@@ -87,7 +88,7 @@ async function generateReport(booking) {
     `Date        : ${formatAppointment(booking.appointmentDate, booking.appointmentTime)}`,
     `Phlebotomist: ${booking.phlebotomist?.name || "—"}`,
     `Status      : ${booking.status.toUpperCase()}`,
-    `Verify      : ${process.env.VERIFY_BASE_URL || "https://homevisit.lk/verify"}/${booking.bookingId}`,
+    `Verify      : ${process.env.VERIFY_BASE_URL || "[PLACEHOLDER - add verification URL]"}/${booking.bookingId}`,
   ].join("\n");
 
   let qrBuf;
@@ -246,7 +247,7 @@ async function generateReport(booking) {
   // ── 7. SIGNATURES ─────────────────────────────────────────────
   const sigColW = usable / 2 - 10;
   [[50, "Dr. S. Arulnathan, MBBS", "Lab Director & Reporting Pathologist", "SLMC-29481"],
-   [50 + sigColW + 20, booking.phlebotomist?.name || "Phlebotomist", "Certified Phlebotomist", booking.phlebotomist?._id?.toString().slice(-6).toUpperCase() || "—"]
+   [50 + sigColW + 20, booking.phlebotomist?.name || "Phlebotomist", "Phlebotomist", booking.phlebotomist?._id?.toString().slice(-6).toUpperCase() || "—"]
   ].forEach(([x, name, title, reg]) => {
     doc.moveTo(x, rowY + 24).lineTo(x + sigColW, rowY + 24).strokeColor(DARK).lineWidth(0.5).stroke();
     doc.fillColor(DARK).font("Helvetica-Bold").fontSize(8).text(name,  x, rowY + 28);
@@ -261,9 +262,9 @@ async function generateReport(booking) {
   doc.rect(50, rowY, usable, 36).fill(GREY);
   doc.fillColor(DARK).font("Helvetica-Bold").fontSize(8).text("Home Visit Laboratory", 58, rowY + 6);
   doc.fillColor(MUTED).font("Helvetica").fontSize(7.5)
-     .text("123 Hospital Road, Jaffna 40000, Sri Lanka  |  Tel: +94 21 222 1234  |  www.homevisit.lk", 58, rowY + 18);
+     .text(`${locale.organisation.addressLine}  |  Tel: ${locale.organisation.phone}  |  ${locale.organisation.website}`, 58, rowY + 18);
   doc.fillColor(MUTED).font("Helvetica-Oblique").fontSize(7)
-     .text(`Report ID: HV-RPT-${booking._id.toString().slice(-6).toUpperCase()}  |  Booking: ${booking.bookingId}  |  Electronically verified.`,
+     .text(`Report ID: HV-RPT-${booking._id.toString().slice(-6).toUpperCase()}  |  Booking: ${booking.bookingId}  |  Generated electronically.`,
        0, rowY + 18, { align: "right", width: W - 65 });
   rowY += 44;
 
