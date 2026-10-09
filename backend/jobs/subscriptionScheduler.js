@@ -3,6 +3,7 @@ const Subscription = require("../models/Subscription");
 const Booking      = require("../models/Booking");
 const { sendSMS }  = require("../utils/notify");
 const { sendBookingEmails } = require("../utils/emailService");
+const { formatDate } = require("../utils/format");
 
 // Generates the next Booking for every active subscription whose
 // nextVisitDate has arrived, then advances it (and rolls the cycle
@@ -60,7 +61,7 @@ async function generateDueVisits(io) {
       }
       if (sub.user?.phone) {
         await sendSMS(sub.user.phone,
-          `Home Visit: Your subscription visit #${booking.bookingId} is scheduled for ${booking.appointmentDate.toDateString()} at ${booking.appointmentTime}.`);
+          `Home Visit: Your subscription visit #${booking.bookingId} is scheduled for ${formatDate(booking.appointmentDate)} at ${booking.appointmentTime}.`);
       }
       if (sub.user) {
         sendBookingEmails(booking, sub.user).catch(err => console.error("📧 Subscription email error:", err.message));

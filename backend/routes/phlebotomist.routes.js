@@ -2,6 +2,7 @@ const express  = require("express");
 const router   = express.Router();
 const User     = require("../models/User");
 const { protect, authorize } = require("../middleware/auth.middleware");
+const { isValidUkPhone, PHONE_MESSAGE } = require("../utils/validators");
 
 // GET /api/phlebotomists — admin gets all phlebotomists
 router.get("/", protect, authorize("admin"), async (req, res, next) => {
@@ -18,6 +19,9 @@ router.post("/", protect, authorize("admin"), async (req, res, next) => {
     const { name, email, phone, password, serviceArea, licenseNumber } = req.body;
     if (!name || !email || !phone || !password) {
       return res.status(400).json({ success:false, message:"Name, email, phone and password are required." });
+    }
+    if (!isValidUkPhone(phone)) {
+      return res.status(400).json({ success:false, message: PHONE_MESSAGE });
     }
     const existing = await User.findOne({ email });
     if (existing) {

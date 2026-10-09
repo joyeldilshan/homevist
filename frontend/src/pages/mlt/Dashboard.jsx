@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import api from "../../utils/api";
 import toast from "react-hot-toast";
+import { formatDate } from "../../utils/format";
 
 /* ── Lab-label palette ─────────────────────────────────────── */
 const INK      = "#171310";
@@ -539,7 +540,7 @@ export default function MLTDashboard() {
                       </div>
                       <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:8 }}>
                         {r.sentToPatient
-                          ? <span style={{ fontFamily:"var(--monof)", fontSize:10.5, letterSpacing:"0.08em", textTransform:"uppercase", color:GREEN }}>✅ Sent {r.sentAt?new Date(r.sentAt).toLocaleDateString():""}</span>
+                          ? <span style={{ fontFamily:"var(--monof)", fontSize:10.5, letterSpacing:"0.08em", textTransform:"uppercase", color:GREEN }}>✅ Sent {r.sentAt?formatDate(r.sentAt):""}</span>
                           : <button className="act act-solid" onClick={() => sendReport(r._id)}>📧 Send to patient</button>
                         }
                       </div>

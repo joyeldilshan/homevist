@@ -1,5 +1,5 @@
 const mongoose     = require("mongoose");
-const addressParts = require("./addressParts.schema");
+const { shape: addressParts, attachPostcodeNormaliser } = require("./addressParts.schema");
 
 const subscriptionSchema = new mongoose.Schema(
   {
@@ -38,5 +38,7 @@ const subscriptionSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+attachPostcodeNormaliser(subscriptionSchema);
 
 module.exports = mongoose.model("Subscription", subscriptionSchema);

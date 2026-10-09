@@ -1,4 +1,8 @@
 const jwt  = require("jsonwebtoken");
+const {
+  isValidUkPhone, PHONE_MESSAGE,
+  normaliseUkPhone, normaliseUkPostcode, POSTCODE_MESSAGE,
+} = require("../utils/validators");
 const User = require("../models/User");
 
 // ── Helper: generate JWT token ────────────────────────────────────
@@ -29,6 +33,10 @@ const sendToken = (user, statusCode, res) => {
 exports.register = async (req, res, next) => {
   try {
     const { name, email, phone, password, age, gender, address, addressParts } = req.body;
+
+    if (!isValidUkPhone(phone)) {
+      return res.status(400).json({ success: false, message: PHONE_MESSAGE });
+    }
 
     // Check if email already exists
     const existing = await User.findOne({ email });
@@ -131,6 +139,18 @@ exports.updateProfile = async (req, res, next) => {
     allowed.forEach((field) => {
       if (req.body[field] !== undefined) updates[field] = req.body[field];
     });
+
+    // findByIdAndUpdate bypasses the pre-save hooks, so normalise here.
+    if (updates.phone !== undefined) {
+      const phone = normaliseUkPhone(updates.phone);
+      if (!phone) return res.status(400).json({ success: false, message: PHONE_MESSAGE });
+      updates.phone = phone;
+    }
+    if (updates.addressParts?.postcode) {
+      const postcode = normaliseUkPostcode(updates.addressParts.postcode);
+      if (!postcode) return res.status(400).json({ success: false, message: POSTCODE_MESSAGE });
+      updates.addressParts = { ...updates.addressParts, postcode };
+    }
 
     const user = await User.findByIdAndUpdate(
       req.user._id,

@@ -1,5 +1,5 @@
 const mongoose     = require("mongoose");
-const addressParts = require("./addressParts.schema");
+const { shape: addressParts, attachPostcodeNormaliser } = require("./addressParts.schema");
 
 const bookingSchema = new mongoose.Schema({
   bookingId: {
@@ -49,5 +49,7 @@ const bookingSchema = new mongoose.Schema({
   }],
 
 }, { timestamps: true });
+
+attachPostcodeNormaliser(bookingSchema);
 
 module.exports = mongoose.model("Booking", bookingSchema);

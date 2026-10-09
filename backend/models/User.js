@@ -1,6 +1,7 @@
 const mongoose     = require("mongoose");
 const bcrypt       = require("bcryptjs");
-const addressParts = require("./addressParts.schema");
+const { shape: addressParts, attachPostcodeNormaliser } = require("./addressParts.schema");
+const { normaliseUkPhone, PHONE_MESSAGE } = require("../utils/validators");
 
 const userSchema = new mongoose.Schema(
   {
@@ -39,6 +40,25 @@ const userSchema = new mongoose.Schema(
 
 // Geo index for location-based queries
 userSchema.index({ location: "2dsphere" });
+
+/**
+ * Normalise a UK phone number to +44 form on save.
+ *
+ * Deliberately only runs when `phone` was actually modified, so a record
+ * created before UK localisation can still be saved when some other field
+ * changes. Existing stored numbers are left exactly as they are until
+ * someone edits them.
+ */
+userSchema.pre("save", function (next) {
+  if (!this.isModified("phone") || !this.phone) return next();
+  const normalised = normaliseUkPhone(this.phone);
+  if (!normalised) return next(new Error(PHONE_MESSAGE));
+  this.phone = normalised;
+  next();
+});
+
+// Same rule for the structured postcode: uppercase and spaced on save.
+attachPostcodeNormaliser(userSchema);
 
 // Hash password before saving
 userSchema.pre("save", async function (next) {

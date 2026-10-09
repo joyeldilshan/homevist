@@ -4,6 +4,9 @@ import { useAuth } from "../../context/AuthContext";
 import { useBookingSocket } from "../../hooks/useSocket";
 import api from "../../utils/api";
 import toast from "react-hot-toast";
+import { formatMoney, formatDate, formatLongDate } from "../../utils/format";
+import { isValidUkPostcode, normaliseUkPostcode, isInServiceArea, outOfAreaMessage, POSTCODE_MESSAGE } from "../../utils/validators";
+import locale from "../../config/locale";
 
 /* ── Lab-label palette ─────────────────────────────────────── */
 const INK      = "#171310";
@@ -107,13 +110,36 @@ export default function UserDashboard() {
 
   const [step,    setStep]    = useState(0);
   const [picked,  setPicked]  = useState([]);
-  const [form,    setForm]    = useState({ date:"", time:"09:00", address:user?.address||"", notes:"" });
+  const [form,    setForm]    = useState({
+    date:"", time:"09:00", notes:"",
+    // Structured UK address. Prefilled from the saved profile where present,
+    // falling back to the legacy free-text address for older accounts.
+    line1:    user?.addressParts?.line1    || "",
+    line2:    user?.addressParts?.line2    || "",
+    city:     user?.addressParts?.city     || "",
+    county:   user?.addressParts?.county   || "",
+    postcode: user?.addressParts?.postcode || "",
+    legacyAddress: user?.address || "",
+  });
   const setF = (k,v) => setForm(p=>({...p,[k]:v}));
+
+  // The API still takes a single `address` string, so compose one from the
+  // structured parts. Keeps older bookings and the PDF/email templates working.
+  const composedAddress = () =>
+    [form.line1, form.line2, form.city, form.county, form.postcode]
+      .filter(Boolean).join(", ") || form.legacyAddress;
+
+  const addressReady = () =>
+    !!form.line1 && !!form.city && isValidUkPostcode(form.postcode) && isInServiceArea(form.postcode);
 
   const [plans,        setPlans]        = useState([]);
   const [mySubs,        setMySubs]      = useState([]);
   const [subscribingId, setSubscribingId] = useState(null);
-  const [subForm,       setSubForm]     = useState({ address:user?.address||"", appointmentTime:"09:00" });
+  const [subForm,       setSubForm]     = useState({
+    address:  user?.address || "",
+    postcode: user?.addressParts?.postcode || "",
+    appointmentTime: "09:00",
+  });
   const [subLoading,    setSubLoading]  = useState(false);
 
   const load = async () => {
@@ -177,8 +203,11 @@ export default function UserDashboard() {
   const totalAmount = picked.reduce((s, t) => s + (t.price || 0), 0);
 
   const handleBook = async () => {
-    if (!picked.length || !form.date || !form.address) {
-      toast.error("Select at least one test and fill all fields."); return;
+    if (!picked.length || !form.date) {
+      toast.error("Select at least one test and choose a date."); return;
+    }
+    if (!addressReady()) {
+      toast.error("Enter your address and a postcode we cover."); return;
     }
     setLoading(true);
     try {
@@ -186,7 +215,14 @@ export default function UserDashboard() {
         testTypeIds:     picked.map(t => t._id),
         appointmentDate: form.date,
         appointmentTime: form.time,
-        address:         form.address,
+        address:         composedAddress(),
+        addressParts: {
+          line1:    form.line1,
+          line2:    form.line2,
+          city:     form.city,
+          county:   form.county,
+          postcode: normaliseUkPostcode(form.postcode) || form.postcode,
+        },
         notes:           form.notes,
       });
       toast.success(`🩸 Booking confirmed! ${picked.length} test${picked.length>1?"s":""} scheduled.`);
@@ -204,9 +240,16 @@ export default function UserDashboard() {
 
   const handleSubscribe = async (planId) => {
     if (!subForm.address) { toast.error("Enter your address."); return; }
+    if (!isValidUkPostcode(subForm.postcode)) { toast.error(POSTCODE_MESSAGE); return; }
+    if (!isInServiceArea(subForm.postcode)) { toast.error(outOfAreaMessage(subForm.postcode)); return; }
     setSubLoading(true);
     try {
-      await api.post("/subscriptions", { planId, address:subForm.address, appointmentTime:subForm.appointmentTime });
+      await api.post("/subscriptions", {
+        planId,
+        address:         subForm.address,
+        addressParts:    { postcode: normaliseUkPostcode(subForm.postcode) || subForm.postcode },
+        appointmentTime: subForm.appointmentTime,
+      });
       toast.success("🔁 Subscribed! Your first visit will be scheduled shortly.");
       setSubscribingId(null); loadSubs();
     } catch(e) { toast.error(e.response?.data?.message || "Subscription failed."); }
@@ -567,7 +610,7 @@ export default function UserDashboard() {
               <div className="head">
                 <SpecimenLabel code="HV-20" name="Patient" cap={CRIMSON} />
                 <h1>Hello, {user?.name?.split(" ")[0]||"Patient"}.</h1>
-                <p className="sub">{new Date().toLocaleDateString("en-US",{weekday:"long",year:"numeric",month:"long",day:"numeric"})}</p>
+                <p className="sub">{formatLongDate()}</p>
               </div>
 
               <div className="stat-row">
@@ -605,7 +648,7 @@ export default function UserDashboard() {
                         <div>
                           <div style={{ fontWeight:700, fontSize:15, marginBottom:4 }}>{getTestNames(b)}</div>
                           <div style={{ fontSize:12, color:"var(--ink-60)", lineHeight:1.8 }}>
-                            📅 {b.appointmentDate?new Date(b.appointmentDate).toDateString():"—"} &nbsp; ⏰ {b.appointmentTime||"—"}
+                            📅 {formatDate(b.appointmentDate)} &nbsp; ⏰ {b.appointmentTime||"—"}
                             {b.phlebotomist && <><br />🧪 {b.phlebotomist.name}</>}
                           </div>
                         </div>
@@ -672,7 +715,7 @@ export default function UserDashboard() {
                         <span key={t._id} className="selected-badge" onClick={() => toggleTest(t)}>{t.name} ✕</span>
                       ))}
                       <span style={{ marginLeft:"auto", fontFamily:"var(--display)", fontSize:17, fontWeight:900, color:CRIMSON }}>
-                        Rs. {totalAmount.toLocaleString()}
+                        {formatMoney(totalAmount)}
                       </span>
                     </div>
                   )}
@@ -688,13 +731,13 @@ export default function UserDashboard() {
                         <div style={{ fontWeight:700, fontSize:14, marginBottom:4 }}>{t.name}</div>
                         <div style={{ fontSize:12, color:"var(--ink-60)", marginBottom:8 }}>Results in {t.duration}</div>
                         {t.preparation && <div style={{ fontSize:11, color:GOLD, marginBottom:8 }}>⚠ {t.preparation}</div>}
-                        <div style={{ fontFamily:"var(--display)", fontSize:18, fontWeight:900, color:CRIMSON }}>Rs. {t.price?.toLocaleString()}</div>
+                        <div style={{ fontFamily:"var(--display)", fontSize:18, fontWeight:900, color:CRIMSON }}>{formatMoney(t.price)}</div>
                       </div>
                     ))}
                   </div>
 
                   <button className="btn btn-primary" onClick={() => picked.length ? setStep(1) : toast.error("Select at least one test.")}>
-                    Next → {picked.length > 0 && `(${picked.length} test${picked.length>1?"s":""} · Rs. ${totalAmount.toLocaleString()})`}
+                    Next → {picked.length > 0 && `(${picked.length} test${picked.length>1?"s":""} · ${formatMoney(totalAmount)})`}
                   </button>
                 </div>
               )}
@@ -723,18 +766,55 @@ export default function UserDashboard() {
               {step === 2 && (
                 <div style={{ maxWidth:440 }}>
                   <div className="card" style={{ padding:24, marginBottom:20 }}>
+                    <div style={{ marginBottom:14 }}>
+                      <FieldLabel>Address line 1</FieldLabel>
+                      <input className="inp" placeholder="12 Example Street" value={form.line1} onChange={e=>setF("line1",e.target.value)} />
+                    </div>
+                    <div style={{ marginBottom:14 }}>
+                      <FieldLabel>Address line 2 (optional)</FieldLabel>
+                      <input className="inp" placeholder="Flat 3" value={form.line2} onChange={e=>setF("line2",e.target.value)} />
+                    </div>
+                    <div style={{ display:"flex", gap:12, marginBottom:14 }}>
+                      <div style={{ flex:1 }}>
+                        <FieldLabel>Town or city</FieldLabel>
+                        <input className="inp" placeholder="Cardiff" value={form.city} onChange={e=>setF("city",e.target.value)} />
+                      </div>
+                      <div style={{ flex:1 }}>
+                        <FieldLabel>County (optional)</FieldLabel>
+                        <input className="inp" placeholder="South Glamorgan" value={form.county} onChange={e=>setF("county",e.target.value)} />
+                      </div>
+                    </div>
                     <div style={{ marginBottom:16 }}>
-                      <FieldLabel>Home address</FieldLabel>
-                      <textarea className="inp" rows={3} placeholder="Full address for the phlebotomist visit..." value={form.address} onChange={e=>setF("address",e.target.value)} style={{ resize:"vertical" }} />
+                      <FieldLabel>Postcode</FieldLabel>
+                      <input
+                        className="inp"
+                        placeholder={locale.examplePostcode}
+                        value={form.postcode}
+                        onChange={e=>setF("postcode",e.target.value.toUpperCase())}
+                        style={{ textTransform:"uppercase" }}
+                      />
+                      {form.postcode && !isValidUkPostcode(form.postcode) && (
+                        <div style={{ fontSize:12.5, color:"var(--crimson)", marginTop:6 }}>{POSTCODE_MESSAGE}</div>
+                      )}
+                      {form.postcode && isValidUkPostcode(form.postcode) && !isInServiceArea(form.postcode) && (
+                        <div style={{ fontSize:12.5, color:"var(--crimson)", marginTop:6, lineHeight:1.5 }}>
+                          {outOfAreaMessage(form.postcode)}
+                        </div>
+                      )}
+                      {form.postcode && isValidUkPostcode(form.postcode) && isInServiceArea(form.postcode) && (
+                        <div style={{ fontSize:12.5, color:"var(--teal)", marginTop:6 }}>
+                          ✓ We cover {normaliseUkPostcode(form.postcode)}
+                        </div>
+                      )}
                     </div>
                     <div>
                       <FieldLabel>Notes (optional)</FieldLabel>
-                      <input className="inp" placeholder="e.g. Gate code, floor number..." value={form.notes} onChange={e=>setF("notes",e.target.value)} />
+                      <input className="inp" placeholder="e.g. Door code, floor number..." value={form.notes} onChange={e=>setF("notes",e.target.value)} />
                     </div>
                   </div>
                   <div style={{ display:"flex", gap:10 }}>
                     <button className="btn btn-ghost" onClick={() => setStep(1)}>← Back</button>
-                    <button className="btn btn-primary" onClick={() => form.address ? setStep(3) : toast.error("Enter your address.")}>Next →</button>
+                    <button className="btn btn-primary" onClick={() => addressReady() ? setStep(3) : toast.error("Enter your address and a postcode we cover.")}>Next →</button>
                   </div>
                 </div>
               )}
@@ -750,19 +830,19 @@ export default function UserDashboard() {
                       {picked.map((t) => (
                         <div key={t._id} style={{ display:"flex", justifyContent:"space-between", padding:"8px 0", borderBottom:"1px solid var(--rule)", fontSize:13 }}>
                           <span style={{ color:"var(--ink-60)", fontWeight:500 }}>🧪 {t.name}</span>
-                          <span style={{ fontWeight:700 }}>Rs. {t.price?.toLocaleString()}</span>
+                          <span style={{ fontWeight:700 }}>{formatMoney(t.price)}</span>
                         </div>
                       ))}
                       <div style={{ display:"flex", justifyContent:"space-between", padding:"10px 0", fontSize:14 }}>
                         <span style={{ fontWeight:700 }}>Total amount</span>
-                        <span style={{ fontFamily:"var(--display)", fontWeight:900, color:CRIMSON, fontSize:18 }}>Rs. {totalAmount.toLocaleString()}</span>
+                        <span style={{ fontFamily:"var(--display)", fontWeight:900, color:CRIMSON, fontSize:18 }}>{formatMoney(totalAmount)}</span>
                       </div>
                     </div>
 
                     {[
-                      ["📅 Date",    form.date ? new Date(form.date).toDateString() : "—"],
+                      ["📅 Date",    formatDate(form.date)],
                       ["⏰ Time",    form.time],
-                      ["📍 Address", form.address],
+                      ["📍 Address", composedAddress()],
                       ["🏠 Service", "Home visit"],
                     ].map(([k,v]) => (
                       <div key={k} style={{ display:"flex", justifyContent:"space-between", padding:"9px 0", borderBottom:"1px solid var(--rule)", fontSize:13 }}>
@@ -809,10 +889,10 @@ export default function UserDashboard() {
                         </span>
                       )}
                       <div style={{ fontSize:12, color:"var(--ink-60)", lineHeight:1.9, marginTop:4 }}>
-                        📅 {b.appointmentDate?new Date(b.appointmentDate).toDateString():"—"} &nbsp; ⏰ {b.appointmentTime||"—"}<br />
+                        📅 {formatDate(b.appointmentDate)} &nbsp; ⏰ {b.appointmentTime||"—"}<br />
                         📍 {b.address||"—"}<br />
                         {b.phlebotomist && <>🧪 {b.phlebotomist.name}<br /></>}
-                        💰 Rs. {b.amount?.toLocaleString()||"—"} &nbsp;
+                        💰 {formatMoney(b.amount)} &nbsp;
                         <span style={{ fontFamily:"var(--monof)", color:"var(--ink-40)", fontSize:10.5 }}>#{b.bookingId||"—"}</span>
                       </div>
                     </div>
@@ -881,7 +961,7 @@ export default function UserDashboard() {
                           </div>
                           <div style={{ fontSize:12, color:"var(--ink-60)", lineHeight:1.9, marginTop:6 }}>
                             📄 Report: <span style={{ fontFamily:"var(--monof)" }}>{rep.reportId}</span> &nbsp;·&nbsp; 🔖 Booking: <span style={{ fontFamily:"var(--monof)" }}>{rep.booking?.bookingId || "—"}</span><br />
-                            📅 Issued: {rep.sentAt ? new Date(rep.sentAt).toDateString() : "—"}
+                            📅 Issued: {formatDate(rep.sentAt)}
                             {rep.labComments && (
                               <>
                                 <br />
@@ -934,9 +1014,9 @@ export default function UserDashboard() {
                           <div style={{ fontWeight:700, fontSize:15, marginBottom:4 }}>{s.plan?.name || "Plan"}</div>
                           <div style={{ fontSize:12, color:"var(--ink-60)", lineHeight:1.9, marginTop:4 }}>
                             🔁 {s.cycleVisitsUsed}/{s.visitsPerCycle} visits this cycle &nbsp;
-                            📅 Next visit: {s.nextVisitDate ? new Date(s.nextVisitDate).toDateString() : "—"}<br />
+                            📅 Next visit: {formatDate(s.nextVisitDate)}<br />
                             📍 {s.address} &nbsp; ⏰ {s.appointmentTime}<br />
-                            💰 Rs. {s.price?.toLocaleString()}/cycle &nbsp;
+                            💰 {formatMoney(s.price)}/cycle &nbsp;
                             <span style={{ fontFamily:"var(--monof)", fontSize:10.5, color: s.paymentStatus==="paid"?GREEN:GOLD }}>
                               {s.paymentStatus==="paid" ? "PAID" : "PAYMENT PENDING"}
                             </span>
@@ -981,7 +1061,7 @@ export default function UserDashboard() {
                         🔁 {p.visitsPerCycle} visits every {p.cycleLengthDays} days
                       </div>
                       <div style={{ fontFamily:"var(--display)", fontSize:20, fontWeight:900, color:LAVENDER, marginBottom:14 }}>
-                        Rs. {p.price?.toLocaleString()}<span style={{ fontSize:12, fontWeight:500, color:"var(--ink-40)" }}> /cycle</span>
+                        {formatMoney(p.price)}<span style={{ fontSize:12, fontWeight:500, color:"var(--ink-40)" }}> /cycle</span>
                       </div>
 
                       {subscribingId === p._id ? (
@@ -989,6 +1069,24 @@ export default function UserDashboard() {
                           <div style={{ marginBottom:10 }}>
                             <FieldLabel>Home address</FieldLabel>
                             <textarea className="inp" rows={2} value={subForm.address} onChange={e=>setSubForm(f=>({...f,address:e.target.value}))} style={{ resize:"vertical" }} />
+                          </div>
+                          <div style={{ marginBottom:10 }}>
+                            <FieldLabel>Postcode</FieldLabel>
+                            <input
+                              className="inp"
+                              placeholder={locale.examplePostcode}
+                              value={subForm.postcode}
+                              onChange={e=>setSubForm(f=>({...f,postcode:e.target.value.toUpperCase()}))}
+                              style={{ textTransform:"uppercase" }}
+                            />
+                            {subForm.postcode && !isValidUkPostcode(subForm.postcode) && (
+                              <div style={{ fontSize:12, color:"var(--crimson)", marginTop:5 }}>{POSTCODE_MESSAGE}</div>
+                            )}
+                            {subForm.postcode && isValidUkPostcode(subForm.postcode) && !isInServiceArea(subForm.postcode) && (
+                              <div style={{ fontSize:12, color:"var(--crimson)", marginTop:5, lineHeight:1.5 }}>
+                                {outOfAreaMessage(subForm.postcode)}
+                              </div>
+                            )}
                           </div>
                           <div style={{ marginBottom:14 }}>
                             <FieldLabel>Preferred time</FieldLabel>

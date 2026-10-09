@@ -3,6 +3,8 @@ const TestType = require("../models/TestType");
 const User     = require("../models/User");
 const { sendSMS } = require("../utils/notify");
 const { sendBookingEmails, sendPhlebotomistAssignment } = require("../utils/emailService");
+const { isValidUkPostcode, POSTCODE_MESSAGE, isInServiceArea, outOfAreaMessage } = require("../utils/validators");
+const { formatDate } = require("../utils/format");
 
 // POST /api/bookings — Patient creates booking (supports multiple tests)
 exports.createBooking = async (req, res, next) => {
@@ -17,6 +19,22 @@ exports.createBooking = async (req, res, next) => {
     if (!ids.length)         return res.status(400).json({ success:false, message:"Select at least one test." });
     if (!appointmentDate || !address)
       return res.status(400).json({ success:false, message:"Date and address are required." });
+
+    // Postcode + service area.
+    // Only enforced when a structured postcode is supplied, so bookings
+    // made with the legacy free-text address alone still go through.
+    if (addressParts?.postcode) {
+      if (!isValidUkPostcode(addressParts.postcode)) {
+        return res.status(400).json({ success:false, message: POSTCODE_MESSAGE });
+      }
+      if (!isInServiceArea(addressParts.postcode)) {
+        return res.status(400).json({
+          success:   false,
+          outOfArea: true,
+          message:   outOfAreaMessage(addressParts.postcode),
+        });
+      }
+    }
 
     const testTypes = await TestType.find({ _id:{ $in:ids }, isActive:true });
     if (testTypes.length === 0)
@@ -55,7 +73,7 @@ exports.createBooking = async (req, res, next) => {
     if (req.user?.phone) {
       const testNames = testTypes.map(t => t.name).join(", ");
       await sendSMS(req.user.phone,
-        `Home Visit: Booking #${booking.bookingId} for ${testNames} on ${appointmentDate} at ${appointmentTime} received. Phlebotomist will be assigned shortly.`);
+        `Home Visit: Booking #${booking.bookingId} for ${testNames} on ${formatDate(appointmentDate)} at ${appointmentTime} received. A phlebotomist will be assigned shortly.`);
     }
 
     sendBookingEmails(booking, req.user).catch(err => console.error("📧 Email error:", err.message));

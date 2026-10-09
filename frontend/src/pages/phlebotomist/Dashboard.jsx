@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import api from "../../utils/api";
 import toast from "react-hot-toast";
+import { formatMoney, formatDate, formatLongDate } from "../../utils/format";
 
 /* ── Lab-label palette ─────────────────────────────────────── */
 const INK      = "#171310";
@@ -116,10 +117,10 @@ export default function PhleboDashboard() {
           <div style={{ fontWeight:700, fontSize:15, marginBottom:5 }}>{b.user?.name||"Patient"}</div>
           <div style={{ fontSize:12, color:"var(--ink-60)", lineHeight:1.9 }}>
             🧪 {getTestNames(b)}<br />
-            📅 {b.appointmentDate?new Date(b.appointmentDate).toDateString():"—"} &nbsp; ⏰ {b.appointmentTime||"—"}<br />
+            📅 {formatDate(b.appointmentDate)} &nbsp; ⏰ {b.appointmentTime||"—"}<br />
             📍 {b.address||"—"}<br />
             📞 {b.user?.phone||"—"}<br />
-            💰 Rs. {b.amount?.toLocaleString()||"—"} &nbsp;
+            💰 {formatMoney(b.amount)} &nbsp;
             <span style={{ fontFamily:"var(--monof)", color:"var(--ink-40)", fontSize:10.5 }}>#{b.bookingId||"—"}</span>
           </div>
         </div>
@@ -439,7 +440,7 @@ export default function PhleboDashboard() {
             <div className="fade-up">
               <SpecimenLabel code="HV-50" name="Field team" cap={BLUE} />
               <h1>Welcome, {user?.name?.split(" ")[0]||"Phlebotomist"}.</h1>
-              <p className="sub">{new Date().toLocaleDateString("en-US",{weekday:"long",year:"numeric",month:"long",day:"numeric"})}</p>
+              <p className="sub">{formatLongDate()}</p>
 
               <div className="stats4" style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:12, marginBottom:26 }}>
                 {[
@@ -499,7 +500,7 @@ export default function PhleboDashboard() {
                     <div>
                       <div style={{ fontWeight:700, fontSize:15, marginBottom:4 }}>{b.user?.name||"—"}</div>
                       <div style={{ fontSize:12, color:"var(--ink-60)" }}>
-                        🧪 {getTestNames(b)} &nbsp; 📅 {b.appointmentDate?new Date(b.appointmentDate).toDateString():"—"} &nbsp; 💰 Rs. {b.amount?.toLocaleString()||"—"}
+                        🧪 {getTestNames(b)} &nbsp; 📅 {formatDate(b.appointmentDate)} &nbsp; 💰 {formatMoney(b.amount)}
                       </div>
                     </div>
                     <StatusBadge status="completed" />

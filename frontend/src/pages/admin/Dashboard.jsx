@@ -4,6 +4,7 @@ import { useAuth } from "../../context/AuthContext";
 import api from "../../utils/api";
 import toast from "react-hot-toast";
 import EmailAuditLog from "./EmailAuditLog";
+import { formatMoney, formatMoneyCompact, formatDate, formatLongDate} from "../../utils/format";
 
 /* ── Lab-label palette ─────────────────────────────────────── */
 const INK      = "#171310";
@@ -18,8 +19,8 @@ const sUser   = b => b?.user?.name || "Unknown Patient";
 const sTest   = b => b?.testTypes?.length
   ? b.testTypes.map(t => t?.name).filter(Boolean).join(", ")
   : (b?.testType?.name || "Unknown Test");
-const sAmount = b => b?.amount ? `Rs. ${Number(b.amount).toLocaleString()}` : "—";
-const sDate   = d => d ? new Date(d).toDateString() : "—";
+const sAmount = b => formatMoney(b?.amount);
+const sDate   = d => formatDate(d);
 const sId     = b => b?.bookingId || "—";
 
 const STATUS_CONFIG = {
@@ -496,7 +497,7 @@ export default function AdminDashboard() {
               <div className="head">
                 <SpecimenLabel code="HV-30" name="Admin" cap={CRIMSON} />
                 <h1>Overview.</h1>
-                <p className="sub">{new Date().toLocaleDateString("en-US",{weekday:"long",year:"numeric",month:"long",day:"numeric"})}</p>
+                <p className="sub">{formatLongDate()}</p>
               </div>
 
               <div className="stats5" style={{ display:"grid", gridTemplateColumns:"repeat(5,1fr)", gap:12, marginBottom:22 }}>
@@ -505,7 +506,7 @@ export default function AdminDashboard() {
                   { label:"Pending",    value:pending.length,                        tint:GOLD    },
                   { label:"Completed",  value:completed.length,                      tint:GREEN   },
                   { label:"Unassigned", value:unassigned.length,                     tint:CRIMSON },
-                  { label:"Revenue",    value:"Rs."+(revenue/1000).toFixed(1)+"K",   tint:TEAL    },
+                  { label:"Revenue",    value:formatMoneyCompact(revenue),   tint:TEAL    },
                 ].map(s=>(
                   <div key={s.label} className="stat" style={{ "--tint":s.tint }}>
                     <div className="stat-v">{s.value}</div>
@@ -636,7 +637,7 @@ export default function AdminDashboard() {
                       </div>
                       <div style={{ fontFamily:"var(--monof)", fontSize:11.5, color:"var(--ink-60)" }}>{t?.code||"—"}</div>
                       <span className="cat-tag">{t?.category||"—"}</span>
-                      <div style={{ fontFamily:"var(--monof)", fontSize:12.5, color:TEAL }}>Rs.{t?.price?.toLocaleString()||"—"}</div>
+                      <div style={{ fontFamily:"var(--monof)", fontSize:12.5, color:TEAL }}>{formatMoney(t?.price)}</div>
                       <div style={{ fontSize:12, color:"var(--ink-60)" }}>{t?.duration||"—"}</div>
                       <div style={{ fontSize:12, fontWeight:700, color:t?.isActive?GREEN:"var(--ink-40)" }}>{t?.isActive?"✓":"✕"}</div>
                       <div style={{ display:"flex", gap:6 }}>
@@ -676,7 +677,7 @@ export default function AdminDashboard() {
                       <div style={{ fontSize:12, color:"var(--ink-60)" }}>{p?.testTypes?.map(t=>t.name).join(", ")||"—"}</div>
                       <div style={{ fontSize:12 }}>{p?.visitsPerCycle||"—"}</div>
                       <div style={{ fontSize:12 }}>{p?.cycleLengthDays||"—"}d</div>
-                      <div style={{ fontFamily:"var(--monof)", fontSize:12.5, color:TEAL }}>Rs.{p?.price?.toLocaleString()||"—"}</div>
+                      <div style={{ fontFamily:"var(--monof)", fontSize:12.5, color:TEAL }}>{formatMoney(p?.price)}</div>
                       <div style={{ fontSize:12, fontWeight:700, color:p?.isActive?GREEN:"var(--ink-40)" }}>{p?.isActive?"✓":"✕"}</div>
                       <div style={{ display:"flex", gap:6 }}>
                         <button className="act act-blue"
@@ -712,8 +713,8 @@ export default function AdminDashboard() {
                         <div style={{ fontWeight:700, fontSize:15, marginBottom:3 }}>{s.plan?.name||"Plan"} — {s.user?.name||"Unknown"}</div>
                         <div style={{ fontSize:12, color:"var(--ink-60)", lineHeight:1.8 }}>
                           📧 {s.user?.email||"—"} &nbsp; 📞 {s.user?.phone||"—"}<br />
-                          🔁 {s.cycleVisitsUsed}/{s.visitsPerCycle} visits this cycle &nbsp; 📅 Next: {s.nextVisitDate?new Date(s.nextVisitDate).toDateString():"—"}<br />
-                          💰 Rs. {s.price?.toLocaleString()}/cycle
+                          🔁 {s.cycleVisitsUsed}/{s.visitsPerCycle} visits this cycle &nbsp; 📅 Next: {formatDate(s.nextVisitDate)}<br />
+                          💰 {formatMoney(s.price)}/cycle
                         </div>
                       </div>
                       <div style={{ display:"flex", alignItems:"center", gap:10, flexWrap:"wrap" }}>
@@ -792,10 +793,10 @@ export default function AdminDashboard() {
               </div>
               <div className="stats4" style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:12, marginBottom:22 }}>
                 {[
-                  { label:"Total revenue",   value:`Rs. ${revenue.toLocaleString()}`, tint:TEAL },
+                  { label:"Total revenue",   value:formatMoney(revenue), tint:TEAL },
                   { label:"Total bookings",  value:safeB.length,                      tint:BLUE },
                   { label:"Completion rate", value:safeB.length?Math.round((completed.length/safeB.length)*100)+"%":"0%", tint:GREEN },
-                  { label:"Avg test value",  value:completed.length?"Rs."+Math.round(revenue/completed.length).toLocaleString():"—", tint:LAVENDER },
+                  { label:"Avg test value",  value:completed.length?formatMoney(Math.round(revenue/completed.length)):"—", tint:LAVENDER },
                 ].map(s=>(
                   <div key={s.label} className="stat" style={{ "--tint":s.tint }}>
                     <div className="stat-v">{s.value}</div>
@@ -872,7 +873,7 @@ export default function AdminDashboard() {
         <Modal title="Add new test" onClose={()=>setTestModal(false)}>
           <FI label="Test name"   fkey="name"        type="text"   placeholder="e.g. Complete Blood Count" val={newTest.name}        setter={setNewTest} />
           <FI label="Code"        fkey="code"        type="text"   placeholder="e.g. CBC"                  val={newTest.code}        setter={setNewTest} />
-          <FI label="Price (Rs.)" fkey="price"       type="number" placeholder="e.g. 2500"                val={newTest.price}       setter={setNewTest} />
+          <FI label="Price (£)" fkey="price"       type="number" placeholder="e.g. 25.00"                val={newTest.price}       setter={setNewTest} />
           <FI label="Turnaround"  fkey="duration"    type="text"   placeholder="e.g. 24h"                  val={newTest.duration}    setter={setNewTest} />
           <FI label="Preparation" fkey="preparation" type="text"   placeholder="e.g. Fast for 8 hours"     val={newTest.preparation} setter={setNewTest} />
           <div style={{ marginBottom:16 }}>
@@ -889,7 +890,7 @@ export default function AdminDashboard() {
       {editTestModal && (
         <Modal title="Edit test" onClose={()=>setEditTestModal(null)}>
           <FI label="Test name"   fkey="name"        type="text"   placeholder="Test name"                val={editTest.name||""}        setter={setEditTest} />
-          <FI label="Price (Rs.)" fkey="price"       type="number" placeholder="Price"                    val={editTest.price||""}       setter={setEditTest} />
+          <FI label="Price (£)" fkey="price"       type="number" placeholder="Price"                    val={editTest.price||""}       setter={setEditTest} />
           <FI label="Turnaround"  fkey="duration"    type="text"   placeholder="e.g. 24h"                 val={editTest.duration||""}    setter={setEditTest} />
           <FI label="Preparation" fkey="preparation" type="text"   placeholder="Preparation instructions" val={editTest.preparation||""} setter={setEditTest} />
           <div style={{ marginBottom:16 }}>
@@ -912,7 +913,7 @@ export default function AdminDashboard() {
           <FI label="Description"      fkey="description"     type="text"   placeholder="Optional short blurb"   val={newPlan.description}     setter={setNewPlan} />
           <FI label="Visits per cycle" fkey="visitsPerCycle"  type="number" placeholder="e.g. 4"                 val={newPlan.visitsPerCycle}  setter={setNewPlan} />
           <FI label="Cycle length (days)" fkey="cycleLengthDays" type="number" placeholder="e.g. 30"             val={newPlan.cycleLengthDays} setter={setNewPlan} />
-          <FI label="Price per cycle (Rs.)" fkey="price"      type="number" placeholder="e.g. 8000"              val={newPlan.price}           setter={setNewPlan} />
+          <FI label="Price per cycle (£)" fkey="price"      type="number" placeholder="e.g. 80.00"              val={newPlan.price}           setter={setNewPlan} />
           <div style={{ marginBottom:16 }}>
             <Lbl c="Tests included in every visit" />
             <div style={{ display:"flex", flexWrap:"wrap", gap:8, maxHeight:160, overflowY:"auto" }}>
@@ -935,7 +936,7 @@ export default function AdminDashboard() {
           <FI label="Description"      fkey="description"     type="text"   placeholder="Description" val={editPlan.description||""}     setter={setEditPlan} />
           <FI label="Visits per cycle" fkey="visitsPerCycle"  type="number" placeholder="Visits"      val={editPlan.visitsPerCycle||""}  setter={setEditPlan} />
           <FI label="Cycle length (days)" fkey="cycleLengthDays" type="number" placeholder="Days"     val={editPlan.cycleLengthDays||""} setter={setEditPlan} />
-          <FI label="Price per cycle (Rs.)" fkey="price"      type="number" placeholder="Price"       val={editPlan.price||""}           setter={setEditPlan} />
+          <FI label="Price per cycle (£)" fkey="price"      type="number" placeholder="Price"       val={editPlan.price||""}           setter={setEditPlan} />
           <div style={{ marginBottom:16 }}>
             <Lbl c="Tests included in every visit" />
             <div style={{ display:"flex", flexWrap:"wrap", gap:8, maxHeight:160, overflowY:"auto" }}>

@@ -1,5 +1,6 @@
 const Subscription = require("../models/Subscription");
 const Plan          = require("../models/Plan");
+const { isValidUkPostcode, POSTCODE_MESSAGE, isInServiceArea, outOfAreaMessage } = require("../utils/validators");
 
 // POST /api/subscriptions — patient subscribes to a plan
 exports.subscribe = async (req, res, next) => {
@@ -7,6 +8,21 @@ exports.subscribe = async (req, res, next) => {
     const { planId, address, addressParts, appointmentTime } = req.body;
     if (!planId || !address) {
       return res.status(400).json({ success: false, message: "Plan and address are required." });
+    }
+
+    // Only enforced when a structured postcode is supplied, so existing
+    // free-text addresses still work.
+    if (addressParts?.postcode) {
+      if (!isValidUkPostcode(addressParts.postcode)) {
+        return res.status(400).json({ success: false, message: POSTCODE_MESSAGE });
+      }
+      if (!isInServiceArea(addressParts.postcode)) {
+        return res.status(400).json({
+          success:   false,
+          outOfArea: true,
+          message:   outOfAreaMessage(addressParts.postcode),
+        });
+      }
     }
 
     const plan = await Plan.findOne({ _id: planId, isActive: true });

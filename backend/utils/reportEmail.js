@@ -1,5 +1,6 @@
 const nodemailer = require("nodemailer");
 const fs = require("fs");
+const { formatDate } = require("./format");
 
 let transporter = null;
 const getTransporter = () => {
@@ -43,7 +44,7 @@ const reportTemplate = (data) => `
         ${row("Sample ID",  data.sampleId)}
         ${row("Booking ID", data.bookingId)}
         ${row("Tests",      data.tests)}
-        ${row("Issued On",  new Date().toDateString())}
+        ${row("Issued On",  formatDate(new Date()))}
       </table>
     </div>
     ${data.labComments ? `

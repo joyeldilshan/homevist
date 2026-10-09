@@ -3,6 +3,7 @@ const bwipjs      = require("bwip-js");
 const QRCode      = require("qrcode");
 const path        = require("path");
 const fs          = require("fs");
+const { formatDate, formatAppointment } = require("./format");
 
 const UPLOAD_DIR = path.join(__dirname, "../uploads/reports");
 if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
@@ -83,7 +84,7 @@ async function generateReport(booking) {
     `Age/Gender  : ${booking.user.age || "—"} / ${booking.user.gender || "—"}`,
     `Phone       : ${booking.user.phone}`,
     `Test        : ${booking.testType.name}`,
-    `Date        : ${new Date(booking.appointmentDate).toDateString()} ${booking.appointmentTime}`,
+    `Date        : ${formatAppointment(booking.appointmentDate, booking.appointmentTime)}`,
     `Phlebotomist: ${booking.phlebotomist?.name || "—"}`,
     `Status      : ${booking.status.toUpperCase()}`,
     `Verify      : ${process.env.VERIFY_BASE_URL || "https://homevisit.lk/verify"}/${booking.bookingId}`,
@@ -157,8 +158,8 @@ async function generateReport(booking) {
   ];
   const bookingRows = [
     ["Booking ID",   booking.bookingId],
-    ["Collected",    `${new Date(booking.appointmentDate).toDateString()} ${booking.appointmentTime}`],
-    ["Report Date",  new Date().toDateString()],
+    ["Collected",    `${formatAppointment(booking.appointmentDate, booking.appointmentTime)}`],
+    ["Report Date",  formatDate(new Date())],
     ["Phlebotomist", booking.phlebotomist?.name || "—"],
     ["Service",      booking.isHomeVisit ? "Home Visit" : "Lab Visit"],
   ];

@@ -1,4 +1,5 @@
 const nodemailer = require("nodemailer");
+const { formatMoney, formatDate } = require("./format");
 
 // ── Single shared transporter instance ────────────────────────
 // Created once, reused for all emails
@@ -82,8 +83,8 @@ const adminTemplate = (booking, patient) => `
     <h3 style="font-size:11px;font-weight:700;color:#718096;text-transform:uppercase;letter-spacing:1px;margin:0 0 12px;">Booking Details</h3>
     <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
       ${infoRow("🧪", "Test",    booking.testType?.name || "—")}
-      ${infoRow("💰", "Amount",  "Rs. " + (booking.amount?.toLocaleString() || "—"))}
-      ${infoRow("📅", "Date",    new Date(booking.appointmentDate).toDateString())}
+      ${infoRow("💰", "Amount",  formatMoney(booking.amount))}
+      ${infoRow("📅", "Date",    formatDate(booking.appointmentDate))}
       ${infoRow("⏰", "Time",    booking.appointmentTime || "—")}
       ${infoRow("📍", "Address", booking.address || "—")}
       ${booking.notes ? infoRow("📝", "Notes", booking.notes) : ""}
@@ -129,10 +130,10 @@ const patientTemplate = (booking, patient) => `
       <table width="100%" cellpadding="0" cellspacing="0">
         ${infoRow("🔖", "Booking ID", booking.bookingId)}
         ${infoRow("🧪", "Test",       booking.testType?.name || "—")}
-        ${infoRow("📅", "Date",       new Date(booking.appointmentDate).toDateString())}
+        ${infoRow("📅", "Date",       formatDate(booking.appointmentDate))}
         ${infoRow("⏰", "Time",       booking.appointmentTime || "—")}
         ${infoRow("📍", "Address",    booking.address || "—")}
-        ${infoRow("💰", "Amount",     "Rs. " + (booking.amount?.toLocaleString() || "—"))}
+        ${infoRow("💰", "Amount",     formatMoney(booking.amount))}
       </table>
     </div>
 
@@ -192,7 +193,7 @@ const phlebotomistTemplate = (booking, patient, phlebotomist) => `
     <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
       ${infoRow("🔖", "Booking ID", booking.bookingId)}
       ${infoRow("🧪", "Test",       booking.testType?.name || "—")}
-      ${infoRow("📅", "Date",       new Date(booking.appointmentDate).toDateString())}
+      ${infoRow("📅", "Date",       formatDate(booking.appointmentDate))}
       ${infoRow("⏰", "Time",       booking.appointmentTime || "—")}
       ${infoRow("📍", "Address",    booking.address || "—")}
       ${booking.notes ? infoRow("📝", "Notes", booking.notes) : ""}

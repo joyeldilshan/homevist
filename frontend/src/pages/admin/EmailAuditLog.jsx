@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import api from "../../utils/api";
+import { formatDate } from "../../utils/format";
 
 /**
  * EmailAuditLog — admin tab with two views:
@@ -116,7 +117,7 @@ export default function EmailAuditLog() {
                   </div>
                   <div style={{ fontSize:12, color:"var(--ink-60)" }}>{testNames(r)}</div>
                   <div style={{ fontFamily:"var(--monof)", fontSize:11.5, color:"var(--ink-60)" }}>{r.reportId}</div>
-                  <div style={{ fontSize:12, color:"var(--ink-60)" }}>{r.sentAt ? new Date(r.sentAt).toLocaleDateString() : "—"}</div>
+                  <div style={{ fontSize:12, color:"var(--ink-60)" }}>{formatDate(r.sentAt)}</div>
                   <span style={{ display:"inline-flex", alignItems:"center", gap:5, padding:"3px 10px", borderRadius:20, fontFamily:"var(--monof)", fontSize:9.5, letterSpacing:"0.08em", textTransform:"uppercase", background:"rgba(46,125,87,0.10)", color:GREEN, border:"1px solid rgba(46,125,87,0.35)", width:"fit-content" }}>
                     ✓ Sent
                   </span>

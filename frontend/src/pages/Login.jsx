@@ -2,6 +2,8 @@ import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import toast from "react-hot-toast";
+import { isValidUkPhone, normaliseUkPhone, PHONE_MESSAGE } from "../utils/validators";
+import locale from "../config/locale";
 
 /**
  * Home Visit — Sign in / Register (lab-label edition).
@@ -67,9 +69,10 @@ export default function AuthPage() {
     if (!name||!email||!phone||!password||!confirm) { toast.error("Fill in all fields."); return; }
     if (password !== confirm) { toast.error("Passwords do not match."); return; }
     if (password.length < 6)  { toast.error("Password must be at least 6 characters."); return; }
+    if (!isValidUkPhone(phone)) { toast.error(PHONE_MESSAGE); return; }
     setLoading(true);
     try {
-      const user = await register({ name, email, phone, password });
+      const user = await register({ name, email, phone: normaliseUkPhone(phone), password });
       toast.success(`Welcome, ${user.name.split(" ")[0]}!`);
       navigate("/user");
     } catch (err) { toast.error(err.response?.data?.message || "Registration failed."); }
@@ -398,7 +401,7 @@ export default function AuthPage() {
                 <div className="reg-grid" style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"0 14px" }}>
                   <div style={{ gridColumn:"1/-1", marginBottom:14 }}>
                     <label className="lbl">Full name</label>
-                    <input className="inp" type="text" placeholder="Joyel Dilshan" value={rForm.name} onChange={e=>setR("name",e.target.value)} />
+                    <input className="inp" type="text" placeholder="Jane Smith" value={rForm.name} onChange={e=>setR("name",e.target.value)} />
                   </div>
                   <div style={{ marginBottom:14 }}>
                     <label className="lbl">Email</label>
@@ -406,7 +409,7 @@ export default function AuthPage() {
                   </div>
                   <div style={{ marginBottom:14 }}>
                     <label className="lbl">Phone</label>
-                    <input className="inp" type="tel" placeholder="+94 77 123 4567" value={rForm.phone} onChange={e=>setR("phone",e.target.value)} />
+                    <input className="inp" type="tel" placeholder={locale.examplePhone} value={rForm.phone} onChange={e=>setR("phone",e.target.value)} />
                   </div>
                   <div style={{ marginBottom:14, position:"relative" }}>
                     <label className="lbl">Password</label>
