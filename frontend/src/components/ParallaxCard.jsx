@@ -65,7 +65,7 @@ export default function ParallaxCard({
             inset: -1.5,
             borderRadius: "inherit",
             padding: 1.5,
-            background: `radial-gradient(circle ${glowRadius + 20}px at ${coords.x}px ${coords.y}px, var(--red, #E53E3E), transparent 60%)`,
+            background: `radial-gradient(circle ${glowRadius + 20}px at ${coords.x}px ${coords.y}px, var(--color-bg-primary, #0F6E62), transparent 60%)`,
             WebkitMask: "linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)",
             WebkitMaskComposite: "xor",
             maskComposite: "exclude",

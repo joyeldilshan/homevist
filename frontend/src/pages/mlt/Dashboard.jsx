@@ -4,15 +4,7 @@ import { useAuth } from "../../context/AuthContext";
 import api from "../../utils/api";
 import toast from "react-hot-toast";
 import { formatDate } from "../../utils/format";
-
-/* ── Lab-label palette ─────────────────────────────────────── */
-const INK      = "#171310";
-const CRIMSON  = "#A4133C";
-const LAVENDER = "#7C6BAE";
-const GOLD     = "#B8892E";
-const TEAL     = "#1C7A6B";
-const BLUE     = "#3E6C9E";
-const GREEN    = "#2E7D57";
+import { INK, CRIMSON, LAVENDER, GOLD, TEAL, BLUE, GREEN } from "../../theme";
 
 const STATUS = {
   collected:   { color:BLUE,     label:"Collected"   },
@@ -36,11 +28,11 @@ function Badge({ status }) {
 
 function Modal({ title, onClose, children }) {
   return (
-    <div style={{ position:"fixed", inset:0, background:"rgba(23,19,16,0.5)", backdropFilter:"blur(4px)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:300, padding:20 }}>
-      <div style={{ background:"#FBF9F5", border:"1px solid rgba(23,19,16,0.13)", borderRadius:14, padding:28, width:"100%", maxWidth:460, maxHeight:"85vh", overflowY:"auto", boxShadow:"0 30px 70px rgba(23,19,16,0.3)" }}>
+    <div style={{ position:"fixed", inset:0, background:"rgba(22,33,31,0.5)", backdropFilter:"blur(4px)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:300, padding:20 }}>
+      <div style={{ background:"#FBF9F5", border:"1px solid rgba(22,33,31,0.13)", borderRadius:14, padding:28, width:"100%", maxWidth:460, maxHeight:"85vh", overflowY:"auto", boxShadow:"0 30px 70px rgba(22,33,31,0.3)" }}>
         <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:20 }}>
           <h2 style={{ fontFamily:"var(--display)", fontSize:22, fontWeight:900, letterSpacing:"-0.01em", margin:0 }}>{title}</h2>
-          <button onClick={onClose} style={{ width:30, height:30, borderRadius:"50%", background:"rgba(23,19,16,0.06)", border:"none", cursor:"pointer", fontSize:14, color:"rgba(23,19,16,0.6)" }}>✕</button>
+          <button onClick={onClose} style={{ width:30, height:30, borderRadius:"50%", background:"rgba(22,33,31,0.06)", border:"none", cursor:"pointer", fontSize:14, color:"rgba(22,33,31,0.6)" }}>✕</button>
         </div>
         {children}
       </div>
@@ -211,7 +203,7 @@ export default function MLTDashboard() {
 
   const Sidebar = () => (
     <aside className="side">
-      <div className="brand"><span className="brand-dot" style={{ background:`radial-gradient(circle at 35% 35%, #35a893, ${TEAL})` }} />Home Visit Lab</div>
+      <div className="brand"><span className="brand-dot" style={{ background:`radial-gradient(circle at 35% 35%, #1A9B8B, ${TEAL})` }} />Home Visit Lab</div>
       <div className="console-chip">
         <div className="console-chip-t">MLT console</div>
         <div className="console-chip-s">Lab technician</div>
@@ -227,7 +219,7 @@ export default function MLTDashboard() {
       ))}
       <div className="side-user">
         <div style={{ fontWeight:700, fontSize:13, marginBottom:1 }}>{user?.name||"MLT"}</div>
-        <div style={{ fontFamily:"var(--monof)", fontSize:10, letterSpacing:"0.1em", textTransform:"uppercase", color:"rgba(23,19,16,0.45)" }}>Lab technician</div>
+        <div style={{ fontFamily:"var(--monof)", fontSize:10, letterSpacing:"0.1em", textTransform:"uppercase", color:"rgba(22,33,31,0.45)" }}>Lab technician</div>
       </div>
       <button className="signout" onClick={() => { logout(); navigate("/login"); }}>Sign out</button>
     </aside>
@@ -283,13 +275,13 @@ export default function MLTDashboard() {
     <div className="ml">
       <style>{`
         .ml {
-          --paper:   #F3F0EA;
+          --paper: var(--color-bg-page);
           --card:    #FBF9F5;
-          --ink:     #171310;
-          --ink-60:  rgba(23,19,16,0.62);
-          --ink-40:  rgba(23,19,16,0.42);
-          --rule:    rgba(23,19,16,0.13);
-          --teal:    #1C7A6B;
+          --ink: var(--color-text-primary);
+          --ink-60: var(--color-text-secondary);
+          --ink-40: var(--color-text-muted);
+          --rule: var(--color-border-default);
+          --teal:    #0F6E62;
           --display: "Playfair Display", Georgia, serif;
           --sansf:   "DM Sans", system-ui, -apple-system, sans-serif;
           --monof:   "DM Mono", ui-monospace, "SF Mono", monospace;
@@ -361,7 +353,7 @@ export default function MLTDashboard() {
           font-family: var(--sansf); font-size: 13.5px; font-weight: 500;
           color: var(--ink-60); transition: background .15s, color .15s;
         }
-        .ml .side-tab:hover { background: rgba(23,19,16,0.05); color: var(--ink); }
+        .ml .side-tab:hover { background: rgba(22,33,31,0.05); color: var(--ink); }
         .ml .side-tab.on { background: var(--ink); color: var(--paper); font-weight: 600; }
         .ml .side-cap { width: 4px; height: 17px; border-radius: 2px; flex-shrink: 0; opacity: .4; transition: opacity .15s; }
         .ml .side-tab.on .side-cap, .ml .side-tab:hover .side-cap { opacity: 1; }
@@ -391,7 +383,7 @@ export default function MLTDashboard() {
           border-radius: 12px; padding: 18px 20px; margin-bottom: 12px;
           transition: transform .2s, box-shadow .2s;
         }
-        .ml .scard:hover { transform: translateY(-1px); box-shadow: 0 10px 24px rgba(23,19,16,0.08); }
+        .ml .scard:hover { box-shadow: 0 10px 24px rgba(22,33,31,0.08); }
 
         .ml .stat {
           background: var(--card); border: 1px solid var(--rule);
@@ -410,7 +402,7 @@ export default function MLTDashboard() {
           font-weight: 700; font-size: 12px; cursor: pointer; transition: all .15s;
           background: transparent; border: 1px solid;
         }
-        .ml .act:hover { transform: translateY(-1px); }
+        .ml .act:hover { }
         .ml .act-solid {
           background: var(--teal); color: #fff; border-color: transparent;
           box-shadow: 0 6px 16px rgba(28,122,107,0.3);
@@ -425,8 +417,8 @@ export default function MLTDashboard() {
           box-shadow: 0 8px 22px rgba(28,122,107,0.3);
           transition: background .2s, transform .15s;
         }
-        .ml .btn-upload:hover { background: #145d51; transform: translateY(-1px); }
-        .ml .btn-upload:disabled { opacity: .6; cursor: default; transform: none; }
+        .ml .btn-upload:hover { background: var(--color-bg-primary-hover); }
+        .ml .btn-upload:disabled { opacity: .4; cursor: default; }
 
         .ml .lbl {
           display: block; margin-bottom: 6px;
@@ -449,7 +441,7 @@ export default function MLTDashboard() {
           border-bottom: 1px solid var(--rule); z-index: 100;
           align-items: center; justify-content: space-between; padding: 0 16px;
         }
-        .ml .overlay { position: fixed; inset: 0; background: rgba(23,19,16,0.45); z-index: 200; }
+        .ml .overlay { position: fixed; inset: 0; background: rgba(22,33,31,0.45); z-index: 200; }
         .ml .drawer {
           position: fixed; left: 0; top: 0; bottom: 0; width: 268px; z-index: 210;
           background: var(--card); border-right: 1px solid var(--rule); overflow-y: auto;
@@ -472,7 +464,7 @@ export default function MLTDashboard() {
 
       <div className="topbar">
         <div className="brand" style={{ padding:0, marginBottom:0 }}>
-          <span className="brand-dot" style={{ background:`radial-gradient(circle at 35% 35%, #35a893, ${TEAL})` }} />
+          <span className="brand-dot" style={{ background:`radial-gradient(circle at 35% 35%, #1A9B8B, ${TEAL})` }} />
           Home Visit Lab
         </div>
         <button onClick={() => setSideOpen(true)} style={{ background:"none", border:"none", fontSize:20, cursor:"pointer", color:INK }}>☰</button>
@@ -578,7 +570,7 @@ export default function MLTDashboard() {
           <div
             onDragEnter={handleDrag} onDragOver={handleDrag} onDragLeave={handleDrag} onDrop={handleDrop}
             onClick={() => fileInputRef.current?.click()}
-            style={{ border:`2px dashed ${dragActive ? TEAL : file ? GREEN : "rgba(23,19,16,0.25)"}`, borderRadius:12, padding:"32px 20px", textAlign:"center", cursor:"pointer", background:dragActive ? "rgba(28,122,107,0.06)" : file ? "rgba(46,125,87,0.06)" : "rgba(23,19,16,0.02)", transition:"all 0.2s", marginBottom:16 }}>
+            style={{ border:`2px dashed ${dragActive ? TEAL : file ? GREEN : "rgba(22,33,31,0.25)"}`, borderRadius:12, padding:"32px 20px", textAlign:"center", cursor:"pointer", background:dragActive ? "rgba(28,122,107,0.06)" : file ? "rgba(46,125,87,0.06)" : "rgba(22,33,31,0.02)", transition:"all 0.2s", marginBottom:16 }}>
             <input ref={fileInputRef} type="file" accept="application/pdf" onChange={handleBrowse} style={{ display:"none" }} />
             {file ? (
               <>

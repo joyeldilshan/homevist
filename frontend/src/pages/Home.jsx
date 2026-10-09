@@ -27,7 +27,7 @@ const SECTIONS = [
   { id: "contact",  code: "HV-09", name: "Contact",  cap: "crimson"  },
 ];
 
-const CAP = { crimson: "#A4133C", lavender: "#7C6BAE", gold: "#B8892E", teal: "#1C7A6B" };
+const CAP = { crimson: "#C9603A", lavender: "#6E6AA8", gold: "#B8862E", teal: "#0F6E62" };
 
 export default function Home() {
   const navigate = useNavigate();
@@ -183,16 +183,16 @@ export default function Home() {
 
       <style>{`
         .hv {
-          --paper:   #F3F0EA;
+          --paper: var(--color-bg-page);
           --card:    #FBF9F5;
-          --ink:     #171310;
-          --ink-60:  rgba(23,19,16,0.64);
-          --ink-40:  rgba(23,19,16,0.42);
-          --rule:    rgba(23,19,16,0.14);
-          --crimson: #A4133C;
-          --lavender:#7C6BAE;
-          --gold:    #B8892E;
-          --teal:    #1C7A6B;
+          --ink: var(--color-text-primary);
+          --ink-60: var(--color-text-secondary);
+          --ink-40: var(--color-text-muted);
+          --rule: var(--color-border-default);
+          --crimson: var(--color-bg-accent);
+          --lavender:#6E6AA8;
+          --gold:    #B8862E;
+          --teal:    #0F6E62;
 
           --display: "Playfair Display", Georgia, serif;
           --sans:    "DM Sans", system-ui, -apple-system, sans-serif;
@@ -221,7 +221,7 @@ export default function Home() {
         }
         .hv .blob-a {
           width: 640px; height: 640px; top: -180px; right: -160px;
-          background: radial-gradient(circle, rgba(164,19,60,0.22), transparent 65%);
+          background: radial-gradient(circle, rgba(201,96,58,0.22), transparent 65%);
         }
         .hv .blob-b {
           width: 560px; height: 560px; top: 45%; left: -200px;
@@ -234,7 +234,7 @@ export default function Home() {
         .hv .cells { position: fixed; inset: 0; z-index: 0; pointer-events: none; }
         .hv .cell-dot {
           position: absolute; border-radius: 50%;
-          background: radial-gradient(circle at 35% 35%, #d24a6e, var(--crimson));
+          background: radial-gradient(circle at 35% 35%, #D47A58, var(--crimson));
           animation: bob 7s ease-in-out infinite alternate;
         }
         @keyframes bob {
@@ -246,7 +246,7 @@ export default function Home() {
           width: 700px; height: 700px; margin: -350px 0 0 -350px;
           background: radial-gradient(circle, rgba(184,137,46,0.10), transparent 65%);
           border-radius: 50%; pointer-events: none; z-index: 0;
-          transition: transform .5s ease-out;
+          transition: transform .2s var(--ease);
         }
 
         /* ---------- type ---------- */
@@ -273,7 +273,7 @@ export default function Home() {
         .hv .wash-lavender { background: linear-gradient(180deg, rgba(124,107,174,0.09), transparent 55%); }
         .hv .wash-teal     { background: linear-gradient(180deg, rgba(28,122,107,0.09), transparent 55%); }
         .hv .wash-gold     { background: linear-gradient(180deg, rgba(184,137,46,0.10), transparent 55%); }
-        .hv .wash-crimson  { background: linear-gradient(180deg, rgba(164,19,60,0.07), transparent 55%); }
+        .hv .wash-crimson  { background: linear-gradient(180deg, rgba(201,96,58,0.07), transparent 55%); }
 
         /* ghost watermark behind each section */
         .hv .ghost {
@@ -281,7 +281,7 @@ export default function Home() {
           font-family: var(--display); font-weight: 900;
           font-size: clamp(70px, 12vw, 170px); line-height: 1;
           color: transparent;
-          -webkit-text-stroke: 1px rgba(23,19,16,0.10);
+          -webkit-text-stroke: 1px rgba(22,33,31,0.10);
           user-select: none; pointer-events: none; white-space: nowrap;
         }
 
@@ -290,7 +290,7 @@ export default function Home() {
           display: inline-flex; align-items: stretch;
           border: 1px solid var(--rule); border-radius: 3px;
           background: var(--card); overflow: hidden; margin-bottom: 26px;
-          box-shadow: 0 2px 10px rgba(23,19,16,0.05);
+          box-shadow: 0 2px 10px rgba(22,33,31,0.05);
         }
         .hv .label-cap  { width: 9px; }
         .hv .cap-crimson  { background: var(--crimson); }
@@ -317,18 +317,19 @@ export default function Home() {
         /* ---------- buttons ---------- */
         .hv .btn {
           font-family: var(--sans); font-size: 14px; font-weight: 700;
-          padding: 13px 26px; border-radius: 2px; cursor: pointer;
+          padding: 13px 26px; border-radius: var(--radius-md); cursor: pointer;
           border: 1px solid transparent;
-          transition: transform .18s ease, background .18s ease, color .18s ease, box-shadow .18s ease;
+          transition: background var(--dur-instant) var(--ease),
+                      border-color var(--dur-instant) var(--ease),
+                      color var(--dur-instant) var(--ease);
         }
-        .hv .btn:hover { transform: translateY(-2px); }
+        /* Hover changes colour only — no lift. */
         .hv .btn-primary {
-          background: var(--crimson); color: #fff;
-          box-shadow: 0 8px 22px rgba(164,19,60,0.32);
+          background: var(--color-bg-primary); color: var(--color-text-on-primary);
         }
-        .hv .btn-primary:hover { background: #8B0F33; box-shadow: 0 12px 28px rgba(164,19,60,0.4); }
-        .hv .btn-ghost { background: transparent; color: var(--ink); border-color: var(--ink); }
-        .hv .btn-ghost:hover { background: var(--ink); color: var(--paper); }
+        .hv .btn-primary:hover { background: var(--color-bg-primary-hover); }
+        .hv .btn-ghost { background: transparent; color: var(--color-text-primary); border-color: var(--color-border-strong); }
+        .hv .btn-ghost:hover { background: var(--color-bg-subtle); border-color: var(--color-border-focus); }
 
         /* ---------- nav ---------- */
         .hv .nav {
@@ -346,12 +347,12 @@ export default function Home() {
         }
         .hv .brand-dot {
           width: 10px; height: 10px; border-radius: 50%;
-          background: radial-gradient(circle at 35% 35%, #d24a6e, var(--crimson));
+          background: radial-gradient(circle at 35% 35%, #D47A58, var(--crimson));
           flex-shrink: 0; animation: pulse 2.4s ease-in-out infinite;
         }
         @keyframes pulse {
-          0%, 100% { box-shadow: 0 0 0 0 rgba(164,19,60,0.35); }
-          50%      { box-shadow: 0 0 0 7px rgba(164,19,60,0); }
+          0%, 100% { box-shadow: 0 0 0 0 rgba(201,96,58,0.35); }
+          50%      { box-shadow: 0 0 0 7px rgba(201,96,58,0); }
         }
         .hv .nav-links { display: flex; gap: 26px; }
         .hv .nav-link {
@@ -364,7 +365,7 @@ export default function Home() {
         .hv .nav-link.on { color: var(--ink); border-bottom-color: var(--crimson); }
         .hv .burger { display: none; background: none; border: none; font-size: 19px; cursor: pointer; color: var(--ink); }
 
-        .hv .overlay { position: fixed; inset: 0; background: rgba(23,19,16,0.45); z-index: 240; }
+        .hv .overlay { position: fixed; inset: 0; background: rgba(22,33,31,0.45); z-index: 240; }
         .hv .drawer {
           position: fixed; top: 0; left: 0; bottom: 0; width: 285px; z-index: 250;
           background: var(--paper); border-right: 1px solid var(--rule);
@@ -402,7 +403,7 @@ export default function Home() {
         .hv .plate-frame {
           position: relative; overflow: hidden;
           border: 1px solid var(--rule); border-radius: 4px;
-          box-shadow: 0 22px 50px rgba(23,19,16,0.16);
+          box-shadow: 0 22px 50px rgba(22,33,31,0.16);
         }
         .hv .plate-img {
           width: 100%; height: 100%; display: block; object-fit: cover;
@@ -440,7 +441,7 @@ export default function Home() {
         .hv .hero-word { position: relative; display: inline-block; }
         .hv .hero-word::after {
           content: ""; position: absolute; left: 0; right: 0; bottom: 7%;
-          height: 0.28em; background: rgba(164,19,60,0.18); z-index: -1;
+          height: 0.28em; background: rgba(201,96,58,0.18); z-index: -1;
           transform: skewX(-8deg);
         }
         .hv .hero-meta {
@@ -476,9 +477,9 @@ export default function Home() {
           content: ""; position: absolute; top: 0; left: 0; right: 0; height: 3px;
           background: var(--tint, var(--crimson));
           transform: scaleX(0); transform-origin: 0 50%;
-          transition: transform .3s ease;
+          transition: transform .18s var(--ease);
         }
-        .hv .cell:hover { transform: translateY(-4px); box-shadow: 0 16px 34px rgba(23,19,16,0.12); z-index: 2; }
+        .hv .cell:hover { box-shadow: 0 16px 34px rgba(22,33,31,0.12); z-index: 2; }
         .hv .cell:hover::before { transform: scaleX(1); }
         .hv .cell-icon {
           width: 44px; height: 44px; border-radius: 10px;
@@ -517,7 +518,7 @@ export default function Home() {
         }
         .hv .band-veil {
           position: absolute; inset: 0;
-          background: linear-gradient(90deg, rgba(23,19,16,0.85), rgba(164,19,60,0.45));
+          background: linear-gradient(90deg, rgba(22,33,31,0.85), rgba(201,96,58,0.45));
           display: flex; align-items: center; padding: 0 6vw;
         }
         .hv .band-veil h2 { color: #fff; max-width: 640px; }
@@ -532,10 +533,10 @@ export default function Home() {
           background: var(--card); padding: 36px 26px;
           border: 1px solid var(--rule); border-radius: 4px;
           border-top: 4px solid var(--tint, var(--crimson));
-          box-shadow: 0 10px 26px rgba(23,19,16,0.07);
+          box-shadow: 0 10px 26px rgba(22,33,31,0.07);
           transition: transform .25s ease, box-shadow .25s ease;
         }
-        .hv .stat:hover { transform: translateY(-5px); box-shadow: 0 18px 38px rgba(23,19,16,0.13); }
+        .hv .stat:hover { box-shadow: 0 18px 38px rgba(22,33,31,0.13); }
         .hv .stat-v {
           font-family: var(--display); font-weight: 900;
           font-size: clamp(40px, 5vw, 62px); line-height: 1; letter-spacing: -0.02em;
@@ -555,7 +556,7 @@ export default function Home() {
           display: flex; flex-direction: column; justify-content: space-between; gap: 22px;
           transition: transform .25s ease, box-shadow .25s ease;
         }
-        .hv .quote:hover { transform: translateY(-5px); box-shadow: 0 18px 38px rgba(23,19,16,0.12); }
+        .hv .quote:hover { box-shadow: 0 18px 38px rgba(22,33,31,0.12); }
         .hv .quote-text {
           font-family: var(--display); font-size: 19px; line-height: 1.45;
           color: var(--ink); font-weight: 700;
@@ -578,7 +579,7 @@ export default function Home() {
           border-bottom: 1px solid var(--rule);
           transition: transform .25s ease, box-shadow .25s ease;
         }
-        .hv .member:hover { transform: translateY(-5px); box-shadow: 0 16px 34px rgba(23,19,16,0.11); }
+        .hv .member:hover { box-shadow: 0 16px 34px rgba(22,33,31,0.11); }
         .hv .member-in {
           width: 42px; height: 42px; border-radius: 50%;
           display: flex; align-items: center; justify-content: center;
@@ -595,7 +596,7 @@ export default function Home() {
           padding: 22px 8px; width: 100%; text-align: left; background: none;
           transition: background .2s ease;
         }
-        .hv .faq:hover { background: rgba(23,19,16,0.03); }
+        .hv .faq:hover { background: rgba(22,33,31,0.03); }
         .hv .faq-q {
           display: flex; justify-content: space-between; align-items: center; gap: 18px;
           font-family: var(--sans); font-weight: 700; font-size: 16px; color: var(--ink);
@@ -608,12 +609,12 @@ export default function Home() {
         .hv .contact {
           position: relative; overflow: hidden; border-radius: 6px;
           border: 1px solid var(--rule); margin-top: 46px;
-          box-shadow: 0 30px 70px rgba(23,19,16,0.22);
+          box-shadow: 0 30px 70px rgba(22,33,31,0.22);
         }
         .hv .contact-bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
         .hv .contact-in {
           position: relative;
-          background: linear-gradient(120deg, rgba(23,19,16,0.92), rgba(164,19,60,0.78));
+          background: linear-gradient(120deg, rgba(22,33,31,0.92), rgba(201,96,58,0.78));
           padding: clamp(48px, 8vw, 92px) 6vw; text-align: center;
         }
         .hv .contact-in h2 { color: #fff; }
@@ -630,7 +631,7 @@ export default function Home() {
           background-image: repeating-linear-gradient(90deg, #fff 0 1px, transparent 1px 3px,
             #fff 3px 5px, transparent 5px 6px, #fff 6px 7px, transparent 7px 10px);
         }
-        .hv .contact-in .btn-primary { background: #fff; color: var(--crimson); box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
+        .hv .contact-in .btn-primary { background: var(--color-bg-surface); color: var(--color-bg-primary); }
         .hv .contact-in .btn-primary:hover { background: var(--paper); }
 
         /* ---------- footer ---------- */
@@ -654,7 +655,7 @@ export default function Home() {
           .hv .grid-3, .hv .quotes, .hv .team-row, .hv .stats-row { grid-template-columns: 1fr; }
           .hv .step { grid-template-columns: 56px 1fr; padding: 24px 10px; }
           .hv .step-n { font-size: 28px; }
-          .hv .band-veil { background: rgba(23,19,16,0.74); }
+          .hv .band-veil { background: rgba(22,33,31,0.74); }
           .hv .ghost { display: none; }
         }
 
@@ -694,7 +695,7 @@ export default function Home() {
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} />
             <motion.div className="drawer"
               initial={{ x: -300 }} animate={{ x: 0 }} exit={{ x: -300 }}
-              transition={{ type: "spring", stiffness: 140, damping: 20 }}>
+              transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}>
               <div className="brand" style={{ marginBottom: 22 }}><span className="brand-dot" />Home Visit</div>
               {SECTIONS.map((s) => (
                 <button key={s.id} className={`drawer-item ${active === s.id ? "on" : ""}`} onClick={() => scrollTo(s.id)}>
@@ -1065,7 +1066,7 @@ function Reveal({ children, delay = 0 }) {
       initial={{ opacity: 0, y: 24 }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, margin: "-60px" }}
-      transition={{ duration: 0.55, delay, ease: [0.22, 1, 0.36, 1] }}
+      transition={{ duration: 0.2, delay, ease: [0.22, 1, 0.36, 1] }}
     >
       {children}
     </motion.div>
@@ -1079,7 +1080,7 @@ function Faq({ q, a, delay }) {
     <motion.button
       className="faq" onClick={() => setOpen(!open)}
       initial={{ opacity: 0, y: 14 }} whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true }} transition={{ duration: 0.4, delay }}
+      viewport={{ once: true }} transition={{ duration: 0.2, delay, ease: [0.22, 1, 0.36, 1] }}
       aria-expanded={open}
     >
       <span className="faq-q">{q}<span className="faq-sign">{open ? "−" : "+"}</span></span>
@@ -1087,7 +1088,7 @@ function Faq({ q, a, delay }) {
         {open && (
           <motion.div className="faq-a"
             initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }} transition={{ duration: 0.25 }}>
+            exit={{ opacity: 0, height: 0 }} transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}>
             <p>{a}</p>
           </motion.div>
         )}

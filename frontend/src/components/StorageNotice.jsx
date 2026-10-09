@@ -51,7 +51,7 @@ export default function StorageNotice() {
       style={{
         position: "fixed", left: 16, right: 16, bottom: 16, zIndex: 9999,
         maxWidth: 680, margin: "0 auto",
-        background: "#171310", color: "#F3F0EA",
+        background: "#16211F", color: "#F4F2ED",
         borderRadius: 10, padding: "16px 18px",
         boxShadow: "0 10px 40px rgba(0,0,0,0.3)",
         display: "flex", gap: 16, alignItems: "flex-start", flexWrap: "wrap",
@@ -74,7 +74,7 @@ export default function StorageNotice() {
       <button
         onClick={dismiss}
         style={{
-          background: "#F3F0EA", color: "#171310", border: "none",
+          background: "#F4F2ED", color: "#16211F", border: "none",
           borderRadius: 6, padding: "9px 18px", fontSize: 13, fontWeight: 600,
           cursor: "pointer", flexShrink: 0,
         }}

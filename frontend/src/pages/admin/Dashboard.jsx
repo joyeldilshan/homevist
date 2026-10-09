@@ -5,15 +5,7 @@ import api from "../../utils/api";
 import toast from "react-hot-toast";
 import EmailAuditLog from "./EmailAuditLog";
 import { formatMoney, formatMoneyCompact, formatDate, formatLongDate} from "../../utils/format";
-
-/* ── Lab-label palette ─────────────────────────────────────── */
-const INK      = "#171310";
-const CRIMSON  = "#A4133C";
-const LAVENDER = "#7C6BAE";
-const GOLD     = "#B8892E";
-const TEAL     = "#1C7A6B";
-const BLUE     = "#3E6C9E";
-const GREEN    = "#2E7D57";
+import { INK, CRIMSON, LAVENDER, GOLD, TEAL, BLUE, GREEN } from "../../theme";
 
 const sUser   = b => b?.user?.name || "Unknown Patient";
 const sTest   = b => b?.testTypes?.length
@@ -27,10 +19,10 @@ const STATUS_CONFIG = {
   pending:          { color:GOLD,      bg:"rgba(184,137,46,0.10)",  border:"rgba(184,137,46,0.35)",  label:"Pending"          },
   confirmed:        { color:BLUE,      bg:"rgba(62,108,158,0.10)",  border:"rgba(62,108,158,0.35)",  label:"Confirmed"        },
   sample_collected: { color:LAVENDER,  bg:"rgba(124,107,174,0.10)", border:"rgba(124,107,174,0.35)", label:"Sample Collected" },
-  processing:       { color:CRIMSON,   bg:"rgba(164,19,60,0.08)",   border:"rgba(164,19,60,0.30)",   label:"Lab Processing"   },
+  processing:       { color:CRIMSON,   bg:"rgba(201,96,58,0.08)",   border:"rgba(201,96,58,0.30)",   label:"Lab Processing"   },
   completed:        { color:GREEN,     bg:"rgba(46,125,87,0.10)",   border:"rgba(46,125,87,0.35)",   label:"Completed"        },
   cancelled:        { color:"#8A8378", bg:"rgba(138,131,120,0.10)", border:"rgba(138,131,120,0.3)",  label:"Cancelled"        },
-  rejected:         { color:CRIMSON,   bg:"rgba(164,19,60,0.08)",   border:"rgba(164,19,60,0.30)",   label:"Rejected"         },
+  rejected:         { color:CRIMSON,   bg:"rgba(201,96,58,0.08)",   border:"rgba(201,96,58,0.30)",   label:"Rejected"         },
 };
 
 const StatusBadge = ({ status }) => {
@@ -53,11 +45,11 @@ const FI = ({ label, fkey, type="text", placeholder, val, setter }) => (
 );
 
 const Modal = ({ title, onClose, children }) => (
-  <div style={{ position:"fixed", inset:0, background:"rgba(23,19,16,0.5)", backdropFilter:"blur(4px)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:300, padding:20 }}>
-    <div style={{ background:"#FBF9F5", border:"1px solid rgba(23,19,16,0.13)", borderRadius:14, padding:28, width:"100%", maxWidth:480, maxHeight:"85vh", overflowY:"auto", boxShadow:"0 30px 70px rgba(23,19,16,0.3)" }}>
+  <div style={{ position:"fixed", inset:0, background:"rgba(22,33,31,0.5)", backdropFilter:"blur(4px)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:300, padding:20 }}>
+    <div style={{ background:"#FBF9F5", border:"1px solid rgba(22,33,31,0.13)", borderRadius:14, padding:28, width:"100%", maxWidth:480, maxHeight:"85vh", overflowY:"auto", boxShadow:"0 30px 70px rgba(22,33,31,0.3)" }}>
     <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:20 }}>
         <h2 style={{ fontFamily:"var(--display)", fontSize:22, fontWeight:900, letterSpacing:"-0.01em", margin:0 }}>{title}</h2>
-        <button onClick={onClose} style={{ width:30, height:30, borderRadius:"50%", background:"rgba(23,19,16,0.06)", border:"none", cursor:"pointer", fontSize:14, color:"rgba(23,19,16,0.6)" }}>✕</button>
+        <button onClick={onClose} style={{ width:30, height:30, borderRadius:"50%", background:"rgba(22,33,31,0.06)", border:"none", cursor:"pointer", fontSize:14, color:"rgba(22,33,31,0.6)" }}>✕</button>
       </div>
       {children}
     </div>
@@ -243,14 +235,14 @@ export default function AdminDashboard() {
       ))}
       <div className="side-user">
         <div style={{ fontWeight:700, fontSize:13, marginBottom:1 }}>{user?.name||"Admin"}</div>
-        <div style={{ fontFamily:"var(--monof)", fontSize:10, letterSpacing:"0.1em", textTransform:"uppercase", color:"rgba(23,19,16,0.45)" }}>Administrator</div>
+        <div style={{ fontFamily:"var(--monof)", fontSize:10, letterSpacing:"0.1em", textTransform:"uppercase", color:"rgba(22,33,31,0.45)" }}>Administrator</div>
       </div>
       <button className="signout" onClick={()=>{ logout(); navigate("/login"); }}>Sign out</button>
     </aside>
   );
 
   const TH = ({ cols, heads }) => (
-    <div style={{ display:"grid", gridTemplateColumns:cols, padding:"11px 18px", background:"rgba(23,19,16,0.03)", borderBottom:"1px solid var(--rule)" }}>
+    <div style={{ display:"grid", gridTemplateColumns:cols, padding:"11px 18px", background:"rgba(22,33,31,0.03)", borderBottom:"1px solid var(--rule)" }}>
       {heads.map(h=>(
         <div key={h} className="th">{h}</div>
       ))}
@@ -261,13 +253,13 @@ export default function AdminDashboard() {
     <div className="ad">
       <style>{`
         .ad {
-          --paper:   #F3F0EA;
+          --paper: var(--color-bg-page);
           --card:    #FBF9F5;
-          --ink:     #171310;
-          --ink-60:  rgba(23,19,16,0.62);
-          --ink-40:  rgba(23,19,16,0.42);
-          --rule:    rgba(23,19,16,0.13);
-          --crimson: #A4133C;
+          --ink: var(--color-text-primary);
+          --ink-60: var(--color-text-secondary);
+          --ink-40: var(--color-text-muted);
+          --rule: var(--color-border-default);
+          --crimson: var(--color-bg-accent);
           --display: "Playfair Display", Georgia, serif;
           --sansf:   "DM Sans", system-ui, -apple-system, sans-serif;
           --monof:   "DM Mono", ui-monospace, "SF Mono", monospace;
@@ -320,12 +312,12 @@ export default function AdminDashboard() {
         }
         .ad .brand-dot {
           width: 10px; height: 10px; border-radius: 50%;
-          background: radial-gradient(circle at 35% 35%, #d24a6e, var(--crimson));
+          background: radial-gradient(circle at 35% 35%, #D47A58, var(--crimson));
           animation: pulse 2.4s ease-in-out infinite;
         }
         @keyframes pulse {
-          0%,100% { box-shadow: 0 0 0 0 rgba(164,19,60,0.35); }
-          50%     { box-shadow: 0 0 0 6px rgba(164,19,60,0); }
+          0%,100% { box-shadow: 0 0 0 0 rgba(201,96,58,0.35); }
+          50%     { box-shadow: 0 0 0 6px rgba(201,96,58,0); }
         }
         .ad .console-chip {
           margin: 0 4px 14px; padding: 10px 12px; border-radius: 8px;
@@ -341,7 +333,7 @@ export default function AdminDashboard() {
           font-family: var(--sansf); font-size: 13.5px; font-weight: 500;
           color: var(--ink-60); transition: background .15s, color .15s;
         }
-        .ad .side-tab:hover { background: rgba(23,19,16,0.05); color: var(--ink); }
+        .ad .side-tab:hover { background: rgba(22,33,31,0.05); color: var(--ink); }
         .ad .side-tab.on { background: var(--ink); color: var(--paper); font-weight: 600; }
         .ad .side-cap { width: 4px; height: 17px; border-radius: 2px; flex-shrink: 0; opacity: .4; transition: opacity .15s; }
         .ad .side-tab.on .side-cap, .ad .side-tab:hover .side-cap { opacity: 1; }
@@ -373,7 +365,7 @@ export default function AdminDashboard() {
         }
         .ad .trow { padding: 13px 18px; border-bottom: 1px solid var(--rule); transition: background .15s; align-items: center; }
         .ad .trow:last-child { border-bottom: none; }
-        .ad .trow:hover { background: rgba(164,19,60,0.035); }
+        .ad .trow:hover { background: rgba(201,96,58,0.035); }
 
         .ad .stat {
           background: var(--card); border: 1px solid var(--rule);
@@ -387,7 +379,7 @@ export default function AdminDashboard() {
         }
 
         .ad .alert {
-          background: rgba(164,19,60,0.06); border: 1px solid rgba(164,19,60,0.3);
+          background: rgba(201,96,58,0.06); border: 1px solid rgba(201,96,58,0.3);
           border-left: 4px solid var(--crimson);
           border-radius: 12px; padding: 16px 20px; margin-bottom: 20px;
           display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;
@@ -396,15 +388,18 @@ export default function AdminDashboard() {
         /* buttons & inputs */
         .ad .btn {
           font-family: var(--sansf); font-size: 13.5px; font-weight: 700;
-          padding: 11px 20px; border-radius: 9px; cursor: pointer;
-          border: 1px solid transparent; transition: transform .15s, background .15s, box-shadow .15s;
+          padding: 11px 20px; border-radius: var(--radius-md); cursor: pointer;
+          border: 1px solid transparent;
+          transition: background var(--dur-instant) var(--ease),
+                      border-color var(--dur-instant) var(--ease),
+                      color var(--dur-instant) var(--ease);
         }
-        .ad .btn:hover { transform: translateY(-1px); }
-        .ad .btn-primary { background: var(--crimson); color: #fff; box-shadow: 0 6px 18px rgba(164,19,60,0.28); }
-        .ad .btn-primary:hover { background: #8B0F33; }
-        .ad .btn-ghost { background: transparent; color: var(--ink); border-color: var(--rule); }
-        .ad .btn-ghost:hover { border-color: var(--ink); }
-        .ad .btn-sm { padding: 7px 14px; font-size: 12.5px; border-radius: 7px; }
+        /* Hover changes colour only — no lift. */
+        .ad .btn-primary { background: var(--color-bg-primary); color: var(--color-text-on-primary); }
+        .ad .btn-primary:hover { background: var(--color-bg-primary-hover); }
+        .ad .btn-ghost { background: transparent; color: var(--color-text-primary); border-color: var(--color-border-strong); }
+        .ad .btn-ghost:hover { background: var(--color-bg-subtle); border-color: var(--color-border-focus); }
+        .ad .btn-sm { padding: 8px 16px; font-size: 12px; border-radius: var(--radius-md); }
         .ad .btn-full { width: 100%; }
 
         .ad .act {
@@ -412,10 +407,10 @@ export default function AdminDashboard() {
           font-weight: 700; font-size: 12px; cursor: pointer; transition: all .15s; white-space: nowrap;
           background: transparent;
         }
-        .ad .act:hover { transform: translateY(-1px); }
+        .ad .act:hover { }
         .ad .act-blue  { color: #3E6C9E; border: 1px solid rgba(62,108,158,0.35); }
         .ad .act-green { color: #2E7D57; border: 1px solid rgba(46,125,87,0.35); }
-        .ad .act-red   { color: var(--crimson); border: 1px solid rgba(164,19,60,0.35); }
+        .ad .act-red   { color: var(--crimson); border: 1px solid rgba(201,96,58,0.35); }
 
         .ad .lbl {
           display: block; margin-bottom: 6px;
@@ -430,7 +425,7 @@ export default function AdminDashboard() {
           transition: border-color .2s, box-shadow .2s;
         }
         .ad .inp::placeholder { color: var(--ink-40); }
-        .ad .inp:focus { outline: none; border-color: var(--crimson); box-shadow: 0 0 0 3px rgba(164,19,60,0.10); }
+        .ad .inp:focus { outline: none; border-color: var(--crimson); box-shadow: 0 0 0 3px rgba(201,96,58,0.10); }
 
         .ad .cat-tag {
           font-family: var(--monof); font-size: 9px; letter-spacing: 0.08em; text-transform: uppercase;
@@ -442,7 +437,7 @@ export default function AdminDashboard() {
           background: var(--card); border: 1px solid var(--rule);
           border-radius: 12px; padding: 16px 18px; margin-bottom: 10px; transition: all .2s;
         }
-        .ad .prow:hover { box-shadow: 0 10px 24px rgba(23,19,16,0.08); transform: translateY(-1px); }
+        .ad .prow:hover { box-shadow: 0 10px 24px rgba(22,33,31,0.08); }
 
         /* mobile */
         .ad .topbar {
@@ -451,7 +446,7 @@ export default function AdminDashboard() {
           border-bottom: 1px solid var(--rule); z-index: 100;
           align-items: center; justify-content: space-between; padding: 0 16px;
         }
-        .ad .overlay { position: fixed; inset: 0; background: rgba(23,19,16,0.45); z-index: 200; }
+        .ad .overlay { position: fixed; inset: 0; background: rgba(22,33,31,0.45); z-index: 200; }
         .ad .drawer {
           position: fixed; left: 0; top: 0; bottom: 0; width: 268px; z-index: 210;
           background: var(--card); border-right: 1px solid var(--rule); overflow-y: auto;
@@ -599,7 +594,7 @@ export default function AdminDashboard() {
                       <div>
                         <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:6 }}>
                           <div style={{ fontWeight:700, fontSize:15 }}>{sUser(b)}</div>
-                          <span style={{ fontFamily:"var(--monof)", fontSize:9, letterSpacing:"0.1em", textTransform:"uppercase", color:CRIMSON, background:"rgba(164,19,60,0.07)", border:"1px solid rgba(164,19,60,0.3)", borderRadius:20, padding:"2px 8px" }}>Unassigned</span>
+                          <span style={{ fontFamily:"var(--monof)", fontSize:9, letterSpacing:"0.1em", textTransform:"uppercase", color:CRIMSON, background:"rgba(201,96,58,0.07)", border:"1px solid rgba(201,96,58,0.3)", borderRadius:20, padding:"2px 8px" }}>Unassigned</span>
                         </div>
                         <div style={{ fontSize:12, color:"var(--ink-60)", lineHeight:1.9 }}>
                           🧪 {sTest(b)}<br />📅 {sDate(b.appointmentDate)} ⏰ {b.appointmentTime||"—"}<br />
@@ -822,7 +817,7 @@ export default function AdminDashboard() {
                                 <span style={{ color:"var(--ink-60)", fontWeight:500 }}>{item.name}</span>
                                 <span style={{ fontFamily:"var(--monof)", fontWeight:500, color:item.color }}>{item.count} ({pct}%)</span>
                               </div>
-                              <div style={{ height:6, background:"rgba(23,19,16,0.06)", borderRadius:3, overflow:"hidden" }}>
+                              <div style={{ height:6, background:"rgba(22,33,31,0.06)", borderRadius:3, overflow:"hidden" }}>
                                 <div style={{ width:`${pct}%`, height:"100%", background:item.color, borderRadius:3, opacity:0.85, transition:"width 0.6s ease" }} />
                               </div>
                             </div>
@@ -843,22 +838,22 @@ export default function AdminDashboard() {
       {/* ASSIGN MODAL */}
       {assignModal && (
         <Modal title="Assign phlebotomist" onClose={()=>setAssignModal(null)}>
-          <p style={{ fontSize:13, color:"rgba(23,19,16,0.6)", marginBottom:16 }}>Click a phlebotomist to assign them to this booking.</p>
+          <p style={{ fontSize:13, color:"rgba(22,33,31,0.6)", marginBottom:16 }}>Click a phlebotomist to assign them to this booking.</p>
           {phlebotomists.length===0
-            ? <div style={{ textAlign:"center", padding:"30px 0", color:"rgba(23,19,16,0.5)", fontSize:14 }}>No phlebotomists found. Add one first.</div>
+            ? <div style={{ textAlign:"center", padding:"30px 0", color:"rgba(22,33,31,0.5)", fontSize:14 }}>No phlebotomists found. Add one first.</div>
             : phlebotomists.map(p=>(
               <div key={p._id} onClick={()=>assignPhlebotomist(assignModal,p._id)}
-                style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"14px 16px", borderRadius:10, border:"1px solid rgba(23,19,16,0.13)", marginBottom:10, cursor:"pointer", transition:"all 0.2s", background:"#fff" }}
-                onMouseOver={e=>{ e.currentTarget.style.borderColor=CRIMSON; e.currentTarget.style.background="rgba(164,19,60,0.04)"; }}
-                onMouseOut={e=>{ e.currentTarget.style.borderColor="rgba(23,19,16,0.13)"; e.currentTarget.style.background="#fff"; }}>
+                style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"14px 16px", borderRadius:10, border:"1px solid rgba(22,33,31,0.13)", marginBottom:10, cursor:"pointer", transition:"all 0.2s", background:"#fff" }}
+                onMouseOver={e=>{ e.currentTarget.style.borderColor=CRIMSON; e.currentTarget.style.background="rgba(201,96,58,0.04)"; }}
+                onMouseOut={e=>{ e.currentTarget.style.borderColor="rgba(22,33,31,0.13)"; e.currentTarget.style.background="#fff"; }}>
                 <div style={{ display:"flex", alignItems:"center", gap:12 }}>
-                  <div style={{ width:40, height:40, borderRadius:"50%", background:"rgba(164,19,60,0.07)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:18 }}>🧪</div>
+                  <div style={{ width:40, height:40, borderRadius:"50%", background:"rgba(201,96,58,0.07)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:18 }}>🧪</div>
                   <div>
                     <div style={{ fontWeight:700, fontSize:14 }}>{p?.name||"—"}</div>
-                    <div style={{ fontSize:12, color:"rgba(23,19,16,0.55)" }}>⭐ {p?.rating?.toFixed(1)||"5.0"} · {p?.serviceArea||"CF"}</div>
+                    <div style={{ fontSize:12, color:"rgba(22,33,31,0.55)" }}>⭐ {p?.rating?.toFixed(1)||"5.0"} · {p?.serviceArea||"CF"}</div>
                   </div>
                 </div>
-                <span style={{ fontFamily:"var(--monof)", fontSize:10, letterSpacing:"0.08em", textTransform:"uppercase", color:p?.isAvailable?GREEN:"rgba(23,19,16,0.4)" }}>
+                <span style={{ fontFamily:"var(--monof)", fontSize:10, letterSpacing:"0.08em", textTransform:"uppercase", color:p?.isAvailable?GREEN:"rgba(22,33,31,0.4)" }}>
                   {p?.isAvailable?"● Online":"○ Offline"}
                 </span>
               </div>
@@ -918,7 +913,7 @@ export default function AdminDashboard() {
             <Lbl c="Tests included in every visit" />
             <div style={{ display:"flex", flexWrap:"wrap", gap:8, maxHeight:160, overflowY:"auto" }}>
               {testTypes.map(t=>(
-                <label key={t._id} style={{ display:"flex", alignItems:"center", gap:6, fontSize:12, background:newPlan.testTypeIds.includes(t._id)?"rgba(124,107,174,0.1)":"rgba(23,19,16,0.04)", border:`1px solid ${newPlan.testTypeIds.includes(t._id)?LAVENDER:"var(--rule)"}`, borderRadius:20, padding:"5px 10px", cursor:"pointer" }}>
+                <label key={t._id} style={{ display:"flex", alignItems:"center", gap:6, fontSize:12, background:newPlan.testTypeIds.includes(t._id)?"rgba(124,107,174,0.1)":"rgba(22,33,31,0.04)", border:`1px solid ${newPlan.testTypeIds.includes(t._id)?LAVENDER:"var(--rule)"}`, borderRadius:20, padding:"5px 10px", cursor:"pointer" }}>
                   <input type="checkbox" checked={newPlan.testTypeIds.includes(t._id)} onChange={()=>toggleTestId(setNewPlan, t._id)} />
                   {t.name}
                 </label>
@@ -941,7 +936,7 @@ export default function AdminDashboard() {
             <Lbl c="Tests included in every visit" />
             <div style={{ display:"flex", flexWrap:"wrap", gap:8, maxHeight:160, overflowY:"auto" }}>
               {testTypes.map(t=>(
-                <label key={t._id} style={{ display:"flex", alignItems:"center", gap:6, fontSize:12, background:editPlan.testTypeIds?.includes(t._id)?"rgba(124,107,174,0.1)":"rgba(23,19,16,0.04)", border:`1px solid ${editPlan.testTypeIds?.includes(t._id)?LAVENDER:"var(--rule)"}`, borderRadius:20, padding:"5px 10px", cursor:"pointer" }}>
+                <label key={t._id} style={{ display:"flex", alignItems:"center", gap:6, fontSize:12, background:editPlan.testTypeIds?.includes(t._id)?"rgba(124,107,174,0.1)":"rgba(22,33,31,0.04)", border:`1px solid ${editPlan.testTypeIds?.includes(t._id)?LAVENDER:"var(--rule)"}`, borderRadius:20, padding:"5px 10px", cursor:"pointer" }}>
                   <input type="checkbox" checked={editPlan.testTypeIds?.includes(t._id)||false} onChange={()=>toggleTestId(setEditPlan, t._id)} />
                   {t.name}
                 </label>

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import api from "../../utils/api";
 import { formatDate } from "../../utils/format";
+import { CRIMSON, LAVENDER, GOLD, TEAL, BLUE, GREEN } from "../../theme";
 
 /**
  * EmailAuditLog — admin tab with two views:
@@ -9,12 +10,6 @@ import { formatDate } from "../../utils/format";
  * Rendered inside the admin dashboard as the "Email & Audit" tab.
  */
 
-const CRIMSON  = "#A4133C";
-const LAVENDER = "#7C6BAE";
-const GOLD     = "#B8892E";
-const TEAL     = "#1C7A6B";
-const BLUE     = "#3E6C9E";
-const GREEN    = "#2E7D57";
 
 const STEP_LABEL = {
   collected:    "Collected",
@@ -83,9 +78,9 @@ export default function EmailAuditLog() {
               padding:"9px 18px", borderRadius:9, cursor:"pointer",
               fontFamily:"var(--sansf)", fontWeight:600, fontSize:13,
               border:"1px solid", transition:"all .15s",
-              borderColor: view===t.id ? "#171310" : "rgba(23,19,16,0.15)",
-              background:  view===t.id ? "#171310" : "transparent",
-              color:       view===t.id ? "#F3F0EA" : "rgba(23,19,16,0.6)",
+              borderColor: view===t.id ? "#16211F" : "rgba(22,33,31,0.15)",
+              background:  view===t.id ? "#16211F" : "transparent",
+              color:       view===t.id ? "#F4F2ED" : "rgba(22,33,31,0.6)",
             }}>
             {t.label}
           </button>
@@ -104,7 +99,7 @@ export default function EmailAuditLog() {
         ) : (
           <div className="table scrollx">
             <div>
-              <div style={{ display:"grid", gridTemplateColumns:"1.4fr 1.6fr 1.4fr 1fr 1fr", padding:"11px 18px", background:"rgba(23,19,16,0.03)", borderBottom:"1px solid var(--rule)" }}>
+              <div style={{ display:"grid", gridTemplateColumns:"1.4fr 1.6fr 1.4fr 1fr 1fr", padding:"11px 18px", background:"rgba(22,33,31,0.03)", borderBottom:"1px solid var(--rule)" }}>
                 {["Patient","Tests","Report ID","Sent","Status"].map(h => (
                   <div key={h} className="th">{h}</div>
                 ))}
@@ -154,7 +149,7 @@ export default function EmailAuditLog() {
                 {(s.movements || []).map((m, i) => (
                   <div key={i} style={{ display:"flex", gap:12, paddingBottom:i < s.movements.length-1 ? 14 : 0, position:"relative" }}>
                     <div style={{ display:"flex", flexDirection:"column", alignItems:"center" }}>
-                      <div style={{ width:12, height:12, borderRadius:"50%", background:STEP_COLOR[m.status] || "rgba(23,19,16,0.25)", flexShrink:0, marginTop:3 }} />
+                      <div style={{ width:12, height:12, borderRadius:"50%", background:STEP_COLOR[m.status] || "rgba(22,33,31,0.25)", flexShrink:0, marginTop:3 }} />
                       {i < s.movements.length-1 && <div style={{ width:2, flex:1, background:"var(--rule)", marginTop:2 }} />}
                     </div>
                     <div style={{ paddingBottom:6 }}>

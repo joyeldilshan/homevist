@@ -90,10 +90,10 @@ const SECTIONS = [
 
 export default function Terms() {
   return (
-    <div style={{ background: "#F3F0EA", minHeight: "100vh", color: "#171310" }}>
+    <div style={{ background: "#F4F2ED", minHeight: "100vh", color: "#16211F" }}>
       <div style={{ maxWidth: 760, margin: "0 auto", padding: "48px 20px 80px" }}>
 
-        <Link to="/" style={{ fontSize: 13, color: "#1C7A6B", textDecoration: "none" }}>
+        <Link to="/" style={{ fontSize: 13, color: "#0F6E62", textDecoration: "none" }}>
           ← Back to Home Visit
         </Link>
 
@@ -101,11 +101,11 @@ export default function Terms() {
           Terms of Service
         </h1>
 
-        <div style={{ margin: "28px 0", padding: "16px 18px", background: "rgba(164,19,60,0.07)", border: "1px solid rgba(164,19,60,0.3)", borderRadius: 8 }}>
+        <div style={{ margin: "28px 0", padding: "16px 18px", background: "rgba(179,38,30,0.07)", border: "1px solid rgba(179,38,30,0.30)", borderRadius: 8 }}>
           <strong style={{ display: "block", marginBottom: 6, fontSize: 14 }}>
             This is a draft and has not been reviewed by a lawyer.
           </strong>
-          <span style={{ fontSize: 13.5, lineHeight: 1.65, color: "rgba(23,19,16,0.75)" }}>
+          <span style={{ fontSize: 13.5, lineHeight: 1.65, color: "rgba(22,33,31,0.75)" }}>
             It is a working scaffold, not finished terms. Every section marked
             {" "}<code style={{ fontSize: 12.5 }}>[PLACEHOLDER - legal review needed]</code>{" "}
             must be completed and the whole document checked by someone qualified
@@ -117,13 +117,13 @@ export default function Terms() {
           <section key={s.h} style={{ marginBottom: 30 }}>
             <h2 style={{ fontSize: 18, fontWeight: 700, margin: "0 0 10px" }}>{s.h}</h2>
             {s.body.map((p, i) => (
-              <p key={i} style={{ fontSize: 14.5, lineHeight: 1.75, margin: "0 0 10px", color: "rgba(23,19,16,0.8)" }}>{p}</p>
+              <p key={i} style={{ fontSize: 14.5, lineHeight: 1.75, margin: "0 0 10px", color: "rgba(22,33,31,0.8)" }}>{p}</p>
             ))}
           </section>
         ))}
 
-        <p style={{ fontSize: 13, color: "rgba(23,19,16,0.55)", marginTop: 40, paddingTop: 20, borderTop: "1px solid rgba(23,19,16,0.12)" }}>
-          See also our <Link to="/privacy" style={{ color: "#1C7A6B" }}>Privacy Policy</Link>.
+        <p style={{ fontSize: 13, color: "rgba(22,33,31,0.55)", marginTop: 40, paddingTop: 20, borderTop: "1px solid rgba(22,33,31,0.12)" }}>
+          See also our <Link to="/privacy" style={{ color: "#0F6E62" }}>Privacy Policy</Link>.
         </p>
       </div>
     </div>

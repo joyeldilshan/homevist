@@ -7,24 +7,16 @@ import toast from "react-hot-toast";
 import { formatMoney, formatDate, formatLongDate } from "../../utils/format";
 import { isValidUkPostcode, normaliseUkPostcode, isInServiceArea, outOfAreaMessage, POSTCODE_MESSAGE } from "../../utils/validators";
 import locale from "../../config/locale";
-
-/* ── Lab-label palette ─────────────────────────────────────── */
-const INK      = "#171310";
-const CRIMSON  = "#A4133C";
-const LAVENDER = "#7C6BAE";
-const GOLD     = "#B8892E";
-const TEAL     = "#1C7A6B";
-const BLUE     = "#3E6C9E";
-const GREEN    = "#2E7D57";
+import { INK, CRIMSON, LAVENDER, GOLD, TEAL, BLUE, GREEN } from "../../theme";
 
 const STATUS_CONFIG = {
   pending:          { color:GOLD,     bg:"rgba(184,137,46,0.10)",  border:"rgba(184,137,46,0.35)",  label:"Pending"          },
   confirmed:        { color:BLUE,     bg:"rgba(62,108,158,0.10)",  border:"rgba(62,108,158,0.35)",  label:"Confirmed"        },
   sample_collected: { color:LAVENDER, bg:"rgba(124,107,174,0.10)", border:"rgba(124,107,174,0.35)", label:"Sample Collected" },
-  processing:       { color:CRIMSON,  bg:"rgba(164,19,60,0.08)",   border:"rgba(164,19,60,0.30)",   label:"Lab Processing"   },
+  processing:       { color:CRIMSON,  bg:"rgba(201,96,58,0.08)",   border:"rgba(201,96,58,0.30)",   label:"Lab Processing"   },
   completed:        { color:GREEN,    bg:"rgba(46,125,87,0.10)",   border:"rgba(46,125,87,0.35)",   label:"Report Ready"     },
   cancelled:        { color:"#8A8378", bg:"rgba(138,131,120,0.10)", border:"rgba(138,131,120,0.3)", label:"Cancelled"        },
-  rejected:         { color:CRIMSON,  bg:"rgba(164,19,60,0.08)",   border:"rgba(164,19,60,0.30)",   label:"Rejected"         },
+  rejected:         { color:CRIMSON,  bg:"rgba(201,96,58,0.08)",   border:"rgba(201,96,58,0.30)",   label:"Rejected"         },
 };
 
 const STATUS_STEPS = [
@@ -55,18 +47,18 @@ function StatusTracker({ status }) {
         return (
           <div key={s.key}>
             <div style={{ display:"flex", alignItems:"flex-start", gap:12, padding:"6px 0" }}>
-              <div style={{ width:32, height:32, borderRadius:"50%", flexShrink:0, display:"flex", alignItems:"center", justifyContent:"center", fontSize:13, fontWeight:700, transition:"all 0.3s", background:done||active?c.color:"rgba(23,19,16,0.06)", color:done||active?"#fff":"rgba(23,19,16,0.35)", border:active?`2px solid ${c.color}`:"2px solid transparent", boxShadow:active?`0 0 0 4px ${c.bg}`:"none" }}>
+              <div style={{ width:32, height:32, borderRadius:"50%", flexShrink:0, display:"flex", alignItems:"center", justifyContent:"center", fontSize:13, fontWeight:700, transition:"all 0.3s", background:done||active?c.color:"rgba(22,33,31,0.06)", color:done||active?"#fff":"rgba(22,33,31,0.35)", border:active?`2px solid ${c.color}`:"2px solid transparent", boxShadow:active?`0 0 0 4px ${c.bg}`:"none" }}>
                 {done ? "✓" : s.icon}
               </div>
               <div style={{ paddingTop:6, flex:1 }}>
-                <div style={{ fontSize:13, fontWeight:700, color:done||active?INK:"rgba(23,19,16,0.4)" }}>
+                <div style={{ fontSize:13, fontWeight:700, color:done||active?INK:"rgba(22,33,31,0.4)" }}>
                   {s.label}
                   {active && <span style={{ marginLeft:8, fontSize:9.5, color:c.color, fontWeight:600, background:c.bg, padding:"2px 8px", borderRadius:20, fontFamily:"var(--monof)", letterSpacing:"0.08em", textTransform:"uppercase" }}>Current</span>}
                 </div>
-                {active && <div style={{ fontSize:12, color:"rgba(23,19,16,0.62)", marginTop:3, lineHeight:1.6 }}>{s.desc}</div>}
+                {active && <div style={{ fontSize:12, color:"rgba(22,33,31,0.62)", marginTop:3, lineHeight:1.6 }}>{s.desc}</div>}
               </div>
             </div>
-            {i < STATUS_STEPS.length-1 && <div style={{ width:2, height:16, marginLeft:15, background:done?c.color:"rgba(23,19,16,0.12)", borderRadius:2 }} />}
+            {i < STATUS_STEPS.length-1 && <div style={{ width:2, height:16, marginLeft:15, background:done?c.color:"rgba(22,33,31,0.12)", borderRadius:2 }} />}
           </div>
         );
       })}
@@ -298,7 +290,7 @@ export default function UserDashboard() {
         <div className="side-avatar">👤</div>
         <div style={{ minWidth:0 }}>
           <div style={{ fontSize:13, fontWeight:700, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{user?.name||"Patient"}</div>
-          <div style={{ fontSize:10.5, color:"rgba(23,19,16,0.45)", fontFamily:"var(--monof)", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{user?.email}</div>
+          <div style={{ fontSize:10.5, color:"rgba(22,33,31,0.45)", fontFamily:"var(--monof)", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{user?.email}</div>
         </div>
       </div>
       <button className="signout" onClick={() => { logout(); navigate("/login"); }}>
@@ -311,13 +303,13 @@ export default function UserDashboard() {
     <div className="ud">
       <style>{`
         .ud {
-          --paper:   #F3F0EA;
+          --paper: var(--color-bg-page);
           --card:    #FBF9F5;
-          --ink:     #171310;
-          --ink-60:  rgba(23,19,16,0.62);
-          --ink-40:  rgba(23,19,16,0.42);
-          --rule:    rgba(23,19,16,0.13);
-          --crimson: #A4133C;
+          --ink: var(--color-text-primary);
+          --ink-60: var(--color-text-secondary);
+          --ink-40: var(--color-text-muted);
+          --rule: var(--color-border-default);
+          --crimson: var(--color-bg-accent);
           --display: "Playfair Display", Georgia, serif;
           --sansf:   "DM Sans", system-ui, -apple-system, sans-serif;
           --monof:   "DM Mono", ui-monospace, "SF Mono", monospace;
@@ -333,7 +325,7 @@ export default function UserDashboard() {
         @keyframes fadeUp  { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
         @keyframes slideIn { from{opacity:0;transform:translateX(14px)} to{opacity:1;transform:translateX(0)} }
         @keyframes ping    { 0%{transform:scale(1);opacity:0.8} 100%{transform:scale(2.2);opacity:0} }
-        @keyframes flash   { 0%,100%{border-color:var(--rule)} 50%{border-color:var(--crimson);box-shadow:0 0 0 3px rgba(164,19,60,0.15)} }
+        @keyframes flash   { 0%,100%{border-color:var(--rule)} 50%{border-color:var(--crimson);box-shadow:0 0 0 3px rgba(201,96,58,0.15)} }
         .ud .fade-up   { animation: fadeUp 0.4s ease forwards; }
         .ud .slide-in  { animation: slideIn 0.3s ease forwards; }
         .ud .flash-brd { animation: flash 0.7s ease 3; }
@@ -379,12 +371,12 @@ export default function UserDashboard() {
         }
         .ud .brand-dot {
           width: 10px; height: 10px; border-radius: 50%;
-          background: radial-gradient(circle at 35% 35%, #d24a6e, var(--crimson));
+          background: radial-gradient(circle at 35% 35%, #D47A58, var(--crimson));
           animation: pulse 2.4s ease-in-out infinite;
         }
         @keyframes pulse {
-          0%,100% { box-shadow: 0 0 0 0 rgba(164,19,60,0.35); }
-          50%     { box-shadow: 0 0 0 6px rgba(164,19,60,0); }
+          0%,100% { box-shadow: 0 0 0 0 rgba(201,96,58,0.35); }
+          50%     { box-shadow: 0 0 0 6px rgba(201,96,58,0); }
         }
         .ud .side-sep { height: 1px; background: var(--rule); margin: 14px 4px; }
         .ud .side-tab {
@@ -395,7 +387,7 @@ export default function UserDashboard() {
           color: var(--ink-60); transition: background .15s, color .15s;
           position: relative;
         }
-        .ud .side-tab:hover { background: rgba(23,19,16,0.05); color: var(--ink); }
+        .ud .side-tab:hover { background: rgba(22,33,31,0.05); color: var(--ink); }
         .ud .side-tab.on { background: var(--ink); color: var(--paper); font-weight: 600; }
         .ud .side-cap {
           width: 4px; height: 18px; border-radius: 2px; flex-shrink: 0;
@@ -429,7 +421,7 @@ export default function UserDashboard() {
         }
         .ud .side-avatar {
           width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0;
-          background: rgba(164,19,60,0.10); border: 1px solid rgba(164,19,60,0.25);
+          background: rgba(201,96,58,0.10); border: 1px solid rgba(201,96,58,0.25);
           display: flex; align-items: center; justify-content: center; font-size: 15px;
         }
         .ud .signout {
@@ -450,7 +442,7 @@ export default function UserDashboard() {
           border-radius: 12px; padding: 18px 20px; margin-bottom: 10px;
           transition: all .2s; cursor: pointer;
         }
-        .ud .booking-row:hover { box-shadow: 0 10px 26px rgba(23,19,16,0.09); transform: translateY(-1px); }
+        .ud .booking-row:hover { box-shadow: 0 10px 26px rgba(22,33,31,0.09); }
 
         /* ---------- stats ---------- */
         .ud .stat-row { display: grid; grid-template-columns: repeat(3,1fr); gap: 14px; margin-bottom: 24px; }
@@ -470,7 +462,7 @@ export default function UserDashboard() {
           background: linear-gradient(120deg, var(--ink), #3d1020 65%, var(--crimson));
           border-radius: 14px; padding: 24px 28px; margin-bottom: 28px;
           display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;
-          box-shadow: 0 18px 40px rgba(23,19,16,0.22);
+          box-shadow: 0 18px 40px rgba(22,33,31,0.22);
         }
         .ud .banner-title { font-family: var(--display); font-weight: 900; font-size: 20px; color: #fff; margin-bottom: 4px; }
         .ud .banner-sub { font-size: 13.5px; color: rgba(255,255,255,0.65); }
@@ -478,17 +470,20 @@ export default function UserDashboard() {
         /* ---------- buttons & inputs ---------- */
         .ud .btn {
           font-family: var(--sansf); font-size: 14px; font-weight: 700;
-          padding: 12px 22px; border-radius: 9px; cursor: pointer;
-          border: 1px solid transparent; transition: transform .15s, background .15s, box-shadow .15s;
+          padding: 12px 22px; border-radius: var(--radius-md); cursor: pointer;
+          border: 1px solid transparent;
+          transition: background var(--dur-instant) var(--ease),
+                      border-color var(--dur-instant) var(--ease),
+                      color var(--dur-instant) var(--ease);
         }
-        .ud .btn:hover { transform: translateY(-1px); }
-        .ud .btn:disabled { opacity: .65; cursor: default; transform: none; }
-        .ud .btn-primary { background: var(--crimson); color: #fff; box-shadow: 0 6px 18px rgba(164,19,60,0.28); }
-        .ud .btn-primary:hover { background: #8B0F33; }
-        .ud .btn-ghost { background: transparent; color: var(--ink); border-color: var(--rule); }
-        .ud .btn-ghost:hover { border-color: var(--ink); }
-        .ud .btn-sm { padding: 7px 14px; font-size: 12.5px; border-radius: 7px; }
-        .ud .btn-white { background: #fff; color: var(--crimson); }
+        /* Hover changes colour only — no lift. */
+        .ud .btn:disabled { opacity: .4; cursor: default; }
+        .ud .btn-primary { background: var(--color-bg-primary); color: var(--color-text-on-primary); }
+        .ud .btn-primary:hover { background: var(--color-bg-primary-hover); }
+        .ud .btn-ghost { background: transparent; color: var(--color-text-primary); border-color: var(--color-border-strong); }
+        .ud .btn-ghost:hover { background: var(--color-bg-subtle); border-color: var(--color-border-focus); }
+        .ud .btn-sm { padding: 8px 16px; font-size: 12px; border-radius: var(--radius-md); }
+        .ud .btn-white { background: var(--color-bg-surface); color: var(--color-bg-primary); }
 
         .ud .lbl {
           display: block; margin-bottom: 6px;
@@ -503,15 +498,15 @@ export default function UserDashboard() {
           transition: border-color .2s, box-shadow .2s;
         }
         .ud .inp::placeholder { color: var(--ink-40); }
-        .ud .inp:focus { outline: none; border-color: var(--crimson); box-shadow: 0 0 0 3px rgba(164,19,60,0.10); }
+        .ud .inp:focus { outline: none; border-color: var(--crimson); box-shadow: 0 0 0 3px rgba(201,96,58,0.10); }
 
         /* ---------- test picker ---------- */
         .ud .test-opt {
           border: 1px solid var(--rule); border-radius: 12px; padding: 18px;
           cursor: pointer; transition: all .2s; background: var(--card); position: relative;
         }
-        .ud .test-opt:hover { border-color: var(--crimson); box-shadow: 0 8px 22px rgba(23,19,16,0.08); }
-        .ud .test-opt.sel { border-color: var(--crimson); background: rgba(164,19,60,0.05); box-shadow: 0 0 0 3px rgba(164,19,60,0.12); }
+        .ud .test-opt:hover { border-color: var(--crimson); box-shadow: 0 8px 22px rgba(22,33,31,0.08); }
+        .ud .test-opt.sel { border-color: var(--crimson); background: rgba(201,96,58,0.05); box-shadow: 0 0 0 3px rgba(201,96,58,0.12); }
         .ud .test-opt .check {
           position: absolute; top: 12px; right: 12px; width: 22px; height: 22px;
           border-radius: 50%; background: var(--crimson); color: #fff; font-size: 12px;
@@ -522,16 +517,16 @@ export default function UserDashboard() {
         .ud .cat-tag {
           font-family: var(--monof); font-size: 9.5px; font-weight: 500;
           letter-spacing: 0.1em; text-transform: uppercase;
-          color: var(--crimson); background: rgba(164,19,60,0.08);
+          color: var(--crimson); background: rgba(201,96,58,0.08);
           padding: 3px 8px; border-radius: 20px;
         }
         .ud .selected-badge {
           display: inline-flex; align-items: center; gap: 6px;
-          background: rgba(164,19,60,0.07); border: 1px solid rgba(164,19,60,0.3);
+          background: rgba(201,96,58,0.07); border: 1px solid rgba(201,96,58,0.3);
           border-radius: 20px; padding: 4px 12px; font-size: 12px;
           font-weight: 600; color: var(--crimson); cursor: pointer; transition: all .2s;
         }
-        .ud .selected-badge:hover { background: rgba(164,19,60,0.14); }
+        .ud .selected-badge:hover { background: rgba(201,96,58,0.14); }
 
         /* ---------- step bar ---------- */
         .ud .stepbar { display: flex; align-items: center; gap: 8px; margin-bottom: 30px; flex-wrap: wrap; }
@@ -539,17 +534,17 @@ export default function UserDashboard() {
           width: 28px; height: 28px; border-radius: 50%;
           display: flex; align-items: center; justify-content: center;
           font-family: var(--monof); font-size: 11px; font-weight: 500;
-          transition: all .3s;
+          transition: background .12s var(--ease), border-color .12s var(--ease), color .12s var(--ease);
         }
 
         /* ---------- reports ---------- */
         .ud .rep-card {
           background: var(--card); border: 1px solid var(--rule);
-          border-left: 4px solid var(--tint, #1C7A6B);
+          border-left: 4px solid var(--tint, #0F6E62);
           border-radius: 12px; padding: 20px 22px; margin-bottom: 12px;
           transition: transform .2s, box-shadow .2s;
         }
-        .ud .rep-card:hover { transform: translateY(-2px); box-shadow: 0 12px 28px rgba(23,19,16,0.10); }
+        .ud .rep-card:hover { box-shadow: 0 12px 28px rgba(22,33,31,0.10); }
 
         /* ---------- topbar / drawer (mobile) ---------- */
         .ud .topbar {
@@ -558,7 +553,7 @@ export default function UserDashboard() {
           border-bottom: 1px solid var(--rule); z-index: 100;
           align-items: center; justify-content: space-between; padding: 0 16px;
         }
-        .ud .overlay { position: fixed; inset: 0; background: rgba(23,19,16,0.45); z-index: 200; }
+        .ud .overlay { position: fixed; inset: 0; background: rgba(22,33,31,0.45); z-index: 200; }
         .ud .drawer {
           position: fixed; left: 0; top: 0; bottom: 0; width: 268px; z-index: 210;
           background: var(--card); border-right: 1px solid var(--rule); overflow-y: auto;
@@ -692,9 +687,9 @@ export default function UserDashboard() {
                   <div key={i} style={{ display:"flex", alignItems:"center", gap:8 }}>
                     <div style={{ display:"flex", alignItems:"center", gap:6 }}>
                       <div className="step-dot" style={{
-                        background: i<=step ? CRIMSON : "rgba(23,19,16,0.06)",
-                        color: i<=step ? "#fff" : "rgba(23,19,16,0.4)",
-                        boxShadow: i===step ? "0 0 0 4px rgba(164,19,60,0.15)" : "none",
+                        background: i<=step ? CRIMSON : "rgba(22,33,31,0.06)",
+                        color: i<=step ? "#fff" : "rgba(22,33,31,0.4)",
+                        boxShadow: i===step ? "0 0 0 4px rgba(201,96,58,0.15)" : "none",
                       }}>
                         {i < step ? "✓" : i+1}
                       </div>
@@ -884,7 +879,7 @@ export default function UserDashboard() {
                     <div style={{ flex:1 }}>
                       <div style={{ fontWeight:700, fontSize:15, marginBottom:4 }}>{getTestNames(b)}</div>
                       {b.testTypes?.length > 1 && (
-                        <span style={{ fontFamily:"var(--monof)", fontSize:9.5, background:"rgba(164,19,60,0.07)", color:CRIMSON, border:"1px solid rgba(164,19,60,0.3)", borderRadius:20, padding:"2px 8px", letterSpacing:"0.06em", marginBottom:6, display:"inline-block" }}>
+                        <span style={{ fontFamily:"var(--monof)", fontSize:9.5, background:"rgba(201,96,58,0.07)", color:CRIMSON, border:"1px solid rgba(201,96,58,0.3)", borderRadius:20, padding:"2px 8px", letterSpacing:"0.06em", marginBottom:6, display:"inline-block" }}>
                           {b.testTypes.length} tests
                         </span>
                       )}
@@ -909,7 +904,7 @@ export default function UserDashboard() {
                         )}
                         {["pending","confirmed"].includes(b.status) && (
                           <button className="btn btn-sm" onClick={e=>{ e.stopPropagation(); handleCancel(b._id); }}
-                            style={{ background:"rgba(164,19,60,0.06)", color:CRIMSON, border:"1px solid rgba(164,19,60,0.3)" }}>
+                            style={{ background:"rgba(201,96,58,0.06)", color:CRIMSON, border:"1px solid rgba(201,96,58,0.3)" }}>
                             Cancel
                           </button>
                         )}
@@ -1034,7 +1029,7 @@ export default function UserDashboard() {
                               <button className="btn btn-sm" onClick={()=>handleSubAction(s._id,"resume")} style={{ background:"rgba(124,107,174,0.08)", color:LAVENDER, border:"1px solid rgba(124,107,174,0.3)" }}>Resume</button>
                             )}
                             {["active","paused"].includes(s.status) && (
-                              <button className="btn btn-sm" onClick={()=>handleSubAction(s._id,"cancel")} style={{ background:"rgba(164,19,60,0.06)", color:CRIMSON, border:"1px solid rgba(164,19,60,0.3)" }}>Cancel</button>
+                              <button className="btn btn-sm" onClick={()=>handleSubAction(s._id,"cancel")} style={{ background:"rgba(201,96,58,0.06)", color:CRIMSON, border:"1px solid rgba(201,96,58,0.3)" }}>Cancel</button>
                             )}
                           </div>
                         </div>
@@ -1119,11 +1114,11 @@ export default function UserDashboard() {
               </div>
               <div style={{ maxWidth:500 }}>
                 <div className="card" style={{ padding:24, marginBottom:20, display:"flex", alignItems:"center", gap:16 }}>
-                  <div style={{ width:64, height:64, borderRadius:"50%", background:"rgba(164,19,60,0.08)", border:"1px solid rgba(164,19,60,0.25)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:26, flexShrink:0 }}>👤</div>
+                  <div style={{ width:64, height:64, borderRadius:"50%", background:"rgba(201,96,58,0.08)", border:"1px solid rgba(201,96,58,0.25)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:26, flexShrink:0 }}>👤</div>
                   <div>
                     <div style={{ fontFamily:"var(--display)", fontWeight:900, fontSize:20, marginBottom:2 }}>{user?.name||"Patient"}</div>
                     <div style={{ fontSize:13, color:"var(--ink-60)", marginBottom:8 }}>{user?.email}</div>
-                    <span style={{ fontFamily:"var(--monof)", fontSize:9.5, letterSpacing:"0.12em", textTransform:"uppercase", background:"rgba(164,19,60,0.07)", color:CRIMSON, border:"1px solid rgba(164,19,60,0.3)", borderRadius:20, padding:"3px 10px" }}>Patient</span>
+                    <span style={{ fontFamily:"var(--monof)", fontSize:9.5, letterSpacing:"0.12em", textTransform:"uppercase", background:"rgba(201,96,58,0.07)", color:CRIMSON, border:"1px solid rgba(201,96,58,0.3)", borderRadius:20, padding:"3px 10px" }}>Patient</span>
                   </div>
                 </div>
                 <div className="card" style={{ padding:24 }}>

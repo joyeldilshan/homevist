@@ -88,16 +88,16 @@ export default function AuthPage() {
     <div className="au">
       <style>{`
         .au {
-          --paper:   #F3F0EA;
+          --paper: var(--color-bg-page);
           --card:    #FBF9F5;
-          --ink:     #171310;
-          --ink-60:  rgba(23,19,16,0.64);
-          --ink-40:  rgba(23,19,16,0.42);
-          --rule:    rgba(23,19,16,0.14);
-          --crimson: #A4133C;
-          --lavender:#7C6BAE;
-          --gold:    #B8892E;
-          --teal:    #1C7A6B;
+          --ink: var(--color-text-primary);
+          --ink-60: var(--color-text-secondary);
+          --ink-40: var(--color-text-muted);
+          --rule: var(--color-border-default);
+          --crimson: var(--color-bg-accent);
+          --lavender:#6E6AA8;
+          --gold:    #B8862E;
+          --teal:    #0F6E62;
           --display: "Playfair Display", Georgia, serif;
           --sansf:   "DM Sans", system-ui, -apple-system, sans-serif;
           --monof:   "DM Mono", ui-monospace, "SF Mono", monospace;
@@ -119,7 +119,7 @@ export default function AuthPage() {
 
         /* ambient colour blobs */
         .au .blob { position: absolute; border-radius: 50%; filter: blur(80px); pointer-events: none; }
-        .au .blob-a { width: 480px; height: 480px; top: -160px; right: -140px; background: radial-gradient(circle, rgba(164,19,60,0.20), transparent 65%); }
+        .au .blob-a { width: 480px; height: 480px; top: -160px; right: -140px; background: radial-gradient(circle, rgba(201,96,58,0.20), transparent 65%); }
         .au .blob-b { width: 420px; height: 420px; bottom: -160px; left: -120px; background: radial-gradient(circle, rgba(28,122,107,0.18), transparent 65%); }
 
         /* home button */
@@ -142,7 +142,7 @@ export default function AuthPage() {
           background: var(--card);
           border: 1px solid var(--rule); border-radius: 6px;
           overflow: hidden; position: relative; z-index: 1;
-          box-shadow: 0 30px 70px rgba(23,19,16,0.18);
+          box-shadow: 0 30px 70px rgba(22,33,31,0.18);
         }
 
         /* ---------- left photo panel ---------- */
@@ -154,7 +154,7 @@ export default function AuthPage() {
         }
         .au .panel-veil {
           position: absolute; inset: 0;
-          background: linear-gradient(180deg, rgba(23,19,16,0.30), rgba(23,19,16,0.86));
+          background: linear-gradient(180deg, rgba(22,33,31,0.30), rgba(22,33,31,0.86));
         }
         .au .panel-in {
           position: relative; z-index: 1; width: 100%;
@@ -168,12 +168,12 @@ export default function AuthPage() {
         }
         .au .brand-dot {
           width: 10px; height: 10px; border-radius: 50%;
-          background: radial-gradient(circle at 35% 35%, #d24a6e, var(--crimson));
+          background: radial-gradient(circle at 35% 35%, #D47A58, var(--crimson));
           animation: pulse 2.4s ease-in-out infinite;
         }
         @keyframes pulse {
-          0%,100% { box-shadow: 0 0 0 0 rgba(164,19,60,0.4); }
-          50%     { box-shadow: 0 0 0 7px rgba(164,19,60,0); }
+          0%,100% { box-shadow: 0 0 0 0 rgba(201,96,58,0.4); }
+          50%     { box-shadow: 0 0 0 7px rgba(201,96,58,0); }
         }
         .au .panel-title {
           font-family: var(--display); font-weight: 900;
@@ -236,7 +236,7 @@ export default function AuthPage() {
         .au .toggle .slider {
           position: absolute; top: 4px; bottom: 4px; left: 4px;
           width: calc(50% - 4px); background: var(--ink);
-          border-radius: 2px; transition: left .35s cubic-bezier(0.34,1.56,0.64,1);
+          border-radius: 2px; transition: left .18s var(--ease);
         }
         .au .toggle.right .slider { left: 50%; }
         .au .toggle button {
@@ -244,7 +244,7 @@ export default function AuthPage() {
           padding: 11px 8px; position: relative; z-index: 1;
           font-family: var(--monof); font-size: 11px; font-weight: 500;
           letter-spacing: 0.16em; text-transform: uppercase;
-          color: var(--ink-40); transition: color .3s;
+          color: var(--ink-40); transition: color .12s var(--ease);
         }
         .au .toggle button.on { color: var(--paper); }
 
@@ -262,7 +262,7 @@ export default function AuthPage() {
           transition: border-color .2s, box-shadow .2s;
         }
         .au .inp::placeholder { color: var(--ink-40); }
-        .au .inp:focus { outline: none; border-color: var(--crimson); box-shadow: 0 0 0 3px rgba(164,19,60,0.12); }
+        .au .inp:focus { outline: none; border-color: var(--crimson); box-shadow: 0 0 0 3px rgba(201,96,58,0.12); }
 
         .au .eye {
           position: absolute; right: 10px; bottom: 8px;
@@ -273,14 +273,13 @@ export default function AuthPage() {
         /* buttons */
         .au .cta {
           width: 100%; padding: 14px 20px; margin-top: 4px;
-          background: var(--crimson); color: #fff;
-          border: none; border-radius: 3px; cursor: pointer;
-          font-family: var(--sansf); font-size: 14px; font-weight: 700;
-          box-shadow: 0 8px 22px rgba(164,19,60,0.30);
-          transition: background .2s, transform .18s, box-shadow .2s;
+          background: var(--color-bg-primary); color: var(--color-text-on-primary);
+          border: 1px solid transparent; border-radius: var(--radius-md); cursor: pointer;
+          font-family: var(--sansf); font-size: 13.5px; font-weight: 600; letter-spacing: 0.01em;
+          transition: background var(--dur-instant) var(--ease);
         }
-        .au .cta:hover { background: #8B0F33; transform: translateY(-2px); box-shadow: 0 12px 28px rgba(164,19,60,0.38); }
-        .au .cta:disabled { opacity: .65; cursor: default; transform: none; }
+        .au .cta:hover { background: var(--color-bg-primary-hover); }
+        .au .cta:disabled { opacity: .4; cursor: default; }
 
         .au .swap { margin-top: 20px; font-size: 13px; color: var(--ink-60); text-align: center; }
         .au .swap span { color: var(--crimson); cursor: pointer; font-weight: 700; }

@@ -4,15 +4,7 @@ import { useAuth } from "../../context/AuthContext";
 import api from "../../utils/api";
 import toast from "react-hot-toast";
 import { formatMoney, formatDate, formatLongDate } from "../../utils/format";
-
-/* ── Lab-label palette ─────────────────────────────────────── */
-const INK      = "#171310";
-const CRIMSON  = "#A4133C";
-const LAVENDER = "#7C6BAE";
-const GOLD     = "#B8892E";
-const TEAL     = "#1C7A6B";
-const BLUE     = "#3E6C9E";
-const GREEN    = "#2E7D57";
+import { INK, CRIMSON, LAVENDER, GOLD, TEAL, BLUE, GREEN } from "../../theme";
 
 const STATUS_CONFIG = {
   pending:          { color:GOLD,      label:"Pending"        },
@@ -135,11 +127,11 @@ export default function PhleboDashboard() {
           const c   = STATUS_CONFIG[s];
           return (
             <div key={s} style={{ display:"flex", alignItems:"center", gap:4 }}>
-              <div style={{ width:8, height:8, borderRadius:"50%", background:me<=cur?c.color:"rgba(23,19,16,0.15)", flexShrink:0, transition:"background 0.3s" }} />
+              <div style={{ width:8, height:8, borderRadius:"50%", background:me<=cur?c.color:"rgba(22,33,31,0.15)", flexShrink:0, transition:"background 0.3s" }} />
               <span style={{ fontFamily:"var(--monof)", fontSize:9, letterSpacing:"0.06em", textTransform:"uppercase", color:me===cur?c.color:me<cur?"var(--ink-60)":"var(--ink-40)", fontWeight:me===cur?500:400 }}>
                 {["Pending","Confirmed","At Lab","Processing","Done"][i]}
               </span>
-              {i<arr.length-1 && <span style={{ color:"rgba(23,19,16,0.2)", fontSize:10 }}>→</span>}
+              {i<arr.length-1 && <span style={{ color:"rgba(22,33,31,0.2)", fontSize:10 }}>→</span>}
             </div>
           );
         })}
@@ -203,10 +195,10 @@ export default function PhleboDashboard() {
         <div className="avail-t">Availability</div>
         <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
           <div style={{ display:"flex", alignItems:"center", gap:7 }}>
-            <div style={{ width:9, height:9, borderRadius:"50%", background:available?GREEN:"rgba(23,19,16,0.3)", transition:"background 0.3s" }} />
+            <div style={{ width:9, height:9, borderRadius:"50%", background:available?GREEN:"rgba(22,33,31,0.3)", transition:"background 0.3s" }} />
             <span style={{ fontFamily:"var(--monof)", fontSize:11, letterSpacing:"0.1em", textTransform:"uppercase", fontWeight:500, color:available?GREEN:"var(--ink-60)" }}>{available?"Online":"Offline"}</span>
           </div>
-          <div onClick={toggleAvailability} style={{ width:42, height:23, borderRadius:50, background:available?GREEN:"rgba(23,19,16,0.2)", cursor:"pointer", position:"relative", transition:"all 0.3s" }}>
+          <div onClick={toggleAvailability} style={{ width:42, height:23, borderRadius:50, background:available?GREEN:"rgba(22,33,31,0.2)", cursor:"pointer", position:"relative", transition:"all 0.3s" }}>
             <div style={{ position:"absolute", top:2.5, width:18, height:18, borderRadius:"50%", background:"#fff", transition:"left 0.3s", left:available?"22px":"2.5px", boxShadow:"0 1px 4px rgba(0,0,0,0.25)" }} />
           </div>
         </div>
@@ -223,7 +215,7 @@ export default function PhleboDashboard() {
 
       <div className="side-user">
         <div style={{ fontWeight:700, fontSize:13, marginBottom:1 }}>{user?.name||"Phlebotomist"}</div>
-        <div style={{ fontFamily:"var(--monof)", fontSize:10, letterSpacing:"0.1em", textTransform:"uppercase", color:"rgba(23,19,16,0.45)", marginBottom:4 }}>Phlebotomist</div>
+        <div style={{ fontFamily:"var(--monof)", fontSize:10, letterSpacing:"0.1em", textTransform:"uppercase", color:"rgba(22,33,31,0.45)", marginBottom:4 }}>Phlebotomist</div>
         <div style={{ fontSize:12, color:GOLD }}>⭐ {user?.rating?.toFixed(1)||"5.0"} · {user?.totalRatings||0} reviews</div>
       </div>
       <button className="signout" onClick={()=>{ logout(); navigate("/login"); }}>Sign out</button>
@@ -234,12 +226,12 @@ export default function PhleboDashboard() {
     <div className="ph">
       <style>{`
         .ph {
-          --paper:   #F3F0EA;
+          --paper: var(--color-bg-page);
           --card:    #FBF9F5;
-          --ink:     #171310;
-          --ink-60:  rgba(23,19,16,0.62);
-          --ink-40:  rgba(23,19,16,0.42);
-          --rule:    rgba(23,19,16,0.13);
+          --ink: var(--color-text-primary);
+          --ink-60: var(--color-text-secondary);
+          --ink-40: var(--color-text-muted);
+          --rule: var(--color-border-default);
           --blue:    #3E6C9E;
           --display: "Playfair Display", Georgia, serif;
           --sansf:   "DM Sans", system-ui, -apple-system, sans-serif;
@@ -301,7 +293,7 @@ export default function PhleboDashboard() {
         }
         .ph .avail {
           margin: 0 4px 14px; padding: 12px; border-radius: 10px;
-          border: 1px solid; transition: all .3s;
+          border: 1px solid; transition: background .12s var(--ease), border-color .12s var(--ease), color .12s var(--ease);
         }
         .ph .avail-t {
           font-family: var(--monof); font-size: 9.5px; letter-spacing: 0.14em;
@@ -314,7 +306,7 @@ export default function PhleboDashboard() {
           font-family: var(--sansf); font-size: 13.5px; font-weight: 500;
           color: var(--ink-60); transition: background .15s, color .15s;
         }
-        .ph .side-tab:hover { background: rgba(23,19,16,0.05); color: var(--ink); }
+        .ph .side-tab:hover { background: rgba(22,33,31,0.05); color: var(--ink); }
         .ph .side-tab.on { background: var(--ink); color: var(--paper); font-weight: 600; }
         .ph .side-cap { width: 4px; height: 17px; border-radius: 2px; flex-shrink: 0; opacity: .4; transition: opacity .15s; }
         .ph .side-tab.on .side-cap, .ph .side-tab:hover .side-cap { opacity: 1; }
@@ -337,7 +329,7 @@ export default function PhleboDashboard() {
           border-radius: 12px; padding: 18px 20px; margin-bottom: 12px;
           transition: transform .2s, box-shadow .2s;
         }
-        .ph .jcard:hover { transform: translateY(-1px); box-shadow: 0 10px 24px rgba(23,19,16,0.08); }
+        .ph .jcard:hover { box-shadow: 0 10px 24px rgba(22,33,31,0.08); }
 
         .ph .stat {
           background: var(--card); border: 1px solid var(--rule);
@@ -356,7 +348,7 @@ export default function PhleboDashboard() {
           font-weight: 700; font-size: 12.5px; cursor: pointer; transition: all .15s;
           background: transparent; border: 1px solid;
         }
-        .ph .act:hover { transform: translateY(-1px); }
+        .ph .act:hover { }
         .ph .act:disabled { cursor: default; transform: none; }
         .ph .act-solid {
           background: var(--blue); color: #fff; border-color: transparent;
@@ -391,7 +383,7 @@ export default function PhleboDashboard() {
           box-shadow: 0 6px 18px rgba(62,108,158,0.28);
           transition: background .2s, transform .15s;
         }
-        .ph .btn-save:hover { background: #2f547d; transform: translateY(-1px); }
+        .ph .btn-save:hover { background: #2f547d; }
 
         /* mobile */
         .ph .topbar {
@@ -400,7 +392,7 @@ export default function PhleboDashboard() {
           border-bottom: 1px solid var(--rule); z-index: 100;
           align-items: center; justify-content: space-between; padding: 0 16px;
         }
-        .ph .overlay { position: fixed; inset: 0; background: rgba(23,19,16,0.45); z-index: 200; }
+        .ph .overlay { position: fixed; inset: 0; background: rgba(22,33,31,0.45); z-index: 200; }
         .ph .drawer {
           position: fixed; left: 0; top: 0; bottom: 0; width: 268px; z-index: 210;
           background: var(--card); border-right: 1px solid var(--rule); overflow-y: auto;
