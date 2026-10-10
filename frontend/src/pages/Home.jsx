@@ -21,11 +21,10 @@ const SECTIONS = [
   { id: "about",    code: "HV-02", name: "About",    cap: "lavender" },
   { id: "features", code: "HV-03", name: "Services", cap: "teal"     },
   { id: "process",  code: "HV-04", name: "Process",  cap: "gold"     },
-  { id: "stats",    code: "HV-05", name: "Numbers",  cap: "crimson"  },
-  { id: "reviews",  code: "HV-06", name: "Reviews",  cap: "lavender" },
-  { id: "team",     code: "HV-07", name: "Team",     cap: "teal"     },
-  { id: "faq",      code: "HV-08", name: "FAQ",      cap: "gold"     },
-  { id: "contact",  code: "HV-09", name: "Contact",  cap: "crimson"  },
+  { id: "roles",    code: "HV-05", name: "Roles",    cap: "crimson"  },
+  { id: "booking",  code: "HV-06", name: "Booking",  cap: "lavender" },
+  { id: "faq",      code: "HV-07", name: "FAQ",      cap: "gold"     },
+  { id: "contact",  code: "HV-08", name: "Contact",  cap: "crimson"  },
 ];
 
 const CAP = { crimson: "#C9603A", lavender: "#6E6AA8", gold: "#B8862E", teal: "#0F6E62" };
@@ -133,28 +132,31 @@ export default function Home() {
     { step: "04", tint: "teal",     title: "Get Your Report",  desc: "Your digital report arrives by email with a barcode reference." },
   ];
 
-  // Figures must come from real data before this block is shown publicly.
-  const stats = [
-    { value: PH, tint: "crimson",  label: "Patients served"   },
-    { value: PH, tint: "gold",     label: "Average rating"    },
-    { value: PH, tint: "teal",     label: "Report turnaround" },
-    { value: "6", tint: "lavender", label: "Test panels"      },
+  /*
+   * The four roles the application actually implements. Taken from the
+   * role enum in backend/models/User.js — not marketing invention.
+   */
+  const roles = [
+    { initials: "P",  tint: "crimson",  title: "Patient",
+      desc: "Books tests, tracks the visit, downloads reports and manages a repeat subscription." },
+    { initials: "Ph", tint: "gold",     title: "Phlebotomist",
+      desc: "Sees assigned visits, sets availability, and updates each booking as the sample is collected." },
+    { initials: "L",  tint: "lavender", title: "Lab technician",
+      desc: "Receives samples, records results, and uploads the verified PDF report." },
+    { initials: "A",  tint: "teal",     title: "Admin",
+      desc: "Assigns phlebotomists, manages the test catalogue and plans, and reviews the email audit log." },
   ];
 
-  // Illustrative sample content only — not real patient feedback.
-  // Replace with genuine, consented testimonials or delete this section.
-  const reviews = [
-    { name: `Sample review ${PH}`, role: "Patient, Cardiff",  text: "Example testimonial text. Replace with a genuine, consented review before launch.", stars: 5, tint: "crimson"  },
-    { name: `Sample review ${PH}`, role: "Patient, Newport",  text: "Example testimonial text. Replace with a genuine, consented review before launch.", stars: 5, tint: "teal"     },
-    { name: `Sample review ${PH}`, role: "Patient, Barry",    text: "Example testimonial text. Replace with a genuine, consented review before launch.", stars: 5, tint: "lavender" },
-  ];
-
-  // Illustrative placeholders — replace with real, named staff or delete.
-  const team = [
-    { name: PH, role: "Lead Pathologist",     initials: "—", tint: "crimson"  },
-    { name: PH, role: "Head of Phlebotomy",   initials: "—", tint: "lavender" },
-    { name: PH, role: "Technology Lead",      initials: "—", tint: "teal"     },
-    { name: PH, role: "Quality Assurance",    initials: "—", tint: "gold"     },
+  /*
+   * The booking lifecycle, taken from the status enum in
+   * backend/models/Booking.js. These are the states the software tracks.
+   */
+  const lifecycle = [
+    { step: "01", tint: "gold",     title: "Pending",          desc: "The booking is placed and waiting for a phlebotomist to be assigned." },
+    { step: "02", tint: "teal",     title: "Confirmed",        desc: "A phlebotomist is assigned to the visit and the patient is notified." },
+    { step: "03", tint: "lavender", title: "Sample collected", desc: "The home visit has happened and the sample is on its way to the laboratory." },
+    { step: "04", tint: "crimson",  title: "Processing",       desc: "The laboratory is analysing the sample and entering results." },
+    { step: "05", tint: "teal",     title: "Report ready",     desc: "The report is generated with a barcode reference and emailed to the patient." },
   ];
 
   const faqs = [
@@ -863,20 +865,21 @@ export default function Home() {
         <p>Standard panels are guaranteed within four hours — or the test is on us.</p>
       </ParallaxBand>
 
-      {/* ================= STATS ================= */}
-      <section id="stats" className="sec wash-crimson">
-        <span className="ghost">Numbers</span>
+      {/* ================= ROLES ================= */}
+      <section id="roles" className="sec wash-crimson">
+        <span className="ghost">Roles</span>
         <div className="wrap">
           <Reveal>
             <SpecimenLabel section={SECTIONS[4]} />
-            <h2>Serving Cardiff and South Wales.</h2>
+            <h2>Four roles, one system.</h2>
           </Reveal>
-          <div className="stats-row">
-            {stats.map((s, i) => (
-              <Reveal key={s.label} index={i} from="scale">
-                <div className="stat" style={{ "--tint": CAP[s.tint] }}>
-                  <div className="stat-v">{s.value}</div>
-                  <div className="stat-l">{s.label}</div>
+          <div className="team-row">
+            {roles.map((r, i) => (
+              <Reveal key={r.title} index={i} from="scale">
+                <div className="member" style={{ "--tint": CAP[r.tint] }}>
+                  <div className="member-in">{r.initials}</div>
+                  <h3>{r.title}</h3>
+                  <p>{r.desc}</p>
                 </div>
               </Reveal>
             ))}
@@ -884,51 +887,23 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ================= REVIEWS ================= */}
-      <section id="reviews" className="sec wash-lavender">
-        <span className="ghost">Reviews</span>
+      {/* ================= BOOKING LIFECYCLE ================= */}
+      <section id="booking" className="sec wash-lavender">
+        <span className="ghost">Booking</span>
         <div className="wrap">
           <Reveal>
             <SpecimenLabel section={SECTIONS[5]} />
-            <h2>What patients say.</h2>
+            <h2>How a booking moves.</h2>
           </Reveal>
-          <div className="quotes">
-            {reviews.map((r, i) => (
-              <Reveal key={r.name} index={i} from="up">
-                <div className="quote" style={{ "--tint": CAP[r.tint] }}>
+          <div className="steps">
+            {lifecycle.map((l, i) => (
+              <Reveal key={l.step} index={i} from="left">
+                <div className="step" style={{ "--tint": CAP[l.tint] }}>
+                  <div className="step-n">{l.step}</div>
                   <div>
-                    <div className="quote-stars">{"★".repeat(r.stars)}</div>
-                    <p className="quote-text" style={{ marginTop: 14 }}>{r.text}</p>
+                    <h3>{l.title}</h3>
+                    <p>{l.desc}</p>
                   </div>
-                  <div className="quote-who">
-                    <div className="quote-badge">{r.name.charAt(0)}</div>
-                    <div>
-                      <div style={{ fontWeight: 700, fontSize: 14 }}>{r.name}</div>
-                      <div style={{ fontSize: 12, color: "var(--ink-40)" }}>{r.role}</div>
-                    </div>
-                  </div>
-                </div>
-              </Reveal>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ================= TEAM ================= */}
-      <section id="team" className="sec wash-teal">
-        <span className="ghost">Team</span>
-        <div className="wrap">
-          <Reveal>
-            <SpecimenLabel section={SECTIONS[6]} />
-            <h2>Behind every report.</h2>
-          </Reveal>
-          <div className="team-row">
-            {team.map((t, i) => (
-              <Reveal key={t.name} index={i} from="scale">
-                <div className="member" style={{ "--tint": CAP[t.tint] }}>
-                  <div className="member-in">{t.initials}</div>
-                  <h3>{t.name}</h3>
-                  <p>{t.role}</p>
                 </div>
               </Reveal>
             ))}
