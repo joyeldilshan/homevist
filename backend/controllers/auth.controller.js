@@ -9,14 +9,21 @@ const locale = require("../config/locale");
 const User = require("../models/User");
 
 // ── Helper: generate JWT token ────────────────────────────────────
-// Signs a token with the user's id and our secret key.
-// Expires in 7 days (set in .env as JWT_EXPIRES_IN).
+/*
+ * Lifetime is controlled by JWT_EXPIRES_IN (default "7d").
+ *
+ * Accepts any value the jsonwebtoken library understands: "15m", "12h",
+ * "7d", or a number of seconds. Shorter is safer — this app stores the
+ * token in sessionStorage, which the browser clears when the tab closes,
+ * so the practical exposure is already bounded by the browser session.
+ *
+ * There is no refresh-token flow: when the token expires the user signs
+ * in again. Documented in README and .env.example.
+ */
+const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || "7d";
+
 const signToken = (id) =>
-  jwt.sign(
-    { id },
-    process.env.JWT_SECRET,
-    { expiresIn: process.env.JWT_EXPIRES_IN || "7d" }
-  );
+  jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
 
 // ── Helper: send token response ───────────────────────────────────
 // Creates the token and sends it back with the user object.
