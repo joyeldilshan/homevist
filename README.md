@@ -230,13 +230,60 @@ any real patient result is reported.
 
 - **Bundle size.** The frontend builds to ~624 kB in one chunk, over Vite's
   500 kB warning. Route-level code splitting is the fix and has not been done.
-- **Dependency audit.** After `npm audit fix` (no `--force`): backend 7,
-  frontend 12. Production-only — what actually ships — is backend 4, frontend 3.
-  The rest is build toolchain. Clearing them needs major bumps of Vite,
-  Tailwind and PostCSS.
+- **Dependency advisories.** See the dedicated section below.
 - **No automated frontend tests.** The 41 tests cover backend validators,
   formatters, rate limiting and the seed guard.
 - **Images.** 1.1 MB total; `image 5.png` is 660 kB for a logo shown at 54 px.
+
+---
+
+---
+
+## Known dependency advisories
+
+Audited with `npm audit fix` only — **never `--force`**, which would bump
+majors and risk breaking real-time updates and routing.
+
+Totals after fixing: backend **7**, frontend **11**. Most of that is the build
+toolchain (chokidar, braces, micromatch, esbuild, postcss), which runs on your
+machine and never reaches a user.
+
+What actually ships is smaller. Production-only (`npm audit --omit=dev`):
+**backend 4, frontend 2.** Every one needs a major version bump, so each is a
+deliberate decision rather than an oversight.
+
+### Backend — 4 (1 high, 3 moderate)
+
+| Package | Severity | Why it is here | Non-breaking fix? |
+|---|---|---|---|
+| `nodemailer` ^6.10.1 | **high** | Direct dependency. 15 open advisories, including SMTP command injection via `envelope.size`, CRLF header injection, and delivery to attacker-controlled domains through IDN/punycode allow-list bypass. | **No.** Needs 10.1.0 — four majors up. |
+| `node-cron` ^3.0.x | moderate | Direct dependency, used by the subscription scheduler. | **No.** Needs 4.6.0 (major). |
+| `uuid` <11.1.1 | moderate | Transitive, pulled in by `node-cron`. Missing buffer bounds check in v3/v5/v6. | **No.** Resolves only with `node-cron` 4.6.0. |
+| `qs` 6.14.2 | moderate | Transitive via `express` 4.22.1. DoS in `qs.stringify`, array-limit bypass. | **No**, despite what `npm audit` reports. Express pins `~6.14.0` (patch-only), and the fix needs ≥ 6.15.4 — unreachable without Express 5. |
+
+> **Read the nodemailer one before you launch.** Email is a core feature here
+> (booking confirmations, report delivery). The risk is mostly in handling
+> untrusted recipient addresses — worth assessing against how your deployment
+> actually uses it. Upgrading to v10 means an API review of
+> `utils/emailService.js`, `utils/notify.js` and `utils/reportEmail.js`.
+
+### Frontend — 2 (both moderate)
+
+| Package | Severity | Why it is here | Non-breaking fix? |
+|---|---|---|---|
+| `react-router-dom` ^6.24.0 | moderate | Direct. Open redirect via backslash in `<Link>`/`useNavigate`. | **No.** Needs 7.18.4 (major); v7 changes the data-router API. |
+| `react-router` | moderate | Transitive, same root cause and same fix. | **No.** |
+
+`nodemailer` was also listed in `frontend/package.json` — a backend package that
+was never imported by any frontend file. Removing it dropped the frontend from
+3 production advisories to 2, including one **high**.
+
+### If you want them cleared
+
+`npm audit fix --force` resolves everything, but it bumps Express, Vite,
+Tailwind, PostCSS, React Router and nodemailer across majors at once. Do it on
+a branch, one package at a time, and re-test real-time booking updates,
+routing and email after each.
 
 ---
 
