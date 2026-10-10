@@ -14,6 +14,7 @@ const testTypeRoutes      = require("./routes/testType.routes");
 const planRoutes          = require("./routes/plan.routes");
 const subscriptionRoutes  = require("./routes/subscription.routes");
 const { errorHandler }   = require("./middleware/error.middleware");
+const { securityHeaders } = require("./middleware/security.middleware");
 const { startSubscriptionScheduler } = require("./jobs/subscriptionScheduler");
 
 const app    = express();
@@ -45,6 +46,7 @@ io.on("connection", (socket) => {
   socket.on("disconnect",   ()          => console.log("Socket disconnected:", socket.id));
 });
 
+app.use(securityHeaders());
 app.use(cors({ origin: process.env.CLIENT_URL || "http://localhost:5173", credentials: true }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
