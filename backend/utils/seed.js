@@ -172,15 +172,103 @@ const USERS = [
   },
 ];
 
-async function seed() {
-  // This script deletes every User and TestType. Refuse to do that against
-  // a production database unless explicitly overridden.
-  if (process.env.NODE_ENV === "production" && process.env.SEED_ALLOW_PRODUCTION !== "yes") {
-    console.error("Refusing to seed: NODE_ENV is 'production'.");
-    console.error("This script deletes all users and test types.");
-    console.error("Set SEED_ALLOW_PRODUCTION=yes only if you are certain.");
+/**
+ * Pull the database name out of a MongoDB connection string.
+ * Handles mongodb:// and mongodb+srv://, with or without a query string.
+ */
+function databaseNameFrom(uri) {
+  if (!uri || typeof uri !== "string") return null;
+  const afterHost = uri.split("://")[1];
+  if (!afterHost) return null;
+  const path = afterHost.split("/").slice(1).join("/");
+  if (!path) return null;
+  const name = path.split("?")[0].trim();
+  return name || null;
+}
+
+/** Ask on the terminal and resolve with what was typed. */
+function ask(question) {
+  return new Promise((resolve) => {
+    const readline = require("readline").createInterface({
+      input: process.stdin, output: process.stdout,
+    });
+    readline.question(question, (answer) => {
+      readline.close();
+      resolve(answer.trim());
+    });
+  });
+}
+
+const SAFE_NAME = /(dev|test|local|sandbox|staging)/i;
+
+/**
+ * Three gates before anything is deleted.
+ *
+ * This script runs deleteMany({}) on Users and TestTypes. The previous
+ * guard only checked NODE_ENV, which is not set at all in most local
+ * shells — so pointing .env at a production Atlas cluster and running
+ * `npm run seed` would have wiped it without a single prompt.
+ */
+async function guard() {
+  const uri  = process.env.MONGO_URI;
+  const name = databaseNameFrom(uri);
+
+  if (!uri) {
+    console.error("Refusing to seed: MONGO_URI is not set.");
     process.exit(1);
   }
+  if (!name) {
+    console.error("Refusing to seed: could not read a database name from MONGO_URI.");
+    console.error("Add an explicit database name, e.g. .../homevisit_dev?retryWrites=true");
+    process.exit(1);
+  }
+
+  console.log("");
+  console.log("  This will DELETE ALL users and ALL test types in:");
+  console.log(`    database: ${name}`);
+  console.log("");
+
+  // Gate 1 — never against production.
+  if (process.env.NODE_ENV === "production") {
+    console.error("Refusing to seed: NODE_ENV is 'production'.");
+    process.exit(1);
+  }
+
+  // Gate 2 — the name must look non-production, unless overridden.
+  const named  = SAFE_NAME.test(name);
+  const forced = process.env.SEED_ALLOW_ANY_DB === "yes";
+  if (!named && !forced) {
+    console.error(`Refusing to seed: "${name}" does not look like a development database.`);
+    console.error("Expected the name to contain dev, test, local, sandbox or staging.");
+    console.error("If you are certain, re-run with SEED_ALLOW_ANY_DB=yes");
+    process.exit(1);
+  }
+  if (forced && !named) {
+    console.log("  SEED_ALLOW_ANY_DB=yes was set — the name check was skipped.");
+    console.log("");
+  }
+
+  // Gate 3 — type the database name to confirm.
+  if (process.env.SEED_SKIP_CONFIRM === "yes") {
+    console.log("  SEED_SKIP_CONFIRM=yes — confirmation prompt skipped (CI).");
+    return;
+  }
+  if (!process.stdin.isTTY) {
+    console.error("Refusing to seed: not an interactive terminal and");
+    console.error("SEED_SKIP_CONFIRM=yes was not set.");
+    process.exit(1);
+  }
+
+  const typed = await ask(`  Type the database name "${name}" to continue: `);
+  if (typed !== name) {
+    console.error("  Names did not match. Nothing was deleted.");
+    process.exit(1);
+  }
+  console.log("");
+}
+
+async function seed() {
+  await guard();
 
   try {
     await mongoose.connect(process.env.MONGO_URI);
@@ -231,4 +319,8 @@ async function seed() {
   }
 }
 
-seed();
+// Only run when invoked directly (npm run seed), so the guard helpers can
+// be unit tested without the script executing and touching a database.
+if (require.main === module) seed();
+
+module.exports = { databaseNameFrom, SAFE_NAME };
