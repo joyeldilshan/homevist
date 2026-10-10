@@ -102,7 +102,52 @@ function outOfAreaMessage(postcode, prefixes = locale.serviceAreaPrefixes) {
   );
 }
 
+// ── Email ────────────────────────────────────────────────────────
+/*
+ * Pragmatic check, not RFC 5322. The goal is to catch typos and obvious
+ * rubbish ("abc", "a@b") at the point of entry. Full RFC validation
+ * rejects addresses that really work and accepts ones that do not — the
+ * only true test is sending mail.
+ */
+const EMAIL = /^[^\s@]+@[^\s@.]+(\.[^\s@.]+)+$/;
+
+function isValidEmail(input) {
+  if (!input || typeof input !== "string") return false;
+  const v = input.trim();
+  return v.length <= 254 && EMAIL.test(v);
+}
+
+const EMAIL_MESSAGE = "Enter a valid email address, for example name@example.com.";
+
+// ── Password ─────────────────────────────────────────────────────
+/*
+ * APPLIES TO NEW PASSWORDS ONLY — registration and password change.
+ *
+ * Deliberately NOT a mongoose schema validator: that would run on every
+ * save and lock existing users out of editing their profile, and could
+ * block sign-in flows for accounts created under the old 6-character
+ * rule. Existing passwords keep working until the user changes one.
+ */
+const PASSWORD_MIN = 8;
+
+function isValidPassword(input) {
+  if (!input || typeof input !== "string") return false;
+  if (input.length < PASSWORD_MIN) return false;
+  if (!/[A-Za-z]/.test(input)) return false;
+  if (!/[0-9]/.test(input)) return false;
+  return true;
+}
+
+const PASSWORD_MESSAGE =
+  `Choose a password of at least ${PASSWORD_MIN} characters that includes ` +
+  "at least one letter and one number.";
+
 module.exports = {
+  isValidEmail,
+  EMAIL_MESSAGE,
+  isValidPassword,
+  PASSWORD_MESSAGE,
+  PASSWORD_MIN,
   normaliseUkPhone,
   isValidUkPhone,
   isUkMobile,

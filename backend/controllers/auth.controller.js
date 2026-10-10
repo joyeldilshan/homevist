@@ -2,6 +2,8 @@ const jwt  = require("jsonwebtoken");
 const {
   isValidUkPhone, PHONE_MESSAGE,
   normaliseUkPhone, normaliseUkPostcode, POSTCODE_MESSAGE,
+  isValidEmail, EMAIL_MESSAGE,
+  isValidPassword, PASSWORD_MESSAGE,
 } = require("../utils/validators");
 const locale = require("../config/locale");
 const User = require("../models/User");
@@ -38,8 +40,18 @@ exports.register = async (req, res, next) => {
       privacyPolicyAccepted,
     } = req.body;
 
+    if (!isValidEmail(email)) {
+      return res.status(400).json({ success: false, message: EMAIL_MESSAGE });
+    }
+
     if (!isValidUkPhone(phone)) {
       return res.status(400).json({ success: false, message: PHONE_MESSAGE });
+    }
+
+    // New accounts only. Existing passwords are never re-checked, so
+    // accounts created under the old 6-character rule keep working.
+    if (!isValidPassword(password)) {
+      return res.status(400).json({ success: false, message: PASSWORD_MESSAGE });
     }
 
     if (privacyPolicyAccepted !== true) {
@@ -193,6 +205,13 @@ exports.changePassword = async (req, res, next) => {
         success: false,
         message: "Please provide current and new password.",
       });
+    }
+
+    // Only the NEW password is held to the rule. currentPassword is
+    // compared as-is, so a user whose existing password predates this
+    // rule can still authenticate in order to change it.
+    if (!isValidPassword(newPassword)) {
+      return res.status(400).json({ success: false, message: PASSWORD_MESSAGE });
     }
 
     // Get user with password field
