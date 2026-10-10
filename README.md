@@ -65,6 +65,8 @@ Open http://localhost:5173.
 | Variable | Notes |
 |---|---|
 | `VITE_API_URL` | Backend URL **including `/api`**. Default `http://localhost:5000/api` |
+| `VITE_DEMO_MODE` | `true` shows the demo panel on the login page. Default off. |
+| `VITE_DEMO_PASSWORD` | Optional, for the demo panel's one-click buttons. **Public once built** — leave blank unless this is a demo deployment. |
 
 > Vite inlines every `VITE_*` variable into the built bundle. **Anything in
 > `frontend/.env` is public.** Never put a secret there.
@@ -144,6 +146,42 @@ fictional accounts and six test types. Three gates run *before* it connects:
 
 Passwords are never stored in the repository. Set `SEED_*_PASSWORD` to choose
 them, or let the script generate and print them once.
+
+---
+
+## Demo mode (optional, off by default)
+
+For a sales demo or a portfolio link, the login page can show a **"Try the
+demo"** panel with one-click sign-in for all four roles.
+
+```bash
+# in frontend/.env
+VITE_DEMO_MODE=true
+```
+
+The four buttons map to the accounts the seed creates — admin, patient,
+phlebotomist and lab technician — so the database must have been seeded first.
+
+### How credentials are handled
+
+**A normal build contains no demo credentials at all.** Verified against the
+built bundle: with `VITE_DEMO_MODE` unset, the account list, the emails and the
+panel markup are all absent from `dist/`. Only the CSS rules remain, because
+they sit in a static template literal Vite cannot tree-shake.
+
+With the panel on but `VITE_DEMO_PASSWORD` blank, clicking a role fills in the
+email and points you at the password printed by `npm run seed`. Still no
+credential in the bundle.
+
+Set `VITE_DEMO_PASSWORD` only on a throwaway demo deployment. Vite inlines every
+`VITE_*` variable, so **that password becomes public** to anyone reading the
+JavaScript. That is acceptable for a demo against a seeded dev database and
+unacceptable for anything else.
+
+Demo sign-in calls the same `login()` as the normal form — there is no separate
+auth path and no bypass. Rate limiting still applies.
+
+Cost: the panel adds **1.5 kB** to the bundle when enabled (641.5 kB → 642.9 kB).
 
 ---
 
@@ -228,7 +266,7 @@ any real patient result is reported.
 
 ### Known issues
 
-- **Bundle size.** The frontend builds to ~624 kB in one chunk, over Vite's
+- **Bundle size.** The frontend builds to ~641 kB in one chunk, over Vite's
   500 kB warning. Route-level code splitting is the fix and has not been done.
 - **Dependency advisories.** See the dedicated section below.
 - **No automated frontend tests.** The 41 tests cover backend validators,

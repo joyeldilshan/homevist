@@ -4,6 +4,7 @@ import { useAuth } from "../context/AuthContext";
 import toast from "react-hot-toast";
 import { isValidUkPhone, normaliseUkPhone, PHONE_MESSAGE } from "../utils/validators";
 import locale from "../config/locale";
+import { DEMO_MODE, DEMO_PASSWORD, DEMO_ACCOUNTS } from "../config/demo";
 
 /**
  * Home Visit — Sign in / Register (lab-label edition).
@@ -62,6 +63,40 @@ export default function AuthPage() {
       else                                  navigate("/user");
     } catch (err) { toast.error(err.response?.data?.message || "Invalid credentials."); }
     finally { setLoading(false); }
+  };
+
+  /*
+   * Demo sign-in.
+   *
+   * Goes through exactly the same login() call as the normal form — no
+   * separate auth path, no bypass. When VITE_DEMO_PASSWORD is unset it
+   * only fills the email in, so a build without that variable cannot
+   * sign anyone in.
+   */
+  const handleDemo = async (account) => {
+    setL("email", account.email);
+
+    if (!DEMO_PASSWORD) {
+      setL("password", "");
+      toast("Email filled in. Paste the password printed by `npm run seed`.", { icon: "🔑" });
+      document.getElementById("login-password")?.focus();
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const user = await login(account.email, DEMO_PASSWORD);
+      toast.success(`Signed in as ${account.label}`);
+      if      (user.role==="admin")        navigate("/admin");
+      else if (user.role==="phlebotomist") navigate("/phlebotomist");
+      else if (user.role==="mlt")          navigate("/mlt");
+      else                                  navigate("/user");
+    } catch (err) {
+      toast.error(
+        err.response?.data?.message ||
+        "Demo sign-in failed. Has the database been seeded?"
+      );
+    } finally { setLoading(false); }
   };
 
   const handleRegister = async (e) => {
@@ -311,6 +346,38 @@ export default function AuthPage() {
         @media (prefers-reduced-motion: reduce) {
           .au * { animation: none !important; transition: none !important; }
         }
+
+        /* ── Demo panel (VITE_DEMO_MODE only) ── */
+        .au .demo {
+          margin-top: 22px; padding: 16px;
+          border: 1px dashed var(--rule); border-radius: 10px;
+          background: rgba(0,0,0,0.015);
+        }
+        .au .demo-head {
+          display: flex; align-items: center; gap: 8px;
+          font-family: var(--monof); font-size: 10.5px; font-weight: 500;
+          letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-60);
+        }
+        .au .demo-pip {
+          width: 7px; height: 7px; border-radius: 50%;
+          background: var(--crimson); flex-shrink: 0;
+        }
+        .au .demo-sub { margin: 7px 0 13px; font-size: 12.5px; color: var(--ink-40); }
+        .au .demo-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        .au .demo-btn {
+          display: flex; flex-direction: column; gap: 2px; text-align: left;
+          padding: 9px 11px; cursor: pointer;
+          border: 1px solid var(--rule); border-radius: 7px;
+          background: #fff; font-family: var(--sansf);
+          transition: border-color .12s, background .12s;
+        }
+        .au .demo-btn:hover:not(:disabled) { border-color: var(--crimson); background: var(--paper); }
+        .au .demo-btn:disabled { opacity: .5; cursor: default; }
+        .au .demo-role { font-size: 12.5px; font-weight: 700; color: var(--ink); }
+        .au .demo-mail { font-family: var(--monof); font-size: 10px; color: var(--ink-40); }
+        .au .demo-note { margin-top: 11px; font-size: 11.5px; line-height: 1.55; color: var(--ink-40); }
+        .au .demo-note code { font-family: var(--monof); font-size: 11px; }
+        @media (max-width: 460px) { .au .demo-grid { grid-template-columns: 1fr; } }
       `}</style>
 
       <div className="blob blob-a" />
@@ -385,7 +452,7 @@ export default function AuthPage() {
                 </div>
                 <div style={{ marginBottom:2, position:"relative" }}>
                   <label className="lbl">Password</label>
-                  <input className="inp" type={showPw?"text":"password"} placeholder="••••••••" value={lForm.password} onChange={e=>setL("password",e.target.value)} style={{ paddingRight:44 }} />
+                  <input id="login-password" className="inp" type={showPw?"text":"password"} placeholder="••••••••" value={lForm.password} onChange={e=>setL("password",e.target.value)} style={{ paddingRight:44 }} />
                   <button type="button" className="eye" onClick={()=>setShowPw(v=>!v)} aria-label="Show password">{showPw?"🙈":"👁"}</button>
                 </div>
                 <div className="forgot"><span>Forgot password?</span></div>
@@ -396,6 +463,41 @@ export default function AuthPage() {
                   No account?{" "}
                   <span onClick={() => switchTo(false)}>Register free →</span>
                 </p>
+
+                {/* Only rendered when VITE_DEMO_MODE=true. */}
+                {DEMO_MODE && (
+                  <div className="demo">
+                    <div className="demo-head">
+                      <span className="demo-pip" aria-hidden="true" />
+                      Try the demo
+                    </div>
+                    <p className="demo-sub">
+                      Sign in as any role to explore the app. Sample data only.
+                    </p>
+                    <div className="demo-grid">
+                      {DEMO_ACCOUNTS.map((a) => (
+                        <button
+                          key={a.role}
+                          type="button"
+                          className="demo-btn"
+                          onClick={() => handleDemo(a)}
+                          disabled={loading}
+                          title={a.blurb}
+                        >
+                          <span className="demo-role">{a.label}</span>
+                          <span className="demo-mail">{a.email}</span>
+                        </button>
+                      ))}
+                    </div>
+                    {!DEMO_PASSWORD && (
+                      <p className="demo-note">
+                        No demo password is built into this app. Clicking fills the
+                        email; take the password from the output of{" "}
+                        <code>npm run seed</code>.
+                      </p>
+                    )}
+                  </div>
+                )}
               </form>
             )}
 
