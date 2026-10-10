@@ -80,6 +80,10 @@ export default function AdminDashboard() {
   const [testTypes,     setTestTypes]     = useState([]);
   const [plans,         setPlans]         = useState([]);
   const [subscriptions, setSubscriptions] = useState([]);
+  // Null until the first fetch resolves, so the UI can tell "still
+  // loading" apart from "loaded and genuinely empty".
+  const [loading,       setLoading]       = useState(true);
+  const [loadError,     setLoadError]     = useState(null);
   const [sideOpen,      setSideOpen]      = useState(false);
 
   const [assignModal,   setAssignModal]   = useState(null);
@@ -100,6 +104,7 @@ export default function AdminDashboard() {
   useEffect(() => { fetchAll(); }, [tab]);
 
   const fetchAll = async () => {
+    setLoadError(null);
     try {
       const [bRes, tRes, pRes, plRes, subRes] = await Promise.all([
         api.get("/bookings"), api.get("/test-types"), api.get("/phlebotomists"),
@@ -110,7 +115,12 @@ export default function AdminDashboard() {
       setPhlebotomists(pRes.data.phlebotomists||[]);
       setPlans(plRes.data.plans||[]);
       setSubscriptions(subRes.data.subscriptions||[]);
-    } catch(err) { console.error(err?.response?.data||err.message); }
+    } catch(err) {
+      console.error(err?.response?.data||err.message);
+      setLoadError(err?.response?.data?.message || "Could not load dashboard data.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const toggleTestId = (setter, id) =>
@@ -467,6 +477,19 @@ export default function AdminDashboard() {
         @media (prefers-reduced-motion: reduce) {
           .ad * { animation: none !important; transition: none !important; }
         }
+
+        .ad .load-note {
+          display: flex; align-items: center; gap: 10px;
+          padding: 14px 16px; margin-bottom: 20px;
+          border: 1px solid var(--rule); border-radius: 10px;
+          background: var(--paper); color: var(--ink-60); font-size: 13.5px;
+        }
+        .ad .load-err { border-color: var(--crimson); color: var(--ink); }
+        .ad .load-dot {
+          width: 13px; height: 13px; border-radius: 50%; flex-shrink: 0;
+          border: 2px solid var(--rule); border-top-color: var(--crimson);
+          animation: spin .9s linear infinite;
+        }
       `}</style>
 
       <div className="desktop-side"><Sidebar /></div>
@@ -485,6 +508,21 @@ export default function AdminDashboard() {
 
       <main className="main">
         <div className="inner">
+
+          {/* First-load feedback. Previously both dashboards rendered an
+              empty shell while fetching, which looked like "no data". */}
+          {loading && (
+            <div className="load-note" role="status" aria-live="polite">
+              <span className="load-dot" aria-hidden="true" />
+              Loading your data…
+            </div>
+          )}
+          {!loading && loadError && (
+            <div className="load-note load-err" role="alert">
+              {loadError}{" "}
+              <button className="btn btn-sm btn-ghost" onClick={fetchAll}>Try again</button>
+            </div>
+          )}
 
           {/* OVERVIEW */}
           {tab==="overview" && (

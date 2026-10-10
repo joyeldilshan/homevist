@@ -50,12 +50,20 @@ export default function PhleboDashboard() {
   const [available, setAvailable] = useState(user?.isAvailable||false);
   const [sideOpen,  setSideOpen]  = useState(false);
   const [sending,   setSending]   = useState(null); // bookingId currently being sent
+  const [loading,   setLoading]   = useState(true);
+  const [loadError, setLoadError] = useState(null);
 
   const fetchBookings = async () => {
+    setLoadError(null);
     try {
       const r = await api.get("/bookings");
       setBookings(r.data.bookings||[]);
-    } catch(e) { console.error(e?.response?.data||e.message); }
+    } catch(e) {
+      console.error(e?.response?.data||e.message);
+      setLoadError(e?.response?.data?.message || "Could not load your visits.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => { fetchBookings(); }, []);
@@ -409,6 +417,19 @@ export default function PhleboDashboard() {
         @media (prefers-reduced-motion: reduce) {
           .ph * { animation: none !important; transition: none !important; }
         }
+
+        .pd .load-note {
+          display: flex; align-items: center; gap: 10px;
+          padding: 14px 16px; margin-bottom: 20px;
+          border: 1px solid var(--rule); border-radius: 10px;
+          background: var(--paper); color: var(--ink-60); font-size: 13.5px;
+        }
+        .pd .load-err { border-color: var(--crimson); color: var(--ink); }
+        .pd .load-dot {
+          width: 13px; height: 13px; border-radius: 50%; flex-shrink: 0;
+          border: 2px solid var(--rule); border-top-color: var(--crimson);
+          animation: spin .9s linear infinite;
+        }
       `}</style>
 
       <div className="desktop-side"><Sidebar /></div>
@@ -427,6 +448,21 @@ export default function PhleboDashboard() {
 
       <main className="main">
         <div className="inner">
+
+          {/* First-load feedback. Previously both dashboards rendered an
+              empty shell while fetching, which looked like "no data". */}
+          {loading && (
+            <div className="load-note" role="status" aria-live="polite">
+              <span className="load-dot" aria-hidden="true" />
+              Loading your data…
+            </div>
+          )}
+          {!loading && loadError && (
+            <div className="load-note load-err" role="alert">
+              {loadError}{" "}
+              <button className="btn btn-sm btn-ghost" onClick={fetchBookings}>Try again</button>
+            </div>
+          )}
 
           {tab==="dashboard" && (
             <div className="fade-up">
