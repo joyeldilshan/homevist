@@ -4,6 +4,9 @@ import axios from "axios";
 // Set VITE_API_URL in your frontend .env for production (e.g. your Render URL + /api)
 const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
+// Exported so the health-check ping targets the same backend.
+export const API_BASE_URL = BASE_URL;
+
 const api = axios.create({
   baseURL: BASE_URL,
   headers: { "Content-Type": "application/json" },

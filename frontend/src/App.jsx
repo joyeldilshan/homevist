@@ -10,6 +10,7 @@ import Privacy         from "./pages/Privacy";
 import Terms           from "./pages/Terms";
 import StorageNotice   from "./components/StorageNotice";
 import NotFound        from "./pages/NotFound";
+import ServerWaking    from "./components/ServerWaking";
 
 // Maps each role to its dashboard path. Unknown roles → null (no redirect).
 const DASHBOARDS = {
@@ -63,6 +64,7 @@ export default function App() {
         <Route path="*" element={<NotFound />} />
       </Routes>
       <StorageNotice />
+      <ServerWaking />
     </>
   );
 }
