@@ -10,8 +10,7 @@ import {
  *
  * PHOTOS live in  frontend/public/images/  as:
  *   image1.jpg   → hero (right column)
- *   image 2.jpg  → about section
- *   image 3.jpg  → full-width band above the stats
+ *   image 2.jpg  → about section and the full-width band
  *   image 4.jpg  → contact card background
  * A missing file falls back to a labelled placeholder.
  */
@@ -857,12 +856,15 @@ export default function Home() {
 
       {/* ================= BAND ================= */}
       <ParallaxBand
-        src="/images/image 3.jpg"
-        alt="Home Visit phlebotomists on a home visit"
-        slot="image 3.jpg"
+        src="/images/image 2.jpg"
+        alt="A laboratory technician preparing blood samples for analysis"
+        slot="image 2.jpg"
       >
-        <h2>Booked at 8am.<br />Results before lunch.</h2>
-        <p>Standard panels are guaranteed within four hours — or the test is on us.</p>
+        <h2>Collected at home.<br />Processed in a laboratory.</h2>
+        <p>
+          Your sample is taken at your address and sent to a laboratory for
+          analysis. You can follow each stage from your account.
+        </p>
       </ParallaxBand>
 
       {/* ================= ROLES ================= */}
