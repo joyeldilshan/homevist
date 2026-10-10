@@ -10,11 +10,14 @@ const {
 } = require("../controllers/auth.controller");
 
 const { protect } = require("../middleware/auth.middleware");
+const {
+  loginLimiter, registerLimiter, passwordLimiter,
+} = require("../middleware/rateLimit.middleware");
 
-router.post("/register", register);
-router.post("/login",    login);
+router.post("/register", registerLimiter, register);
+router.post("/login",    loginLimiter,    login);
 router.get ("/me",              protect, getMe);
 router.put ("/update-profile",  protect, updateProfile);
-router.put ("/change-password", protect, changePassword);
+router.put ("/change-password", passwordLimiter, protect, changePassword);
 
 module.exports = router;

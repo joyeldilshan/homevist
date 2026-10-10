@@ -26,6 +26,14 @@ const io = new Server(server, {
   },
 });
 
+/*
+ * Render, Vercel and most PaaS hosts sit behind a reverse proxy. Without
+ * this, req.ip is the proxy's address, so the rate limiters would treat
+ * every visitor as one client and a single abuser would lock out everyone.
+ * 1 = trust exactly one proxy hop, which is what Render provides.
+ */
+app.set("trust proxy", 1);
+
 app.set("etag", false);
 
 app.use((req, _res, next) => { req.io = io; next(); });
