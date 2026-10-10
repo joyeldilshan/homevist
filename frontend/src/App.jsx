@@ -9,6 +9,7 @@ import MLTDashboard from "./pages/mlt/Dashboard";
 import Privacy         from "./pages/Privacy";
 import Terms           from "./pages/Terms";
 import StorageNotice   from "./components/StorageNotice";
+import NotFound        from "./pages/NotFound";
 
 // Maps each role to its dashboard path. Unknown roles → null (no redirect).
 const DASHBOARDS = {
@@ -58,7 +59,8 @@ export default function App() {
         <Route path="/admin"        element={<RoleRoute role="admin"><AdminDashboard /></RoleRoute>} />
         <Route path="/mlt" element={<RoleRoute role="mlt"><MLTDashboard /></RoleRoute>} />
 
-        <Route path="*" element={<Navigate to={dash || "/"} replace />} />
+        {/* Show a real 404 rather than silently bouncing the user. */}
+        <Route path="*" element={<NotFound />} />
       </Routes>
       <StorageNotice />
     </>
