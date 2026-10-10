@@ -4,6 +4,7 @@ const Booking   = require("../models/Booking");
 const { sendReportToPatient } = require("../utils/reportEmail");
 const path = require("path");
 const fs   = require("fs");
+const logger = require("../utils/logger");
 
 // Build the disk path of a stored report file from its URL
 const diskPathFromUrl = (fileUrl) =>
@@ -131,7 +132,7 @@ exports.sendReport = async (req, res, next) => {
 
     res.json({ success: true, message: "Report sent to patient.", report });
   } catch (err) {
-    console.error("📧 Report send error:", err.message);
+    logger.error("📧 Report send error:", err.message);
     res.status(500).json({ success: false, message: "Failed to send report: " + err.message });
   }
 };

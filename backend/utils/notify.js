@@ -1,12 +1,13 @@
 const nodemailer = require("nodemailer");
 const locale = require("../config/locale");
+const logger = require("../utils/logger");
 
 // SMS via Twilio
 // If credentials are not set, runs in mock mode (prints to console)
 exports.sendSMS = async (to, body) => {
   if (!process.env.TWILIO_ACCOUNT_SID || !process.env.TWILIO_AUTH_TOKEN) {
-    console.log("SMS MOCK -> To:", to);
-    console.log("SMS MOCK -> Message:", body);
+    logger.debug("SMS MOCK -> To:", to);
+    logger.debug("SMS MOCK -> Message:", body);
     return;
   }
   try {
@@ -17,9 +18,9 @@ exports.sendSMS = async (to, body) => {
       from: process.env.TWILIO_PHONE_NUMBER,
       to,
     });
-    console.log("SMS sent to", to);
+    logger.debug("SMS sent to", to);
   } catch (err) {
-    console.error("SMS failed:", err.message);
+    logger.error("SMS failed:", err.message);
   }
 };
 
@@ -27,8 +28,8 @@ exports.sendSMS = async (to, body) => {
 // If credentials are not set, runs in mock mode (prints to console)
 exports.sendEmail = async (to, subject, htmlBody) => {
   if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-    console.log("EMAIL MOCK -> To:", to);
-    console.log("EMAIL MOCK -> Subject:", subject);
+    logger.debug("EMAIL MOCK -> To:", to);
+    logger.debug("EMAIL MOCK -> Subject:", subject);
     return;
   }
   try {
@@ -59,8 +60,8 @@ exports.sendEmail = async (to, subject, htmlBody) => {
         </div>
       `,
     });
-    console.log("Email sent to", to);
+    logger.debug("Email sent to", to);
   } catch (err) {
-    console.error("Email failed:", err.message);
+    logger.error("Email failed:", err.message);
   }
 };

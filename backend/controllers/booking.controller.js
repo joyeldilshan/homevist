@@ -5,6 +5,7 @@ const { sendSMS } = require("../utils/notify");
 const { sendBookingEmails, sendPhlebotomistAssignment } = require("../utils/emailService");
 const { isValidUkPostcode, POSTCODE_MESSAGE, isInServiceArea, outOfAreaMessage } = require("../utils/validators");
 const { formatDate } = require("../utils/format");
+const logger = require("../utils/logger");
 
 // POST /api/bookings — Patient creates booking (supports multiple tests)
 exports.createBooking = async (req, res, next) => {
@@ -76,7 +77,7 @@ exports.createBooking = async (req, res, next) => {
         `Home Visit: Booking #${booking.bookingId} for ${testNames} on ${formatDate(appointmentDate)} at ${appointmentTime} received. A phlebotomist will be assigned shortly.`);
     }
 
-    sendBookingEmails(booking, req.user).catch(err => console.error("📧 Email error:", err.message));
+    sendBookingEmails(booking, req.user).catch(err => logger.error("📧 Email error:", err.message));
 
     res.status(201).json({ success:true, booking });
   } catch (err) { next(err); }
@@ -216,7 +217,7 @@ exports.assignPhlebotomist = async (req, res, next) => {
     // Email to phlebotomist — only if we still have a valid patient
     if (booking.user) {
       sendPhlebotomistAssignment(booking, booking.user, booking.phlebotomist)
-        .catch(err => console.error("📧 Assignment email error:", err.message));
+        .catch(err => logger.error("📧 Assignment email error:", err.message));
     }
 
     if (req.io) {

@@ -5,6 +5,7 @@ const path        = require("path");
 const fs          = require("fs");
 const { formatDate, formatAppointment } = require("./format");
 const locale = require("../config/locale");
+const logger = require("../utils/logger");
 
 const UPLOAD_DIR = path.join(__dirname, "../uploads/reports");
 if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
@@ -74,7 +75,7 @@ async function generateReport(booking) {
       backgroundcolor: "F5F5F5",
     });
   } catch (e) {
-    console.error("Barcode generation error:", e.message);
+    logger.error("Barcode generation error:", e.message);
   }
 
   // Generate QR PNG buffer
@@ -100,7 +101,7 @@ async function generateReport(booking) {
       errorCorrectionLevel: "M",
     });
   } catch (e) {
-    console.error("QR generation error:", e.message);
+    logger.error("QR generation error:", e.message);
   }
 
   // Place barcode image (left-centre of strip)

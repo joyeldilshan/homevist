@@ -1,9 +1,10 @@
 /**
+const logger = require("../utils/logger");
  * Global Express error handler.
  * Any controller that calls next(err) lands here.
  */
 exports.errorHandler = (err, req, res, next) => {
-  console.error("❌", err.message);
+  logger.error("❌", err.message);
 
   let status  = err.statusCode || 500;
   let message = err.message    || "Internal Server Error";

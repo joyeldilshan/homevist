@@ -16,6 +16,7 @@ const subscriptionRoutes  = require("./routes/subscription.routes");
 const { errorHandler }   = require("./middleware/error.middleware");
 const { securityHeaders } = require("./middleware/security.middleware");
 const { startSubscriptionScheduler } = require("./jobs/subscriptionScheduler");
+const logger = require("./utils/logger");
 
 const app    = express();
 const server = http.createServer(app);
@@ -40,10 +41,10 @@ app.set("etag", false);
 app.use((req, _res, next) => { req.io = io; next(); });
 
 io.on("connection", (socket) => {
-  console.log("Socket connected:", socket.id);
+  logger.debug("Socket connected:", socket.id);
   socket.on("join_booking", (bookingId) => socket.join(bookingId));
   socket.on("join_admin",   ()          => socket.join("admin_room"));
-  socket.on("disconnect",   ()          => console.log("Socket disconnected:", socket.id));
+  socket.on("disconnect",   ()          => logger.debug("Socket disconnected:", socket.id));
 });
 
 app.use(securityHeaders());
@@ -72,15 +73,15 @@ app.use(errorHandler);
 mongoose
   .connect(process.env.MONGO_URI)
   .then(() => {
-    console.log("Connected to MongoDB");
+    logger.startup("Connected to MongoDB");
     startSubscriptionScheduler(io);
     const PORT = process.env.PORT || 5000;
     server.listen(PORT, () => {
-      console.log("Home Visit API running on http://localhost:" + PORT);
+      logger.startup("Home Visit API running on port " + PORT);
     });
   })
   .catch((err) => {
-    console.error("MongoDB connection failed:", err.message);
+    logger.error("MongoDB connection failed:", err.message);
     process.exit(1);
   });
 

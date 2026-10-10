@@ -1,5 +1,6 @@
 const nodemailer = require("nodemailer");
 const { formatMoney, formatDate } = require("./format");
+const logger = require("../utils/logger");
 
 // ── Single shared transporter instance ────────────────────────
 // Created once, reused for all emails
@@ -228,7 +229,7 @@ const sendAdminBookingAlert = async (booking, patient) => {
     subject: `🩸 New Booking: ${booking.bookingId} — ${patient.name}`,
     html:    adminTemplate(booking, patient),
   });
-  console.log(`📧 Admin alert sent for ${booking.bookingId}`);
+  logger.debug(`📧 Admin alert sent for ${booking.bookingId}`);
 };
 
 const sendPatientConfirmation = async (booking, patient) => {
@@ -238,7 +239,7 @@ const sendPatientConfirmation = async (booking, patient) => {
     subject: `✅ Booking Confirmed — ${booking.bookingId} | Home Visit`,
     html:    patientTemplate(booking, patient),
   });
-  console.log(`📧 Patient confirmation sent to ${patient.email}`);
+  logger.debug(`📧 Patient confirmation sent to ${patient.email}`);
 };
 
 const sendPhlebotomistAssignment = async (booking, patient, phlebotomist) => {
@@ -249,7 +250,7 @@ const sendPhlebotomistAssignment = async (booking, patient, phlebotomist) => {
     subject: `🧪 New Job Assigned — ${booking.bookingId} | Home Visit`,
     html:    phlebotomistTemplate(booking, patient, phlebotomist),
   });
-  console.log(`📧 Assignment email sent to ${phlebotomist.email}`);
+  logger.debug(`📧 Assignment email sent to ${phlebotomist.email}`);
 };
 
 // Send both admin + patient emails together
@@ -261,7 +262,7 @@ const sendBookingEmails = async (booking, patient) => {
   ]);
   results.forEach((r, i) => {
     if (r.status === "rejected") {
-      console.error(`📧 ${i === 0 ? "Admin" : "Patient"} email failed:`, r.reason?.message);
+      logger.error(`📧 ${i === 0 ? "Admin" : "Patient"} email failed:`, r.reason?.message);
     }
   });
 };

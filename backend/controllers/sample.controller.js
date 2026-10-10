@@ -1,5 +1,6 @@
 const Sample  = require("../models/Sample");
 const Booking = require("../models/Booking");
+const logger = require("../utils/logger");
 
 /**
  * POST /api/samples
@@ -67,7 +68,7 @@ exports.sendToLab = async (req, res, next) => {
       });
     }
 
-    console.log(`🧫 Sample ${sample.sampleId} created for booking ${booking.bookingId}`);
+    logger.debug(`🧫 Sample ${sample.sampleId} created for booking ${booking.bookingId}`);
     res.status(201).json({ success: true, sample });
   } catch (err) { next(err); }
 };

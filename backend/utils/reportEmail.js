@@ -1,6 +1,7 @@
 const nodemailer = require("nodemailer");
 const fs = require("fs");
 const { formatDate } = require("./format");
+const logger = require("../utils/logger");
 
 let transporter = null;
 const getTransporter = () => {
@@ -89,10 +90,10 @@ exports.sendReportToPatient = async (data) => {
       contentType: "application/pdf",
     });
   } else {
-    console.warn("⚠️ Report file not found on disk:", data.filePath);
+    logger.warn("⚠️ Report file not found on disk:", data.filePath);
   }
 
   const info = await getTransporter().sendMail(mail);
-  console.log(`📧 Report ${data.reportId} sent to ${data.to}`);
+  logger.debug(`📧 Report ${data.reportId} sent to ${data.to}`);
   return info;
 };
