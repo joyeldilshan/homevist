@@ -1,0 +1,23 @@
+{
+  "name": "home-visit",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Home Visit — mobile blood-testing platform. Node/Express + MongoDB backend, React/Vite frontend.",
+  "scripts": {
+    "install:all": "npm install --prefix backend && npm install --prefix frontend",
+    "dev": "concurrently -n api,web -c blue,magenta \"npm --prefix backend run dev\" \"npm --prefix frontend run dev\"",
+    "dev:api": "npm --prefix backend run dev",
+    "dev:web": "npm --prefix frontend run dev",
+    "build": "npm --prefix frontend run build",
+    "start": "npm --prefix backend start",
+    "test": "npm --prefix backend test",
+    "seed": "npm --prefix backend run seed",
+    "audit": "npm --prefix backend audit && npm --prefix frontend audit"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
