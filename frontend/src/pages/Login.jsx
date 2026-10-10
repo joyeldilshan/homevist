@@ -326,7 +326,7 @@ export default function AuthPage() {
           {imgOk ? (
             <img
               src="/images/image 5.png"
-              alt="A Home Visit phlebotomist preparing a home blood collection"
+              alt="Home Visit Mobile Lab logo"
               className="panel-img"
               onError={() => setImgOk(false)}
             />
