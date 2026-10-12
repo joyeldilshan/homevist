@@ -28,6 +28,23 @@ const SECTIONS = [
 
 const CAP = { crimson: "#C9603A", lavender: "#6E6AA8", gold: "#B8862E", teal: "#0F6E62" };
 
+/*
+ * Look a section up by id, never by position.
+ *
+ * These were previously referenced by array position. When the stats,
+ * reviews and team sections were removed, the array shrank from 9
+ * entries to 8 and every position after the removal shifted by one.
+ * The contact block kept reading position 8, which no longer existed,
+ * so SpecimenLabel received undefined and threw — taking the whole
+ * landing page down. The FAQ block, reading position 7, silently
+ * rendered the "Contact" label instead of its own.
+ *
+ * Looking up by id makes both failures impossible: a missing id yields
+ * undefined at the call site rather than a wrong neighbour, and no
+ * reference depends on how many sections exist.
+ */
+const section = (id) => SECTIONS.find((s) => s.id === id);
+
 export default function Home() {
   const navigate = useNavigate();
   const [active, setActive] = useState("hero");
@@ -732,7 +749,7 @@ export default function Home() {
         <div className="wrap hero-grid">
           <motion.div style={{ y: heroTextY, opacity: heroFade }}>
             <Reveal>
-              <SpecimenLabel section={SECTIONS[0]} />
+              <SpecimenLabel section={section("hero")} />
               <h1>
                 Hospital care,<br />drawn at<br />
                 <span className="hero-word" style={{ color: "var(--crimson)" }}>your door.</span>
@@ -791,7 +808,7 @@ export default function Home() {
             />
           </Reveal>
           <Reveal delay={0.1} from="right">
-            <SpecimenLabel section={SECTIONS[1]} />
+            <SpecimenLabel section={section("about")} />
             <h2>Every drop tells a story. We make sure it reaches you.</h2>
             <p className="lead" style={{ margin: "20px 0 16px" }}>
               Home Visit brings blood sample collection to your home across Cardiff and South Wales, and sends your sample to a laboratory for processing.
@@ -810,7 +827,7 @@ export default function Home() {
         <span className="ghost">Services</span>
         <div className="wrap">
           <Reveal>
-            <SpecimenLabel section={SECTIONS[2]} />
+            <SpecimenLabel section={section("features")} />
             <h2>What you get.</h2>
             <p className="lead" style={{ marginTop: 16, maxWidth: 560 }}>
               Six things we hold ourselves to on every single booking.
@@ -835,7 +852,7 @@ export default function Home() {
         <span className="ghost">Process</span>
         <div className="wrap">
           <Reveal>
-            <SpecimenLabel section={SECTIONS[3]} />
+            <SpecimenLabel section={section("process")} />
             <h2>Four steps. One report.</h2>
           </Reveal>
           <div className="steps">
@@ -872,7 +889,7 @@ export default function Home() {
         <span className="ghost">Roles</span>
         <div className="wrap">
           <Reveal>
-            <SpecimenLabel section={SECTIONS[4]} />
+            <SpecimenLabel section={section("roles")} />
             <h2>Four roles, one system.</h2>
           </Reveal>
           <div className="team-row">
@@ -894,7 +911,7 @@ export default function Home() {
         <span className="ghost">Booking</span>
         <div className="wrap">
           <Reveal>
-            <SpecimenLabel section={SECTIONS[5]} />
+            <SpecimenLabel section={section("booking")} />
             <h2>How a booking moves.</h2>
           </Reveal>
           <div className="steps">
@@ -918,7 +935,7 @@ export default function Home() {
         <span className="ghost">FAQ</span>
         <div className="wrap" style={{ maxWidth: 820 }}>
           <Reveal>
-            <SpecimenLabel section={SECTIONS[7]} />
+            <SpecimenLabel section={section("faq")} />
             <h2>Common questions.</h2>
           </Reveal>
           <div className="faqs">
@@ -935,7 +952,7 @@ export default function Home() {
           <div className="contact">
             <BgImage src="/images/image 4.jpg" slot="image 4.jpg" className="contact-bg" />
             <div className="contact-in">
-              <SpecimenLabel section={SECTIONS[8]} />
+              <SpecimenLabel section={section("contact")} />
               <h2>Ready when you are.</h2>
               <p>
                 Book your first home blood test today, or send us a question.
@@ -969,13 +986,30 @@ export default function Home() {
 }
 
 /* ============== specimen label ============== */
+/**
+ * Section label.
+ *
+ * Renders nothing when handed a missing or unrecognised section rather
+ * than throwing. A decorative label is never worth taking the whole page
+ * down for — which is exactly what happened when a stale positional
+ * lookup resolved to undefined.
+ *
+ * This is a backstop, not the fix: callers pass section("id"), so a bad
+ * value should not reach here in the first place.
+ */
 function SpecimenLabel({ section }) {
+  if (!section) return null;
+
+  // An unknown cap would produce a class with no rule and an invisible
+  // swatch; fall back to a defined one so the label still reads.
+  const cap = section.cap && CAP[section.cap] ? section.cap : "teal";
+
   return (
     <div className="label">
-      <div className={`label-cap cap-${section.cap}`} />
+      <div className={`label-cap cap-${cap}`} />
       <div className="label-body">
-        <span className="label-code">{section.code}</span>
-        <span className="label-name">{section.name}</span>
+        <span className="label-code">{section.code ?? ""}</span>
+        <span className="label-name">{section.name ?? ""}</span>
         <span className="barcode" />
       </div>
     </div>
