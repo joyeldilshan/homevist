@@ -1,19 +1,39 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
+import { motion, useScroll, useSpring, useTransform } from "framer-motion";
 import { useRichMotion } from "../hooks/useRichMotion";
-import {
-  motion, AnimatePresence, useScroll, useSpring, useTransform,
-} from "framer-motion";
+import { Reveal, Stagger, StaggerItem, usePointerParallax } from "../motion";
 
 /**
- * Home Visit — landing page (colour + parallax edition).
+ * Home Visit — landing page (Phase 2: cinematic).
  *
- * PHOTOS live in  frontend/public/images/  as:
- *   image1.jpg   → hero (right column)
- *   image 2.jpg  → about section and the full-width band
- *   image 4.jpg  → contact card background
- * A missing file falls back to a labelled placeholder.
+ * MOTION. Every effect is transform/opacity only and gated behind
+ * useRichMotion(), so on a narrow viewport, a coarse pointer or with
+ * prefers-reduced-motion the page renders instantly with no movement.
+ * The aurora is a CSS gradient moved on the GPU — it never animates
+ * background-position, which would repaint the whole layer each frame.
+ *
+ * COPY RULES — unchanged and non-negotiable. Nothing asserts that this
+ * service, any laboratory or any person is accredited, registered,
+ * certified or compliant. Anything unverifiable carries
+ * [PLACEHOLDER - add only if true]. No statistics, testimonials, team
+ * members or customer names appear anywhere on this page.
+ *
+ * PHOTOS live in frontend/public/images/.
+ *   image1.jpg   phlebotomist with a patient at home  -> hero
+ *   image 2.jpg  laboratory technician                -> band
+ *   image 4.jpg  gloved hand with a sample tube       -> about aside
+ *   image 5.png  brand mark                           -> footer
  */
+
+const PH = "[PLACEHOLDER - add only if true]";
+
+const IMG = {
+  hero: "/images/image1.jpg",
+  lab:  "/images/image%202.jpg",
+  tube: "/images/image%204.jpg",
+  logo: "/images/image%205.png",
+};
 
 const SECTIONS = [
   { id: "hero",     code: "HV-01", name: "Home",     cap: "crimson"  },
@@ -29,109 +49,85 @@ const SECTIONS = [
 const CAP = { crimson: "#C9603A", lavender: "#6E6AA8", gold: "#B8862E", teal: "#0F6E62" };
 
 /*
- * Look a section up by id, never by position.
- *
- * These were previously referenced by array position. When the stats,
- * reviews and team sections were removed, the array shrank from 9
- * entries to 8 and every position after the removal shifted by one.
- * The contact block kept reading position 8, which no longer existed,
- * so SpecimenLabel received undefined and threw — taking the whole
- * landing page down. The FAQ block, reading position 7, silently
- * rendered the "Contact" label instead of its own.
- *
- * Looking up by id makes both failures impossible: a missing id yields
- * undefined at the call site rather than a wrong neighbour, and no
- * reference depends on how many sections exist.
+ * Look a section up by id, never by position. Positional lookups broke
+ * once already: removing three sections shifted every index after them,
+ * so one block rendered a neighbouring label and another read past the
+ * end of the array and crashed the page.
  */
 const section = (id) => SECTIONS.find((s) => s.id === id);
 
+/* ── Section label ─────────────────────────────────────────────── */
+function SpecimenLabel({ section }) {
+  if (!section) return null;
+  const cap = section.cap && CAP[section.cap] ? section.cap : "teal";
+  return (
+    <div className="label">
+      <span className="label-cap" style={{ background: CAP[cap] }} />
+      <span className="label-code">{section.code ?? ""}</span>
+      <span className="label-name">{section.name ?? ""}</span>
+    </div>
+  );
+}
+
+/* ── Photo that drifts against the scroll ──────────────────────── */
+function ParallaxPhoto({ src, alt, strength = 10, className = "", priority = false }) {
+  const rich = useRichMotion();
+  const ref = useRef(null);
+  const { scrollYProgress } = useScroll({ target: ref, offset: ["start end", "end start"] });
+  const travel = rich ? strength : 0;
+  const y = useTransform(scrollYProgress, [0, 1], [`-${travel}%`, `${travel}%`]);
+  const [failed, setFailed] = useState(false);
+
+  return (
+    <div ref={ref} className={`photo ${className}`}>
+      {failed ? (
+        <div className="photo-missing">Image not found<br /><code>{decodeURI(src)}</code></div>
+      ) : (
+        <motion.img
+          src={src}
+          alt={alt}
+          className="photo-img"
+          style={{ y }}
+          loading={priority ? "eager" : "lazy"}
+          decoding="async"
+          fetchpriority={priority ? "high" : "auto"}
+          onError={() => setFailed(true)}
+        />
+      )}
+    </div>
+  );
+}
+
 export default function Home() {
   const navigate = useNavigate();
-  const [active, setActive] = useState("hero");
-  const [open, setOpen] = useState(false);
-  const [mouse, setMouse] = useState({ x: 0, y: 0 });
-
-  // Single gate for the rich motion. False on narrow viewports, touch
-  // devices and when reduced motion is requested — see useRichMotion.
   const rich = useRichMotion();
+  const [open, setOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
+  const [openFaq, setOpenFaq] = useState(null);
 
   const { scrollY, scrollYProgress } = useScroll();
   const progress = useSpring(scrollYProgress, { stiffness: 120, damping: 30 });
+  const pointer = usePointerParallax({ strength: 14 });
 
-  /*
-   * Global parallax layers.
-   *
-   * Hooks must run unconditionally, so the transforms are always created;
-   * `depth` collapses their range to zero when rich motion is off. That
-   * keeps the subscription cheap instead of animating elements the CSS has
-   * already hidden on mobile.
-   */
-  const depth  = rich ? 1 : 0;
-  const blobA  = useTransform(scrollY, [0, 4000], [0,  620 * depth]);
-  const blobB  = useTransform(scrollY, [0, 4000], [0, -480 * depth]);
-  const blobC  = useTransform(scrollY, [0, 4000], [0,  300 * depth]);
-  const cellsY = useTransform(scrollY, [0, 4000], [0, -900 * depth]);
-
-  // Hero parallax — text sinks, image rises, both fade out on scroll.
-  const heroTextY = useTransform(scrollY, [0, 700], [0,  110 * depth]);
-  const heroImgY  = useTransform(scrollY, [0, 700], [0,  -70 * depth]);
-  const heroFade  = useTransform(scrollY, [0, 560], [1, 0]);
-
-  // Desktop-only extras: the hero image settles back as you scroll past,
-  // and the backdrop drifts sideways so the depth reads on a wide screen.
-  const heroScale = useTransform(scrollY, [0, 700], [1, rich ? 1.06 : 1]);
-  const driftX    = useTransform(scrollY, [0, 4000], [0, rich ? 160 : 0]);
+  // Hero: text sinks and fades while the photo rises — they move apart.
+  const d = rich ? 1 : 0;
+  const heroTextY  = useTransform(scrollY, [0, 700], [0, 80 * d]);
+  const heroFade   = useTransform(scrollY, [0, 520], [1, d ? 0.1 : 1]);
+  const heroPhotoY = useTransform(scrollY, [0, 700], [0, -54 * d]);
 
   useEffect(() => {
-    let ticking = false;
-    const checkSections = () => {
-      ticking = false;
-      SECTIONS.forEach(({ id }) => {
-        const el = document.getElementById(id);
-        if (!el) return;
-        const r = el.getBoundingClientRect();
-        if (r.top < window.innerHeight / 2 && r.bottom > window.innerHeight / 2) setActive(id);
-      });
-    };
-    const onScroll = () => {
-      if (ticking) return;
-      ticking = true;
-      requestAnimationFrame(checkSections);
-    };
+    const onScroll = () => setScrolled(window.scrollY > 16);
+    onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
-    checkSections();
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  useEffect(() => {
-    const onMove = (e) =>
-      setMouse({
-        x: (e.clientX / window.innerWidth - 0.5) * 2,
-        y: (e.clientY / window.innerHeight - 0.5) * 2,
-      });
-    window.addEventListener("mousemove", onMove);
-    return () => window.removeEventListener("mousemove", onMove);
-  }, []);
-
-  const scrollTo = (id) => {
+  const go = (id) => {
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
     setOpen(false);
   };
 
   // ============== CONTENT ==============
-  /*
-   * COPY RULES FOR THIS PAGE
-   * Do not state or imply that this service, any laboratory or any member
-   * of staff is accredited, registered, certified or compliant with any
-   * standard or regulation. Those are claims only the business can make,
-   * and only once they are true and evidenced.
-   *
-   * Anything that cannot be verified from the codebase is marked
-   * [PLACEHOLDER - add only if true] and must be either substantiated or
-   * deleted before this page goes live.
-   */
-  const PH = "[PLACEHOLDER - add only if true]";
-
   const features = [
     { icon: "🩸", tint: "crimson",  title: "Home Blood Collection", desc: "A phlebotomist comes to your home and collects your sample using sterile, single-use equipment." },
     { icon: "⚡", tint: "gold",     title: "Digital Reports",       desc: `Your report is delivered digitally with a barcode reference. Typical turnaround: ${PH}` },
@@ -148,25 +144,16 @@ export default function Home() {
     { step: "04", tint: "teal",     title: "Get Your Report",  desc: "Your digital report arrives by email with a barcode reference." },
   ];
 
-  /*
-   * The four roles the application actually implements. Taken from the
-   * role enum in backend/models/User.js — not marketing invention.
-   */
+  // The four roles the application actually implements, from the role
+  // enum in backend/models/User.js — not marketing invention.
   const roles = [
-    { initials: "P",  tint: "crimson",  title: "Patient",
-      desc: "Books tests, tracks the visit, downloads reports and manages a repeat subscription." },
-    { initials: "Ph", tint: "gold",     title: "Phlebotomist",
-      desc: "Sees assigned visits, sets availability, and updates each booking as the sample is collected." },
-    { initials: "L",  tint: "lavender", title: "Lab technician",
-      desc: "Receives samples, records results, and uploads the verified PDF report." },
-    { initials: "A",  tint: "teal",     title: "Admin",
-      desc: "Assigns phlebotomists, manages the test catalogue and plans, and reviews the email audit log." },
+    { initials: "P",  tint: "crimson",  title: "Patient",        desc: "Books tests, tracks the visit, downloads reports and manages a repeat subscription." },
+    { initials: "Ph", tint: "gold",     title: "Phlebotomist",   desc: "Sees assigned visits, sets availability, and updates each booking as the sample is collected." },
+    { initials: "L",  tint: "lavender", title: "Lab technician", desc: "Receives samples, records results, and uploads the verified PDF report." },
+    { initials: "A",  tint: "teal",     title: "Admin",          desc: "Assigns phlebotomists, manages the test catalogue and plans, and reviews the email audit log." },
   ];
 
-  /*
-   * The booking lifecycle, taken from the status enum in
-   * backend/models/Booking.js. These are the states the software tracks.
-   */
+  // The booking lifecycle, from the status enum in backend/models/Booking.js.
   const lifecycle = [
     { step: "01", tint: "gold",     title: "Pending",          desc: "The booking is placed and waiting for a phlebotomist to be assigned." },
     { step: "02", tint: "teal",     title: "Confirmed",        desc: "A phlebotomist is assigned to the visit and the patient is notified." },
@@ -183,979 +170,490 @@ export default function Home() {
     { q: "How is my health information handled?", a: "We handle your health information in line with our Privacy Policy, which explains what we collect, why, and how long we keep it." },
   ];
 
-  const ticker = [
-    "Home collection", "Digital reports", "Barcode reference", "Cardiff & South Wales",
-    "CF postcodes", "Routine blood panels", "Track your booking",
-  ];
+  const NAV = SECTIONS.filter((s) => ["about", "features", "process", "faq"].includes(s.id));
 
   return (
     <div className="hv">
-      <motion.div className="hv-progress" style={{ scaleX: progress }} />
-
-      {/* ============ FIXED PARALLAX BACKDROP ============ */}
-      <motion.div className="blob blob-a" style={{ y: blobA, x: driftX }} />
-      <motion.div className="blob blob-b" style={{ y: blobB }} />
-      <motion.div className="blob blob-c" style={{ y: blobC, x: driftX }} />
-      <motion.div className="cells" style={{ y: cellsY }} aria-hidden="true">
-        {[...Array(16)].map((_, i) => (
-          <span
-            key={i}
-            className="cell-dot"
-            style={{
-              left: `${(i * 61) % 97}%`,
-              top: `${(i * 137) % 100 + 8}%`,
-              width: 8 + (i % 4) * 5,
-              height: 8 + (i % 4) * 5,
-              animationDelay: `${(i % 6) * 0.8}s`,
-              opacity: 0.15 + (i % 3) * 0.08,
-            }}
-          />
-        ))}
-      </motion.div>
-      <div
-        className="cursor-glow"
-        style={{ transform: `translate(${mouse.x * 40}px, ${mouse.y * 40}px)` }}
-      />
-
       <style>{`
-        .hv {
-          --paper: var(--color-bg-page);
-          --card:    #FBF9F5;
-          --ink: var(--color-text-primary);
-          --ink-60: var(--color-text-secondary);
-          --ink-40: var(--color-text-muted);
-          --rule: var(--color-border-default);
-          --crimson: var(--color-bg-accent);
-          --lavender:#6E6AA8;
-          --gold:    #B8862E;
-          --teal:    #0F6E62;
+        .hv { background: var(--color-bg-page); color: var(--color-text-primary); font-family: var(--sansf); overflow-x: hidden; position: relative; }
+        .hv .wrap { max-width: var(--maxw); margin: 0 auto; padding-inline: var(--gutter); position: relative; z-index: 1; }
+        .hv section { padding-block: clamp(56px, 6.5vw, 104px); position: relative; }
+        .hv h1, .hv h2, .hv h3 { font-family: var(--display); font-weight: 800; letter-spacing: var(--tracking-tight); line-height: var(--leading-tight); }
+        .hv p { line-height: var(--leading-body); }
 
-          --sans:    var(--sansf);
-          --mono:    var(--monof);
+        /* ===== Aurora ===== */
+        .hv .aurora { position: fixed; inset: -30% -10%; z-index: 0; pointer-events: none;
+          background: var(--grad-aurora); filter: blur(44px); opacity: .5; will-change: transform; }
+        .hv .grain { position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: .5;
+          background-image: radial-gradient(var(--color-border-default) .6px, transparent .6px);
+          background-size: 22px 22px;
+          -webkit-mask-image: radial-gradient(ellipse at 50% 0%, #000 20%, transparent 72%);
+          mask-image: radial-gradient(ellipse at 50% 0%, #000 20%, transparent 72%); }
 
-          background: var(--paper);
-          color: var(--ink);
-          font-family: var(--sans);
-          overflow-x: hidden;
-          position: relative;
-        }
+        .hv .prog { position: fixed; top: 0; left: 0; right: 0; height: 3px; z-index: 100;
+          background: var(--grad-accent); transform-origin: 0 50%; }
 
-        .hv *, .hv *::before, .hv *::after { margin:0; padding:0; box-sizing:border-box; }
-        .hv :focus-visible { outline: 2px solid var(--crimson); outline-offset: 3px; }
+        /* ===== Nav ===== */
+        .hv .nav { position: sticky; top: 0; z-index: 60; display: flex; align-items: center;
+          justify-content: space-between; gap: 16px; padding: 15px var(--gutter);
+          border-bottom: 1px solid transparent;
+          transition: background var(--dur-base) var(--ease), border-color var(--dur-base) var(--ease), padding var(--dur-base) var(--ease); }
+        .hv .nav.on { padding-block: 11px; background: rgba(244,242,237,.78);
+          backdrop-filter: var(--glass-blur); border-bottom-color: var(--color-border-default); }
+        .hv .brand { display: flex; align-items: center; gap: 10px; font-family: var(--display);
+          font-weight: 800; font-size: 17px; letter-spacing: var(--tracking-snug); }
+        .hv .brand-dot { width: 11px; height: 11px; border-radius: 50%; background: var(--grad-primary); flex-shrink: 0; }
+        .hv .nav-links { display: flex; gap: 28px; }
+        .hv .nav-links button { background: none; border: none; cursor: pointer; font-family: var(--sansf);
+          font-size: var(--fs-small); color: var(--color-text-secondary); padding: 4px 0; position: relative;
+          transition: color var(--dur-instant) var(--ease); }
+        .hv .nav-links button::after { content: ""; position: absolute; left: 0; right: 0; bottom: -2px;
+          height: 1.5px; background: var(--color-bg-primary); transform: scaleX(0); transform-origin: 0 50%;
+          transition: transform var(--dur-fast) var(--ease); }
+        .hv .nav-links button:hover { color: var(--color-text-primary); }
+        .hv .nav-links button:hover::after { transform: scaleX(1); }
+        .hv .burger { display: none; background: none; border: none; font-size: 20px; cursor: pointer; color: var(--color-text-primary); }
 
-        .hv .hv-progress {
-          position: fixed; top: 0; left: 0; right: 0; height: 3px;
-          background: linear-gradient(90deg, var(--crimson), var(--gold), var(--teal), var(--lavender));
-          transform-origin: 0 50%; z-index: 300;
-        }
+        /* ===== Buttons ===== */
+        .hv .b { display: inline-flex; align-items: center; justify-content: center; gap: 9px;
+          font-family: var(--sansf); font-size: var(--fs-small); font-weight: 600; letter-spacing: .01em;
+          padding: 14px 26px; border-radius: var(--radius-md); border: 1px solid transparent;
+          cursor: pointer; text-decoration: none; white-space: nowrap;
+          transition: background var(--dur-fast) var(--ease), box-shadow var(--dur-fast) var(--ease),
+                      border-color var(--dur-fast) var(--ease), transform var(--dur-fast) var(--ease); }
+        .hv .b-pri { background: var(--grad-primary); color: var(--color-text-on-primary); box-shadow: var(--elev-2); }
+        .hv .b-pri:hover { box-shadow: var(--glow-primary); transform: translateY(-2px); }
+        .hv .b-sec { background: var(--color-bg-surface); color: var(--color-text-primary);
+          border-color: var(--color-border-default); box-shadow: var(--elev-1); }
+        .hv .b-sec:hover { border-color: var(--color-bg-primary); box-shadow: var(--elev-2); transform: translateY(-2px); }
 
-        /* ---------- parallax backdrop ---------- */
-        .hv .blob {
-          position: fixed; border-radius: 50%; filter: blur(90px);
-          pointer-events: none; z-index: 0;
-        }
-        .hv .blob-a {
-          width: 640px; height: 640px; top: -180px; right: -160px;
-          background: radial-gradient(circle, rgba(201,96,58,0.22), transparent 65%);
-        }
-        .hv .blob-b {
-          width: 560px; height: 560px; top: 45%; left: -200px;
-          background: radial-gradient(circle, rgba(28,122,107,0.20), transparent 65%);
-        }
-        .hv .blob-c {
-          width: 520px; height: 520px; bottom: -220px; right: 10%;
-          background: radial-gradient(circle, rgba(124,107,174,0.20), transparent 65%);
-        }
-        .hv .cells { position: fixed; inset: 0; z-index: 0; pointer-events: none; }
-        .hv .cell-dot {
-          position: absolute; border-radius: 50%;
-          background: radial-gradient(circle at 35% 35%, #D47A58, var(--crimson));
-          animation: bob 7s ease-in-out infinite alternate;
-        }
-        @keyframes bob {
-          from { transform: translateY(0) scale(1); }
-          to   { transform: translateY(-26px) scale(1.08); }
-        }
-        .hv .cursor-glow {
-          position: fixed; top: 50%; left: 50%;
-          width: 700px; height: 700px; margin: -350px 0 0 -350px;
-          background: radial-gradient(circle, rgba(184,137,46,0.10), transparent 65%);
-          border-radius: 50%; pointer-events: none; z-index: 0;
-          transition: transform .2s var(--ease);
-        }
+        /* ===== Label ===== */
+        .hv .label { display: inline-flex; align-items: center; gap: 9px; padding: 6px 13px 6px 9px;
+          border: 1px solid var(--color-border-default); border-radius: var(--radius-full);
+          background: var(--glass-bg); margin-bottom: 20px; }
+        .hv .label-cap { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+        .hv .label-code, .hv .label-name { font-family: var(--monof); font-size: var(--fs-label);
+          letter-spacing: var(--tracking-wide); text-transform: uppercase; }
+        .hv .label-code { color: var(--color-text-muted); }
+        .hv .label-name { color: var(--color-text-primary); font-weight: 500; }
 
-        /* ---------- type ---------- */
-        .hv h1 {
-          font-family: var(--display); font-weight: 900;
-          font-size: clamp(48px, 7.4vw, 100px);
-          line-height: 0.93; letter-spacing: -0.02em;
-        }
-        .hv h2 {
-          font-family: var(--display); font-weight: 900;
-          font-size: clamp(31px, 4.6vw, 58px);
-          line-height: 1.04; letter-spacing: -0.015em;
-        }
-        .hv h3 { font-family: var(--sans); font-weight: 700; font-size: 17px; letter-spacing: -0.01em; }
-        .hv p { color: var(--ink-60); font-size: 15px; line-height: 1.7; }
-        .hv .lead { font-size: clamp(16px, 1.6vw, 19px); line-height: 1.65; color: var(--ink-60); }
+        /* ===== Hero ===== */
+        .hv .hero { min-height: calc(100svh - 66px); display: flex; flex-direction: column;
+          justify-content: center; padding-block: clamp(28px, 5vh, 64px); }
+        .hv .hero-grid { display: grid; grid-template-columns: 1.08fr .92fr; gap: clamp(32px, 5vw, 76px); align-items: center; }
+        .hv .hero h1 { font-size: var(--fs-hero); font-weight: 900; max-width: 13ch; margin-bottom: 22px; }
+        .hv .hero h1 .accent { background: var(--grad-text); -webkit-background-clip: text; background-clip: text; color: transparent; }
+        .hv .hero-lede { font-size: clamp(16px, 1.3vw, 19px); color: var(--color-text-secondary); max-width: 46ch; margin-bottom: 30px; }
+        .hv .hero-cta { display: flex; gap: 12px; flex-wrap: wrap; }
+        .hv .hero-meta { display: grid; grid-template-columns: repeat(3, auto); justify-content: start; gap: 26px; margin-top: 34px; }
+        .hv .hero-meta div { display: flex; flex-direction: column; gap: 3px; }
+        .hv .hero-meta b { font-family: var(--display); font-size: 19px; font-weight: 800; }
+        .hv .hero-meta span { font-family: var(--monof); font-size: var(--fs-label);
+          letter-spacing: var(--tracking-wide); text-transform: uppercase; color: var(--color-text-muted); }
 
-        /* ---------- layout ---------- */
-        .hv .wrap { max-width: 1180px; margin: 0 auto; position: relative; }
-        .hv .sec  { padding: clamp(84px, 11vw, 156px) 6vw; position: relative; z-index: 1; }
-        .hv .sec + .sec { border-top: 1px solid var(--rule); }
+        /* ===== Photo ===== */
+        .hv .photo { position: relative; overflow: hidden; border-radius: var(--radius-xl);
+          background: var(--color-bg-subtle); box-shadow: var(--elev-3); }
+        .hv .photo-img { position: absolute; inset: -14% 0; width: 100%; height: 128%; object-fit: cover; display: block; }
+        .hv .photo-missing { position: absolute; inset: 0; display: flex; flex-direction: column;
+          align-items: center; justify-content: center; gap: 6px; padding: 16px; text-align: center;
+          font-family: var(--monof); font-size: 12px; color: var(--color-text-muted); }
+        .hv .photo-hero { aspect-ratio: 4 / 5; }
+        .hv .photo-tall { aspect-ratio: 4 / 4.4; }
 
-        /* section colour washes */
-        .hv .wash-lavender { background: linear-gradient(180deg, rgba(124,107,174,0.09), transparent 55%); }
-        .hv .wash-teal     { background: linear-gradient(180deg, rgba(28,122,107,0.09), transparent 55%); }
-        .hv .wash-gold     { background: linear-gradient(180deg, rgba(184,137,46,0.10), transparent 55%); }
-        .hv .wash-crimson  { background: linear-gradient(180deg, rgba(201,96,58,0.07), transparent 55%); }
+        /* ===== Section heads ===== */
+        /* No max-width on .head itself: a ch value here resolves against
+           the container's 16px font, which squeezed 60px headings into a
+           ~368px box and broke every section title mid-phrase. Constrain
+           the heading and the lede separately, in their own ems. */
+        .hv .head { margin-bottom: clamp(32px, 4vw, 52px); }
+        .hv .head h2 { font-size: var(--fs-display); margin-bottom: 14px; max-width: 16em; text-wrap: balance; }
+        .hv .head p { font-size: var(--fs-body); color: var(--color-text-secondary); max-width: 54ch; }
 
-        /* ghost watermark behind each section */
-        .hv .ghost {
-          position: absolute; top: 26px; right: 0;
-          font-family: var(--display); font-weight: 900;
-          font-size: clamp(70px, 12vw, 170px); line-height: 1;
-          color: transparent;
-          -webkit-text-stroke: 1px rgba(22,33,31,0.10);
-          user-select: none; pointer-events: none; white-space: nowrap;
-        }
+        /* ===== Cards ===== */
+        .hv .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+        .hv .card { position: relative; padding: 28px; border-radius: var(--radius-lg);
+          background: var(--color-bg-surface); border: 1px solid var(--color-border-default);
+          box-shadow: var(--elev-1); overflow: hidden; height: 100%;
+          transition: transform var(--dur-fast) var(--ease), box-shadow var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease); }
+        .hv .card:hover { transform: translateY(-5px); box-shadow: var(--elev-3); border-color: var(--tint); }
+        .hv .card-icon { font-size: 25px; display: block; margin-bottom: 14px; }
+        .hv .card h3 { font-size: var(--fs-h2); margin-bottom: 9px; }
+        .hv .card p { font-size: var(--fs-small); color: var(--color-text-secondary); }
 
-        /* ---------- specimen label ---------- */
-        .hv .label {
-          display: inline-flex; align-items: stretch;
-          border: 1px solid var(--rule); border-radius: 3px;
-          background: var(--card); overflow: hidden; margin-bottom: 26px;
-          box-shadow: 0 2px 10px rgba(22,33,31,0.05);
-        }
-        .hv .label-cap  { width: 9px; }
-        .hv .cap-crimson  { background: var(--crimson); }
-        .hv .cap-lavender { background: var(--lavender); }
-        .hv .cap-gold     { background: var(--gold); }
-        .hv .cap-teal     { background: var(--teal); }
-        .hv .label-body { padding: 7px 12px 7px 11px; display: flex; align-items: center; gap: 12px; }
-        .hv .label-code {
-          font-family: var(--mono); font-size: 11px; font-weight: 500;
-          letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink);
-        }
-        .hv .label-name {
-          font-family: var(--mono); font-size: 11px;
-          letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-40);
-        }
-        .hv .barcode {
-          width: 46px; align-self: stretch; min-height: 16px; opacity: .75;
-          background-image: repeating-linear-gradient(90deg,
-            var(--ink) 0 1px, transparent 1px 3px,
-            var(--ink) 3px 5px, transparent 5px 6px,
-            var(--ink) 6px 7px, transparent 7px 10px);
-        }
+        /* ===== Steps ===== */
+        .hv .steps { display: flex; flex-direction: column; }
+        .hv .step { display: grid; grid-template-columns: 92px 1fr; gap: 26px; align-items: start;
+          padding: 26px 0; border-top: 1px solid var(--color-border-default); }
+        .hv .steps > div:last-child .step { border-bottom: 1px solid var(--color-border-default); }
+        .hv .step-n { font-family: var(--display); font-size: 42px; font-weight: 900; line-height: 1;
+          color: transparent; -webkit-text-stroke: 1.5px var(--tint); }
+        .hv .step h3 { font-size: var(--fs-h2); margin-bottom: 7px; }
+        .hv .step p { font-size: var(--fs-small); color: var(--color-text-secondary); max-width: 62ch; }
 
-        /* ---------- buttons ---------- */
-        .hv .btn {
-          font-family: var(--sans); font-size: 14px; font-weight: 700;
-          padding: 13px 26px; border-radius: var(--radius-md); cursor: pointer;
-          border: 1px solid transparent;
-          transition: background var(--dur-instant) var(--ease),
-                      border-color var(--dur-instant) var(--ease),
-                      color var(--dur-instant) var(--ease);
-        }
-        /* Hover changes colour only — no lift. */
-        .hv .btn-primary {
-          background: var(--color-bg-primary); color: var(--color-text-on-primary);
-        }
-        .hv .btn-primary:hover { background: var(--color-bg-primary-hover); }
-        .hv .btn-ghost { background: transparent; color: var(--color-text-primary); border-color: var(--color-border-strong); }
-        .hv .btn-ghost:hover { background: var(--color-bg-subtle); border-color: var(--color-border-focus); }
+        .hv .split { display: grid; grid-template-columns: 1fr 1fr; gap: clamp(30px, 5vw, 72px); align-items: center; }
+        .hv .split-top { align-items: start; }
 
-        /* ---------- nav ---------- */
-        .hv .nav {
-          position: fixed; top: 0; left: 0; right: 0; height: 66px;
-          display: flex; align-items: center; justify-content: space-between;
-          padding: 0 6vw; z-index: 200;
-          background: rgba(243,240,234,0.86);
-          backdrop-filter: blur(14px);
-          border-bottom: 1px solid var(--rule);
-        }
-        .hv .brand {
-          display: flex; align-items: center; gap: 9px;
-          font-family: var(--mono); font-weight: 500; font-size: 13px;
-          letter-spacing: 0.22em; text-transform: uppercase;
-        }
-        .hv .brand-dot {
-          width: 10px; height: 10px; border-radius: 50%;
-          background: radial-gradient(circle at 35% 35%, #D47A58, var(--crimson));
-          flex-shrink: 0; animation: pulse 2.4s ease-in-out infinite;
-        }
-        @keyframes pulse {
-          0%, 100% { box-shadow: 0 0 0 0 rgba(201,96,58,0.35); }
-          50%      { box-shadow: 0 0 0 7px rgba(201,96,58,0); }
-        }
-        .hv .nav-links { display: flex; gap: 26px; }
-        .hv .nav-link {
-          background: none; border: none; cursor: pointer;
-          font-family: var(--mono); font-size: 11px; letter-spacing: 0.13em;
-          text-transform: uppercase; color: var(--ink-40); padding: 4px 0;
-          border-bottom: 1px solid transparent; transition: color .2s, border-color .2s;
-        }
-        .hv .nav-link:hover { color: var(--ink); }
-        .hv .nav-link.on { color: var(--ink); border-bottom-color: var(--crimson); }
-        .hv .burger { display: none; background: none; border: none; font-size: 19px; cursor: pointer; color: var(--ink); }
+        /* ===== Band ===== */
+        .hv .band { position: relative; min-height: clamp(320px, 52vh, 520px); display: flex; align-items: center; overflow: hidden; }
+        .hv .band .photo { position: absolute; inset: 0; border-radius: 0; box-shadow: none; }
+        .hv .band-veil { position: absolute; inset: 0; background: linear-gradient(100deg, rgba(14,17,22,.88), rgba(15,110,98,.66)); }
+        .hv .band-in { position: relative; z-index: 1; }
+        .hv .band-in h2 { color: #fff; font-size: var(--fs-display); max-width: 18ch; margin-bottom: 14px; }
+        .hv .band-in p { color: rgba(255,255,255,.88); font-size: var(--fs-body); max-width: 52ch; }
 
-        .hv .overlay { position: fixed; inset: 0; background: rgba(22,33,31,0.45); z-index: 240; }
-        .hv .drawer {
-          position: fixed; top: 0; left: 0; bottom: 0; width: 285px; z-index: 250;
-          background: var(--paper); border-right: 1px solid var(--rule);
-          padding: 26px 22px; display: flex; flex-direction: column; gap: 4px;
-        }
-        .hv .drawer-item {
-          display: flex; justify-content: space-between; align-items: center;
-          padding: 13px 4px; border: none; border-bottom: 1px solid var(--rule);
-          font-family: var(--mono); font-size: 12px; letter-spacing: 0.12em;
-          text-transform: uppercase; color: var(--ink-60);
-          background: none; width: 100%; cursor: pointer; text-align: left;
-        }
-        .hv .drawer-item.on { color: var(--crimson); }
+        /* ===== Roles ===== */
+        .hv .roles { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+        .hv .role { display: flex; gap: 16px; padding: 22px; border-radius: var(--radius-lg); height: 100%;
+          background: var(--glass-bg); border: 1px solid var(--color-border-default);
+          transition: transform var(--dur-fast) var(--ease), box-shadow var(--dur-fast) var(--ease); }
+        .hv .role:hover { transform: translateY(-3px); box-shadow: var(--elev-2); }
+        .hv .role-badge { width: 42px; height: 42px; border-radius: 12px; flex-shrink: 0; display: flex;
+          align-items: center; justify-content: center; font-family: var(--display); font-weight: 800;
+          font-size: 15px; color: #fff; background: var(--tint); }
+        .hv .role h3 { font-size: var(--fs-h3); margin-bottom: 5px; }
+        .hv .role p { font-size: var(--fs-small); color: var(--color-text-secondary); }
 
-        /* ---------- ticker ---------- */
-        .hv .ticker {
-          border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule);
-          background: var(--ink); overflow: hidden; position: relative; z-index: 1;
-        }
-        .hv .ticker-track {
-          display: flex; gap: 0; width: max-content;
-          animation: slide 26s linear infinite;
-        }
-        @keyframes slide { from { transform: translateX(0); } to { transform: translateX(-50%); } }
-        .hv .ticker-item {
-          display: flex; align-items: center; gap: 18px;
-          padding: 13px 26px;
-          font-family: var(--mono); font-size: 11.5px; letter-spacing: 0.16em;
-          text-transform: uppercase; color: rgba(243,240,234,0.85); white-space: nowrap;
-        }
-        .hv .ticker-item::after { content: "·"; color: var(--gold); font-size: 16px; }
+        /* ===== Lifecycle ===== */
+        .hv .flow { display: grid; grid-template-columns: repeat(5, 1fr); gap: 18px; }
+        .hv .flow-item { padding-top: 20px; border-top: 2px solid var(--tint); height: 100%; }
+        .hv .flow-item b { font-family: var(--monof); font-size: var(--fs-label);
+          letter-spacing: var(--tracking-wide); color: var(--tint); display: block; margin-bottom: 9px; }
+        .hv .flow-item h3 { font-size: var(--fs-h3); margin-bottom: 6px; }
+        .hv .flow-item p { font-size: 13px; color: var(--color-text-secondary); line-height: 1.55; }
 
-        /* ---------- photo plates ---------- */
-        .hv .plate { position: relative; }
-        .hv .plate-frame {
-          position: relative; overflow: hidden;
-          border: 1px solid var(--rule); border-radius: 4px;
-          box-shadow: 0 22px 50px rgba(22,33,31,0.16);
-        }
-        .hv .plate-img {
-          width: 100%; height: 100%; display: block; object-fit: cover;
-          transform: scale(1.12); /* headroom for parallax drift */
-        }
-        .hv .plate-tape {
-          position: absolute; top: -1px; left: 18px;
-          padding: 5px 12px; z-index: 2;
-          font-family: var(--mono); font-size: 10px; letter-spacing: .14em;
-          text-transform: uppercase; color: #fff;
-          border-radius: 0 0 3px 3px;
-        }
-        .hv .plate-cap {
-          display: flex; align-items: center; gap: 8px; margin-top: 12px;
-          font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.13em;
-          text-transform: uppercase; color: var(--ink-40);
-        }
-        .hv .plate-cap::before { content: ""; width: 16px; height: 1px; background: var(--ink-40); }
-        .hv .ph {
-          width: 100%; height: 100%; display: flex; flex-direction: column;
-          align-items: center; justify-content: center; gap: 8px;
-          border: 1px dashed var(--ink-40); border-radius: 4px;
-          background: var(--card); color: var(--ink-40);
-          font-family: var(--mono); font-size: 11px; letter-spacing: 0.1em;
-          text-align: center; padding: 20px;
-        }
-
-        /* ---------- hero ---------- */
-        .hv .hero { padding-top: clamp(122px, 15vw, 190px); }
-        .hv .hero-grid {
-          display: grid; grid-template-columns: 1.05fr 0.95fr;
-          gap: clamp(30px, 5vw, 70px); align-items: center;
-        }
-        .hv .hero-frame { height: clamp(350px, 47vw, 540px); }
-        .hv .hero-word { position: relative; display: inline-block; }
-        .hv .hero-word::after {
-          content: ""; position: absolute; left: 0; right: 0; bottom: 7%;
-          height: 0.28em; background: rgba(201,96,58,0.18); z-index: -1;
-          transform: skewX(-8deg);
-        }
-        .hv .hero-meta {
-          display: flex; gap: 30px; margin-top: 42px;
-          padding-top: 22px; border-top: 1px solid var(--rule); flex-wrap: wrap;
-        }
-        .hv .hero-meta-item { display: flex; flex-direction: column; gap: 3px; }
-        .hv .hero-meta-v { font-family: var(--display); font-size: 27px; font-weight: 900; }
-        .hv .hero-meta-l {
-          font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.13em;
-          text-transform: uppercase; color: var(--ink-40);
-        }
-
-        /* ---------- about ---------- */
-        .hv .about-grid {
-          display: grid; grid-template-columns: 0.95fr 1.05fr;
-          gap: clamp(30px, 5vw, 70px); align-items: center;
-        }
-        .hv .about-frame { height: clamp(310px, 41vw, 470px); }
-
-        /* ---------- features ---------- */
-        .hv .grid-3 {
-          display: grid; grid-template-columns: repeat(3, 1fr);
-          gap: 1px; background: var(--rule);
-          border: 1px solid var(--rule); border-radius: 4px;
-          margin-top: 52px; overflow: hidden;
-        }
-        .hv .cell {
-          background: var(--card); padding: 34px 28px; position: relative;
-          transition: transform .25s ease, box-shadow .25s ease;
-        }
-        .hv .cell::before {
-          content: ""; position: absolute; top: 0; left: 0; right: 0; height: 3px;
-          background: var(--tint, var(--crimson));
-          transform: scaleX(0); transform-origin: 0 50%;
-          transition: transform .18s var(--ease);
-        }
-        .hv .cell:hover { box-shadow: 0 16px 34px rgba(22,33,31,0.12); z-index: 2; }
-        .hv .cell:hover::before { transform: scaleX(1); }
-        .hv .cell-icon {
-          width: 44px; height: 44px; border-radius: 10px;
-          display: flex; align-items: center; justify-content: center;
-          font-size: 21px; margin-bottom: 16px;
-          background: color-mix(in srgb, var(--tint, var(--crimson)) 14%, transparent);
-        }
-        .hv .cell h3 { margin-bottom: 8px; }
-
-        /* ---------- process ---------- */
-        .hv .steps { margin-top: 52px; counter-reset: step; }
-        .hv .step {
-          display: grid; grid-template-columns: 92px 1fr; gap: 24px;
-          padding: 30px 22px; align-items: start; border-radius: 4px;
-          border: 1px solid transparent; border-bottom-color: var(--rule);
-          transition: background .25s ease, border-color .25s ease, transform .25s ease;
-        }
-        .hv .step:hover {
-          background: var(--card); border-color: var(--rule);
-          transform: translateX(6px);
-        }
-        .hv .step-n {
-          font-family: var(--display); font-weight: 900; font-size: 40px;
-          line-height: 1; color: var(--tint, var(--crimson)); opacity: .85;
-        }
-        .hv .step h3 { margin-bottom: 6px; font-size: 19px; }
-
-        /* ---------- band ---------- */
-        .hv .band {
-          position: relative; height: clamp(300px, 42vw, 480px);
-          overflow: hidden; border-top: 1px solid var(--rule); z-index: 1;
-        }
-        .hv .band-img {
-          position: absolute; inset: -18% 0; width: 100%; height: 136%;
-          object-fit: cover; display: block;
-        }
-        .hv .band-veil {
-          position: absolute; inset: 0;
-          background: linear-gradient(90deg, rgba(22,33,31,0.85), rgba(201,96,58,0.45));
-          display: flex; align-items: center; padding: 0 6vw;
-        }
-        .hv .band-veil h2 { color: #fff; max-width: 640px; }
-        .hv .band-veil p  { color: rgba(255,255,255,0.75); max-width: 480px; margin-top: 14px; }
-
-        /* ---------- stats ---------- */
-        .hv .stats-row {
-          display: grid; grid-template-columns: repeat(4, 1fr);
-          gap: 22px; margin-top: 52px;
-        }
-        .hv .stat {
-          background: var(--card); padding: 36px 26px;
-          border: 1px solid var(--rule); border-radius: 4px;
-          border-top: 4px solid var(--tint, var(--crimson));
-          box-shadow: 0 10px 26px rgba(22,33,31,0.07);
-          transition: transform .25s ease, box-shadow .25s ease;
-        }
-        .hv .stat:hover { box-shadow: 0 18px 38px rgba(22,33,31,0.13); }
-        .hv .stat-v {
-          font-family: var(--display); font-weight: 900;
-          font-size: clamp(40px, 5vw, 62px); line-height: 1; letter-spacing: -0.02em;
-          color: var(--tint, var(--ink));
-        }
-        .hv .stat-l {
-          font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.13em;
-          text-transform: uppercase; color: var(--ink-40); margin-top: 10px;
-        }
-
-        /* ---------- reviews ---------- */
-        .hv .quotes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; margin-top: 52px; }
-        .hv .quote {
-          background: var(--card); border: 1px solid var(--rule);
-          border-left: 4px solid var(--tint, var(--crimson));
-          border-radius: 4px; padding: 30px 26px;
-          display: flex; flex-direction: column; justify-content: space-between; gap: 22px;
-          transition: transform .25s ease, box-shadow .25s ease;
-        }
-        .hv .quote:hover { box-shadow: 0 18px 38px rgba(22,33,31,0.12); }
-        .hv .quote-text {
-          font-family: var(--display); font-size: 19px; line-height: 1.45;
-          color: var(--ink); font-weight: 700;
-        }
-        .hv .quote-who { display: flex; align-items: center; gap: 11px; }
-        .hv .quote-badge {
-          width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0;
-          background: var(--tint, var(--ink)); color: #fff;
-          display: flex; align-items: center; justify-content: center;
-          font-family: var(--mono); font-size: 12px;
-        }
-        .hv .quote-stars { color: var(--gold); font-size: 12px; letter-spacing: 2px; }
-
-        /* ---------- team ---------- */
-        .hv .team-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 22px; margin-top: 52px; }
-        .hv .member {
-          border-top: 3px solid var(--tint, var(--ink)); padding: 20px 18px;
-          background: var(--card); border-radius: 0 0 4px 4px;
-          border-left: 1px solid var(--rule); border-right: 1px solid var(--rule);
-          border-bottom: 1px solid var(--rule);
-          transition: transform .25s ease, box-shadow .25s ease;
-        }
-        .hv .member:hover { box-shadow: 0 16px 34px rgba(22,33,31,0.11); }
-        .hv .member-in {
-          width: 42px; height: 42px; border-radius: 50%;
-          display: flex; align-items: center; justify-content: center;
-          font-family: var(--mono); font-size: 13px; color: #fff;
-          background: var(--tint, var(--ink)); margin-bottom: 14px;
-        }
-        .hv .member h3 { margin-bottom: 4px; font-size: 15px; }
-        .hv .member p { font-size: 13px; }
-
-        /* ---------- faq ---------- */
-        .hv .faqs { margin-top: 46px; border-top: 1px solid var(--rule); }
-        .hv .faq {
-          border: none; border-bottom: 1px solid var(--rule); cursor: pointer;
-          padding: 22px 8px; width: 100%; text-align: left; background: none;
-          transition: background .2s ease;
-        }
-        .hv .faq:hover { background: rgba(22,33,31,0.03); }
-        .hv .faq-q {
-          display: flex; justify-content: space-between; align-items: center; gap: 18px;
-          font-family: var(--sans); font-weight: 700; font-size: 16px; color: var(--ink);
-        }
-        .hv .faq-sign { font-family: var(--mono); font-size: 18px; color: var(--crimson); flex-shrink: 0; }
+        /* ===== FAQ ===== */
+        .hv .faq { border-top: 1px solid var(--color-border-default); }
+        .hv .faq.last { border-bottom: 1px solid var(--color-border-default); }
+        .hv .faq-q { width: 100%; display: flex; justify-content: space-between; align-items: center; gap: 24px;
+          background: none; border: none; cursor: pointer; text-align: left; padding: 24px 0;
+          font-family: var(--display); font-weight: 700; font-size: var(--fs-h2);
+          letter-spacing: var(--tracking-snug); color: var(--color-text-primary);
+          transition: color var(--dur-instant) var(--ease); }
+        .hv .faq-q:hover { color: var(--color-bg-primary); }
+        .hv .faq-sign { font-family: var(--monof); font-size: 22px; color: var(--color-text-accent); flex-shrink: 0;
+          transition: transform var(--dur-fast) var(--ease); }
+        .hv .faq.open .faq-sign { transform: rotate(45deg); }
         .hv .faq-a { overflow: hidden; }
-        .hv .faq-a p { padding-top: 12px; max-width: 640px; }
+        .hv .faq-a p { font-size: var(--fs-body); color: var(--color-text-secondary); max-width: 70ch; padding-bottom: 24px; }
 
-        /* ---------- contact ---------- */
-        .hv .contact {
-          position: relative; overflow: hidden; border-radius: 6px;
-          border: 1px solid var(--rule); margin-top: 46px;
-          box-shadow: 0 30px 70px rgba(22,33,31,0.22);
-        }
-        .hv .contact-bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
-        .hv .contact-in {
-          position: relative;
-          background: linear-gradient(120deg, rgba(22,33,31,0.92), rgba(201,96,58,0.78));
-          padding: clamp(48px, 8vw, 92px) 6vw; text-align: center;
-        }
-        .hv .contact-in h2 { color: #fff; }
-        .hv .contact-in p  { color: rgba(255,255,255,0.72); max-width: 520px; margin: 14px auto 0; }
-        .hv .contact-row { display: flex; justify-content: center; gap: 34px; flex-wrap: wrap; margin-top: 34px; }
-        .hv .contact-item {
-          font-family: var(--mono); font-size: 12px; letter-spacing: 0.08em;
-          color: rgba(255,255,255,0.88);
-        }
-        .hv .contact-in .label { background: transparent; border-color: rgba(255,255,255,0.3); box-shadow: none; }
-        .hv .contact-in .label-code { color: #fff; }
-        .hv .contact-in .label-name { color: rgba(255,255,255,0.55); }
-        .hv .contact-in .barcode {
-          background-image: repeating-linear-gradient(90deg, #fff 0 1px, transparent 1px 3px,
-            #fff 3px 5px, transparent 5px 6px, #fff 6px 7px, transparent 7px 10px);
-        }
-        .hv .contact-in .btn-primary { background: var(--color-bg-surface); color: var(--color-bg-primary); }
-        .hv .contact-in .btn-primary:hover { background: var(--paper); }
+        /* ===== CTA ===== */
+        .hv .cta { position: relative; overflow: hidden; border-radius: var(--radius-2xl);
+          padding: clamp(40px, 6vw, 76px); text-align: center; background: var(--ground-900); box-shadow: var(--elev-4); }
+        .hv .cta::before { content: ""; position: absolute; inset: -40%; background: var(--grad-aurora);
+          filter: blur(50px); opacity: .62; pointer-events: none; }
+        .hv .cta-in { position: relative; z-index: 1; }
+        .hv .cta h2 { color: #fff; font-size: var(--fs-display); margin-bottom: 16px; }
+        .hv .cta p { color: rgba(255,255,255,.82); font-size: var(--fs-body); max-width: 48ch; margin: 0 auto 30px; }
+        .hv .cta .label { background: rgba(255,255,255,.1); border-color: rgba(255,255,255,.22); }
+        .hv .cta .label-name { color: #fff; }
+        .hv .cta .label-code { color: rgba(255,255,255,.6); }
+        .hv .cta .b-sec { background: transparent; color: #fff; border-color: rgba(255,255,255,.32); box-shadow: none; }
+        .hv .cta .b-sec:hover { background: rgba(255,255,255,.1); border-color: #fff; }
 
-        /* ---------- footer ---------- */
-        .hv .foot {
-          padding: 34px 6vw; border-top: 1px solid var(--rule);
-          display: flex; justify-content: space-between; align-items: center;
-          gap: 16px; flex-wrap: wrap; position: relative; z-index: 1;
-        }
-        .hv .foot p { font-family: var(--mono); font-size: 11px; letter-spacing: 0.08em; }
+        /* ===== Footer ===== */
+        .hv .foot { border-top: 1px solid var(--color-border-default); padding-block: 46px; position: relative; z-index: 1; }
+        .hv .foot-row { display: flex; justify-content: space-between; align-items: center; gap: 24px; flex-wrap: wrap; }
+        .hv .foot-logo { height: 46px; width: auto; opacity: .85; }
+        .hv .foot a { color: var(--color-text-secondary); font-size: var(--fs-small); text-decoration: none; margin-right: 22px; }
+        .hv .foot a:hover { color: var(--color-text-primary); text-decoration: underline; }
+        .hv .foot small { font-size: var(--fs-small); color: var(--color-text-muted); }
 
-        /* ---------- responsive ---------- */
-        @media (max-width: 1000px) {
-          .hv .nav-links { display: none; }
-          .hv .burger { display: block; }
-          .hv .hero-grid, .hv .about-grid { grid-template-columns: 1fr; }
-          .hv .grid-3, .hv .quotes { grid-template-columns: repeat(2, 1fr); }
-          .hv .team-row, .hv .stats-row { grid-template-columns: repeat(2, 1fr); }
-          .hv .ghost { font-size: clamp(56px, 14vw, 120px); }
+        /* ===== Responsive ===== */
+        @media (max-width: 980px) {
+          .hv .hero-grid, .hv .split { grid-template-columns: 1fr; }
+          .hv .cards { grid-template-columns: repeat(2, 1fr); }
+          .hv .flow { grid-template-columns: repeat(2, 1fr); }
+          .hv .photo-hero { aspect-ratio: 16 / 10; }
         }
         @media (max-width: 640px) {
-          .hv .grid-3, .hv .quotes, .hv .team-row, .hv .stats-row { grid-template-columns: 1fr; }
-          .hv .step { grid-template-columns: 56px 1fr; padding: 24px 10px; }
-          .hv .step-n { font-size: 28px; }
-          .hv .band-veil { background: rgba(22,33,31,0.74); }
-          .hv .ghost { display: none; }
+          .hv .nav-links { display: none; }
+          .hv .burger { display: block; }
+          .hv .nav-links.open { display: flex; flex-direction: column; position: absolute; top: 100%;
+            left: 0; right: 0; background: var(--color-bg-page);
+            border-bottom: 1px solid var(--color-border-default); padding: 18px var(--gutter); gap: 16px; }
+          .hv .cards, .hv .roles, .hv .flow { grid-template-columns: 1fr; }
+          .hv .step { grid-template-columns: 58px 1fr; gap: 16px; }
+          .hv .step-n { font-size: 30px; }
+          .hv .hero-meta { gap: 14px; }
+          .hv .hero-meta b { font-size: 17px; }
         }
 
-        /* ---------- mobile perf: drop GPU-heavy fixed blur layers ---------- */
-        @media (max-width: 780px), (hover: none) and (pointer: coarse) {
-          .hv .blob, .hv .cells, .hv .cursor-glow { display: none; }
-          .hv .nav { backdrop-filter: none; background: rgba(243,240,234,0.97); }
-        }
-
+        /* Aurora and grain are pure decoration; drop them for reduced motion. */
         @media (prefers-reduced-motion: reduce) {
-          .hv * { animation: none !important; transition: none !important; }
-          .hv .btn:hover, .hv .cell:hover, .hv .stat:hover,
-          .hv .quote:hover, .hv .member:hover, .hv .step:hover { transform: none; }
-          .hv .ticker-track { animation: none !important; }
+          .hv .aurora, .hv .grain { display: none; }
+          .hv .card:hover, .hv .role:hover, .hv .b:hover { transform: none; }
         }
       `}</style>
 
-      {/* ================= NAV ================= */}
-      <nav className="nav">
-        <button className="burger" onClick={() => setOpen(true)} aria-label="Open menu">☰</button>
+      <motion.div
+        className="aurora"
+        aria-hidden="true"
+        style={pointer.layer(0.6)}
+        animate={rich ? { scale: [1, 1.07, 1], rotate: [0, 1.5, 0] } : undefined}
+        transition={rich ? { duration: 26, repeat: Infinity, ease: "easeInOut" } : undefined}
+      />
+      <div className="grain" aria-hidden="true" />
+      <motion.div className="prog" style={{ scaleX: progress }} aria-hidden="true" />
+
+      {/* ===== NAV ===== */}
+      <nav className={scrolled ? "nav on" : "nav"}>
         <div className="brand"><span className="brand-dot" />Home Visit</div>
-        <div className="nav-links">
-          {SECTIONS.slice(1, 6).map((s) => (
-            <button key={s.id} className={`nav-link ${active === s.id ? "on" : ""}`} onClick={() => scrollTo(s.id)}>
-              {s.name}
-            </button>
-          ))}
+        <div className={open ? "nav-links open" : "nav-links"}>
+          {NAV.map((s) => <button key={s.id} onClick={() => go(s.id)}>{s.name}</button>)}
         </div>
-        <button className="btn btn-primary" onClick={() => navigate("/login")}>Book a test</button>
+        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+          <button className="b b-pri" onClick={() => navigate("/login")}>Book a test</button>
+          <button className="burger" onClick={() => setOpen(!open)} aria-label="Toggle menu" aria-expanded={open}>
+            {open ? "✕" : "☰"}
+          </button>
+        </div>
       </nav>
 
-      {/* ================= DRAWER ================= */}
-      <AnimatePresence>
-        {open && (
-          <>
-            <motion.div className="overlay" onClick={() => setOpen(false)}
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} />
-            <motion.div className="drawer"
-              initial={{ x: -300 }} animate={{ x: 0 }} exit={{ x: -300 }}
-              transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}>
-              <div className="brand" style={{ marginBottom: 22 }}><span className="brand-dot" />Home Visit</div>
-              {SECTIONS.map((s) => (
-                <button key={s.id} className={`drawer-item ${active === s.id ? "on" : ""}`} onClick={() => scrollTo(s.id)}>
-                  <span>{s.name}</span>
-                  <span style={{ fontSize: 10, color: CAP[s.cap] }}>{s.code}</span>
-                </button>
-              ))}
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
-
-      {/* ================= HERO ================= */}
-      <section id="hero" className="sec hero">
-        <div className="wrap hero-grid">
+      {/* ===== HERO ===== */}
+      <header id="hero" className="wrap hero">
+        <div className="hero-grid">
           <motion.div style={{ y: heroTextY, opacity: heroFade }}>
-            <Reveal>
-              <SpecimenLabel section={section("hero")} />
-              <h1>
-                Hospital care,<br />drawn at<br />
-                <span className="hero-word" style={{ color: "var(--crimson)" }}>your door.</span>
-              </h1>
-              <p className="lead" style={{ marginTop: 22, maxWidth: 460 }}>
-                A certified phlebotomist comes to your home, collects the sample, and your
-                verified report lands in the app within hours. No queues, no waiting rooms.
-              </p>
-              <div style={{ marginTop: 32, display: "flex", gap: 12, flexWrap: "wrap" }}>
-                <button className="btn btn-primary" onClick={() => navigate("/login")}>Book a test</button>
-                <button className="btn btn-ghost" onClick={() => scrollTo("process")}>See how it works</button>
-              </div>
-              <div className="hero-meta">
-                <div className="hero-meta-item"><span className="hero-meta-v">2h</span><span className="hero-meta-l">Report time</span></div>
-                <div className="hero-meta-item"><span className="hero-meta-v">200+</span><span className="hero-meta-l">Test panels</span></div>
-                <div className="hero-meta-item"><span className="hero-meta-v">Cardiff</span><span className="hero-meta-l">& South Wales</span></div>
-              </div>
-            </Reveal>
+            <Stagger>
+              <StaggerItem><SpecimenLabel section={section("hero")} /></StaggerItem>
+              <StaggerItem><h1>Blood tests, <span className="accent">at your door.</span></h1></StaggerItem>
+              <StaggerItem>
+                <p className="hero-lede">
+                  A phlebotomist visits your home, takes the sample, and your
+                  report arrives digitally. No clinic, no waiting room.
+                </p>
+              </StaggerItem>
+              <StaggerItem>
+                <div className="hero-cta">
+                  <button className="b b-pri" onClick={() => navigate("/login")}>Book a test →</button>
+                  <button className="b b-sec" onClick={() => go("process")}>See how it works</button>
+                </div>
+              </StaggerItem>
+              <StaggerItem>
+                <div className="hero-meta">
+                  <div><b>Cardiff</b><span>&amp; South Wales</span></div>
+                  <div><b>CF</b><span>postcodes covered</span></div>
+                  <div><b>6</b><span>test panels</span></div>
+                </div>
+              </StaggerItem>
+            </Stagger>
           </motion.div>
 
-          <motion.div style={{ y: heroImgY, scale: heroScale }}>
-            <Reveal delay={0.1} from="right">
-              <ParallaxPlate
-                src="/images/image1.jpg"
-                alt="A Home Visit phlebotomist collecting a sample at a patient's home"
-                caption="Plate 01 — Home collection"
-                frameClass="hero-frame" slot="image1.jpg"
-                tape="Specimen 01" tint={CAP.crimson}
-                eager
+          <motion.div style={{ y: heroPhotoY }}>
+            <Reveal from="right" index={1}>
+              <ParallaxPhoto
+                src={IMG.hero}
+                alt="A phlebotomist taking a blood sample from a seated patient in her own living room"
+                className="photo-hero"
+                priority
               />
             </Reveal>
           </motion.div>
         </div>
+      </header>
+
+      {/* ===== ABOUT ===== */}
+      <section id="about" className="wrap">
+        <div className="split split-top">
+          <Reveal>
+            <div>
+              <SpecimenLabel section={section("about")} />
+              <h2 style={{ fontSize: "var(--fs-display)", marginBottom: 16, maxWidth: "14em", textWrap: "balance" }}>Every drop tells a story.</h2>
+              <p style={{ fontSize: "var(--fs-body)", color: "var(--color-text-secondary)", maxWidth: "52ch" }}>
+                Home Visit connects patients in Cardiff and South Wales with a
+                phlebotomist who comes to them. The sample goes to a laboratory
+                for analysis, and the result comes back as a report you can
+                download from your account.
+              </p>
+            </div>
+          </Reveal>
+          <Reveal from="left" index={1}>
+            <ParallaxPhoto
+              src={IMG.tube}
+              alt="A gloved hand holding a labelled blood sample tube"
+              className="photo-tall"
+              strength={12}
+            />
+          </Reveal>
+        </div>
       </section>
 
-      {/* ================= TICKER ================= */}
-      <div className="ticker" aria-hidden="true">
-        <div className="ticker-track">
-          {[...ticker, ...ticker].map((t, i) => (
-            <span className="ticker-item" key={i}>{t}</span>
+      {/* ===== FEATURES ===== */}
+      <section id="features" className="wrap">
+        <Reveal>
+          <div className="head">
+            <SpecimenLabel section={section("features")} />
+            <h2>What you get.</h2>
+            <p>Everything the service does, and nothing it does not.</p>
+          </div>
+        </Reveal>
+        <div className="cards">
+          {features.map((f, i) => (
+            <Reveal key={f.title} index={i} from="scale">
+              <article className="card" style={{ "--tint": CAP[f.tint] }}>
+                <span className="card-icon" aria-hidden="true">{f.icon}</span>
+                <h3>{f.title}</h3>
+                <p>{f.desc}</p>
+              </article>
+            </Reveal>
           ))}
+        </div>
+      </section>
+
+      {/* ===== PROCESS ===== */}
+      <section id="process" className="wrap">
+        <Reveal>
+          <div className="head">
+            <SpecimenLabel section={section("process")} />
+            <h2>Four steps. One report.</h2>
+          </div>
+        </Reveal>
+        <div className="steps">
+          {process.map((p, i) => (
+            <Reveal key={p.step} index={i} from="left">
+              <div className="step" style={{ "--tint": CAP[p.tint] }}>
+                <span className="step-n">{p.step}</span>
+                <div>
+                  <h3>{p.title}</h3>
+                  <p>{p.desc}</p>
+                </div>
+              </div>
+            </Reveal>
+          ))}
+        </div>
+      </section>
+
+      {/* ===== BAND ===== */}
+      <div className="band">
+        <ParallaxPhoto
+          src={IMG.lab}
+          alt="A laboratory technician preparing blood samples for analysis"
+          strength={14}
+        />
+        <div className="band-veil" />
+        <div className="wrap band-in">
+          <Reveal>
+            <div>
+              <h2>Collected at home. Processed in a laboratory.</h2>
+              <p>
+                Your sample is taken at your address and sent to a laboratory
+                for analysis. You can follow each stage from your account.
+              </p>
+            </div>
+          </Reveal>
         </div>
       </div>
 
-      {/* ================= ABOUT ================= */}
-      <section id="about" className="sec wash-lavender">
-        <span className="ghost">About</span>
-        <div className="wrap about-grid">
-          <Reveal>
-            <ParallaxPlate
-              src="/images/image 2.jpg"
-              alt="Samples being processed in an accredited laboratory"
-              caption="Plate 02 — Accredited lab"
-              frameClass="about-frame" slot="image 2.jpg"
-              tape="Specimen 02" tint={CAP.lavender}
-            />
-          </Reveal>
-          <Reveal delay={0.1} from="right">
-            <SpecimenLabel section={section("about")} />
-            <h2>Every drop tells a story. We make sure it reaches you.</h2>
-            <p className="lead" style={{ margin: "20px 0 16px" }}>
-              Home Visit brings blood sample collection to your home across Cardiff and South Wales, and sends your sample to a laboratory for processing.
-            </p>
-            <p>
-              From a routine full blood count to advanced hormone profiles, every sample is barcoded at
-              your door, tracked through the lab, and verified by a technician before the report is
-              released to you. You can follow each stage from your phone.
-            </p>
-          </Reveal>
-        </div>
-      </section>
-
-      {/* ================= FEATURES ================= */}
-      <section id="features" className="sec wash-teal">
-        <span className="ghost">Services</span>
-        <div className="wrap">
-          <Reveal>
-            <SpecimenLabel section={section("features")} />
-            <h2>What you get.</h2>
-            <p className="lead" style={{ marginTop: 16, maxWidth: 560 }}>
-              Six things we hold ourselves to on every single booking.
-            </p>
-          </Reveal>
-          <div className="grid-3">
-            {features.map((f, i) => (
-              <Reveal key={f.title} index={i} from="scale">
-                <div className="cell" style={{ "--tint": CAP[f.tint] }}>
-                  <span className="cell-icon">{f.icon}</span>
-                  <h3>{f.title}</h3>
-                  <p>{f.desc}</p>
-                </div>
-              </Reveal>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ================= PROCESS ================= */}
-      <section id="process" className="sec wash-gold">
-        <span className="ghost">Process</span>
-        <div className="wrap">
-          <Reveal>
-            <SpecimenLabel section={section("process")} />
-            <h2>Four steps. One report.</h2>
-          </Reveal>
-          <div className="steps">
-            {process.map((p, i) => (
-              <Reveal key={p.step} index={i} from="left">
-                <div className="step" style={{ "--tint": CAP[p.tint] }}>
-                  <div className="step-n">{p.step}</div>
-                  <div>
-                    <h3>{p.title}</h3>
-                    <p>{p.desc}</p>
-                  </div>
-                </div>
-              </Reveal>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ================= BAND ================= */}
-      <ParallaxBand
-        src="/images/image 2.jpg"
-        alt="A laboratory technician preparing blood samples for analysis"
-        slot="image 2.jpg"
-      >
-        <h2>Collected at home.<br />Processed in a laboratory.</h2>
-        <p>
-          Your sample is taken at your address and sent to a laboratory for
-          analysis. You can follow each stage from your account.
-        </p>
-      </ParallaxBand>
-
-      {/* ================= ROLES ================= */}
-      <section id="roles" className="sec wash-crimson">
-        <span className="ghost">Roles</span>
-        <div className="wrap">
-          <Reveal>
+      {/* ===== ROLES ===== */}
+      <section id="roles" className="wrap">
+        <Reveal>
+          <div className="head">
             <SpecimenLabel section={section("roles")} />
             <h2>Four roles, one system.</h2>
-          </Reveal>
-          <div className="team-row">
-            {roles.map((r, i) => (
-              <Reveal key={r.title} index={i} from="scale">
-                <div className="member" style={{ "--tint": CAP[r.tint] }}>
-                  <div className="member-in">{r.initials}</div>
+            <p>Each role sees only what it needs.</p>
+          </div>
+        </Reveal>
+        <div className="roles">
+          {roles.map((r, i) => (
+            <Reveal key={r.title} index={i} from="scale">
+              <div className="role" style={{ "--tint": CAP[r.tint] }}>
+                <span className="role-badge" aria-hidden="true">{r.initials}</span>
+                <div>
                   <h3>{r.title}</h3>
                   <p>{r.desc}</p>
                 </div>
-              </Reveal>
-            ))}
-          </div>
+              </div>
+            </Reveal>
+          ))}
         </div>
       </section>
 
-      {/* ================= BOOKING LIFECYCLE ================= */}
-      <section id="booking" className="sec wash-lavender">
-        <span className="ghost">Booking</span>
-        <div className="wrap">
-          <Reveal>
+      {/* ===== LIFECYCLE ===== */}
+      <section id="booking" className="wrap">
+        <Reveal>
+          <div className="head">
             <SpecimenLabel section={section("booking")} />
             <h2>How a booking moves.</h2>
-          </Reveal>
-          <div className="steps">
-            {lifecycle.map((l, i) => (
-              <Reveal key={l.step} index={i} from="left">
-                <div className="step" style={{ "--tint": CAP[l.tint] }}>
-                  <div className="step-n">{l.step}</div>
-                  <div>
-                    <h3>{l.title}</h3>
-                    <p>{l.desc}</p>
-                  </div>
-                </div>
-              </Reveal>
-            ))}
+            <p>The five states the software tracks, start to finish.</p>
           </div>
+        </Reveal>
+        <div className="flow">
+          {lifecycle.map((l, i) => (
+            <Reveal key={l.step} index={i} from="up">
+              <div className="flow-item" style={{ "--tint": CAP[l.tint] }}>
+                <b>{l.step}</b>
+                <h3>{l.title}</h3>
+                <p>{l.desc}</p>
+              </div>
+            </Reveal>
+          ))}
         </div>
       </section>
 
-      {/* ================= FAQ ================= */}
-      <section id="faq" className="sec wash-gold">
-        <span className="ghost">FAQ</span>
-        <div className="wrap" style={{ maxWidth: 820 }}>
-          <Reveal>
+      {/* ===== FAQ ===== */}
+      <section id="faq" className="wrap">
+        <Reveal>
+          <div className="head">
             <SpecimenLabel section={section("faq")} />
             <h2>Common questions.</h2>
-          </Reveal>
-          <div className="faqs">
-            {faqs.map((f, i) => (
-              <Faq key={f.q} q={f.q} a={f.a} delay={i * 0.06} />
-            ))}
           </div>
+        </Reveal>
+        <div>
+          {faqs.map((f, i) => {
+            const isOpen = openFaq === i;
+            const last = i === faqs.length - 1;
+            return (
+              <Reveal key={f.q} index={i}>
+                <div className={`faq${isOpen ? " open" : ""}${last ? " last" : ""}`}>
+                  <button className="faq-q" onClick={() => setOpenFaq(isOpen ? null : i)} aria-expanded={isOpen}>
+                    {f.q}<span className="faq-sign" aria-hidden="true">+</span>
+                  </button>
+                  <motion.div
+                    className="faq-a"
+                    initial={false}
+                    animate={{ height: isOpen ? "auto" : 0, opacity: isOpen ? 1 : 0 }}
+                    transition={{ duration: rich ? 0.24 : 0, ease: [0.22, 1, 0.36, 1] }}
+                  >
+                    <p>{f.a}</p>
+                  </motion.div>
+                </div>
+              </Reveal>
+            );
+          })}
         </div>
       </section>
 
-      {/* ================= CONTACT ================= */}
-      <section id="contact" className="sec">
-        <div className="wrap">
-          <div className="contact">
-            <BgImage src="/images/image 4.jpg" slot="image 4.jpg" className="contact-bg" />
-            <div className="contact-in">
+      {/* ===== CTA ===== */}
+      <section id="contact" className="wrap">
+        <Reveal from="scale">
+          <div className="cta">
+            <div className="cta-in">
               <SpecimenLabel section={section("contact")} />
               <h2>Ready when you are.</h2>
               <p>
-                Book your first home blood test today, or send us a question.
-                We usually reply within the hour.
+                Create an account, choose your tests and pick a time. We will
+                tell you straight away whether we cover your postcode.
               </p>
-              <div className="contact-row">
-                <span className="contact-item">support@homevisit.com</span>
-                <span className="contact-item">+44 7565 20619</span>
-                <span className="contact-item">Cardiff, Wales</span>
+              <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
+                <button className="b b-pri" onClick={() => navigate("/login")}>Book a test →</button>
+                <button className="b b-sec" onClick={() => go("faq")}>Read the FAQ</button>
               </div>
-              <button className="btn btn-primary" style={{ marginTop: 34, padding: "15px 34px", fontSize: 15 }}
-                onClick={() => navigate("/login")}>
-                Book a test
-              </button>
             </div>
           </div>
-        </div>
+        </Reveal>
       </section>
 
-      {/* ================= FOOTER ================= */}
+      {/* ===== FOOTER ===== */}
       <footer className="foot">
-        <div className="brand"><span className="brand-dot" />Home Visit</div>
-        <p style={{ marginBottom: 10 }}>
-          <Link to="/privacy" style={{ color: "inherit", textDecoration: "underline", marginRight: 16 }}>Privacy Policy</Link>
-          <Link to="/terms" style={{ color: "inherit", textDecoration: "underline" }}>Terms of Service</Link>
-        </p>
-        <p>© 2026 Home Visit — built with care in Cardiff.</p>
+        <div className="wrap foot-row">
+          <img className="foot-logo" src={IMG.logo} alt="Home Visit Mobile Lab logo" loading="lazy" decoding="async" />
+          <div>
+            <Link to="/privacy">Privacy Policy</Link>
+            <Link to="/terms">Terms of Service</Link>
+          </div>
+          <small>© 2026 Home Visit · Cardiff, Wales</small>
+        </div>
       </footer>
     </div>
-  );
-}
-
-/* ============== specimen label ============== */
-/**
- * Section label.
- *
- * Renders nothing when handed a missing or unrecognised section rather
- * than throwing. A decorative label is never worth taking the whole page
- * down for — which is exactly what happened when a stale positional
- * lookup resolved to undefined.
- *
- * This is a backstop, not the fix: callers pass section("id"), so a bad
- * value should not reach here in the first place.
- */
-function SpecimenLabel({ section }) {
-  if (!section) return null;
-
-  // An unknown cap would produce a class with no rule and an invisible
-  // swatch; fall back to a defined one so the label still reads.
-  const cap = section.cap && CAP[section.cap] ? section.cap : "teal";
-
-  return (
-    <div className="label">
-      <div className={`label-cap cap-${cap}`} />
-      <div className="label-body">
-        <span className="label-code">{section.code ?? ""}</span>
-        <span className="label-name">{section.name ?? ""}</span>
-        <span className="barcode" />
-      </div>
-    </div>
-  );
-}
-
-/* ============== photo plate with internal parallax drift ============== */
-function ParallaxPlate({ src, alt, caption, frameClass, slot, tape, tint, eager }) {
-  const [failed, setFailed] = useState(false);
-  const ref = useRef(null);
-  const { scrollYProgress } = useScroll({ target: ref, offset: ["start end", "end start"] });
-  const y = useTransform(scrollYProgress, [0, 1], ["-7%", "7%"]);
-
-  return (
-    <figure className="plate" ref={ref}>
-      <div className={`plate-frame ${frameClass}`}>
-        {tape && <span className="plate-tape" style={{ background: tint }}>{tape}</span>}
-        {failed ? (
-          <div className="ph"><span style={{ fontSize: 20 }}>▦</span><span>Add public/images/{slot}</span></div>
-        ) : (
-          <motion.img
-            src={src} alt={alt} className="plate-img" style={{ y }}
-            loading={eager ? "eager" : "lazy"}
-            decoding="async"
-            /* Lowercase on purpose. React 18 does not recognise the
-               camelCase fetchPriority prop (that landed in React 19) and
-               warns, then drops it. Lowercase passes straight through to
-               the DOM, which is what the browser actually reads. */
-            fetchpriority={eager ? "high" : "auto"}
-            onError={() => setFailed(true)}
-          />
-        )}
-      </div>
-      {caption && <figcaption className="plate-cap">{caption}</figcaption>}
-    </figure>
-  );
-}
-
-/* ============== full-width parallax band ============== */
-function ParallaxBand({ src, alt, slot, children }) {
-  const [failed, setFailed] = useState(false);
-  const ref = useRef(null);
-  const { scrollYProgress } = useScroll({ target: ref, offset: ["start end", "end start"] });
-  const y = useTransform(scrollYProgress, [0, 1], ["-12%", "12%"]);
-
-  return (
-    <div className="band" ref={ref}>
-      {failed ? (
-        <div className="ph" style={{ position: "absolute", inset: 0, borderRadius: 0, border: "none" }}>
-          <span>Add public/images/{slot}</span>
-        </div>
-      ) : (
-        <motion.img
-          src={src} alt={alt} className="band-img" style={{ y }}
-          loading="lazy" decoding="async"
-          onError={() => setFailed(true)}
-        />
-      )}
-      <div className="band-veil"><div>{children}</div></div>
-    </div>
-  );
-}
-
-/* ============== simple background image with fallback ============== */
-function BgImage({ src, slot, className }) {
-  const [failed, setFailed] = useState(false);
-  if (failed) {
-    return (
-      <div className={`ph ${className || ""}`} style={{ borderRadius: 0 }}>
-        <span>Add public/images/{slot}</span>
-      </div>
-    );
-  }
-  return (
-    <img
-      src={src} alt="" className={className}
-      loading="lazy" decoding="async"
-      onError={() => setFailed(true)}
-    />
-  );
-}
-
-/* ============== scroll reveal ==============
- * Reveals once as the element enters view.
- *
- * `from` picks the direction it travels in ("up" | "left" | "right" |
- * "scale"), so a row of cards can fan in rather than all sliding the same
- * way. `index` applies the 40ms stagger from the motion spec without each
- * caller having to do the arithmetic.
- *
- * On touch, narrow screens or reduced-motion this collapses to a plain
- * fade with no transform, so nothing moves on the devices where the
- * mobile perf fix matters.
- */
-const REVEAL_FROM = {
-  up:    { y: 24,  x: 0,   scale: 1    },
-  left:  { y: 0,   x: -28, scale: 1    },
-  right: { y: 0,   x: 28,  scale: 1    },
-  scale: { y: 12,  x: 0,   scale: 0.97 },
-};
-
-function Reveal({ children, delay = 0, index = 0, from = "up" }) {
-  const rich = useRichMotion();
-  const offset = REVEAL_FROM[from] || REVEAL_FROM.up;
-
-  // 40ms stagger per the motion spec, capped so a long list never crawls.
-  const wait = delay + Math.min(index, 6) * 0.04;
-
-  const hidden = rich
-    ? { opacity: 0, ...offset }
-    : { opacity: 0 };
-  const shown = rich
-    ? { opacity: 1, y: 0, x: 0, scale: 1 }
-    : { opacity: 1 };
-
-  return (
-    <motion.div
-      initial={hidden}
-      whileInView={shown}
-      viewport={{ once: true, margin: "-60px" }}
-      transition={{ duration: rich ? 0.2 : 0.12, delay: wait, ease: [0.22, 1, 0.36, 1] }}
-    >
-      {children}
-    </motion.div>
-  );
-}
-
-/* ============== collapsible FAQ ============== */
-function Faq({ q, a, delay }) {
-  const [open, setOpen] = useState(false);
-  return (
-    <motion.button
-      className="faq" onClick={() => setOpen(!open)}
-      initial={{ opacity: 0, y: 14 }} whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true }} transition={{ duration: 0.2, delay, ease: [0.22, 1, 0.36, 1] }}
-      aria-expanded={open}
-    >
-      <span className="faq-q">{q}<span className="faq-sign">{open ? "−" : "+"}</span></span>
-      <AnimatePresence initial={false}>
-        {open && (
-          <motion.div className="faq-a"
-            initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }} transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}>
-            <p>{a}</p>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </motion.button>
   );
 }

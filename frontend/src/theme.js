@@ -18,6 +18,7 @@ export const TERRACOTTA_600 = "#C9603A";
 export const INK_900        = "#16211F";
 export const INK_500        = "#55635F";
 export const INK_300        = "#8A9794";
+export const INK_400        = "#626E6B";  // muted TEXT, 4.74:1 on paper
 export const INK_100        = "#D4DBD9";
 export const PAPER          = "#F4F2ED";
 export const WHITE          = "#FFFFFF";
@@ -29,7 +30,7 @@ export const ACCENT         = TERRACOTTA_600;
 export const SURFACE        = WHITE;
 export const TEXT_PRIMARY   = INK_900;
 export const TEXT_SECONDARY = INK_500;
-export const TEXT_MUTED     = INK_300;
+export const TEXT_MUTED     = INK_400;
 export const BORDER         = INK_100;
 
 // ── Status ───────────────────────────────────────────────────

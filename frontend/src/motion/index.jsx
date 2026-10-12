@@ -43,23 +43,82 @@ const FROM = {
 
 /**
  * Reveals children once as they scroll into view.
+ *
  * `index` applies the shared stagger without each caller doing the maths.
+ *
+ * WHY THIS IS NOT JUST whileInView
+ * ---------------------------------
+ * A plain whileInView + once:true leaves content PERMANENTLY INVISIBLE if
+ * the intersection callback is missed. That is not hypothetical: it was
+ * reproduced on this landing page. Jumping to an anchor, scrolling fast,
+ * or loading a URL with a hash can move past a section without the
+ * observer ever reporting it, and because once:true never re-checks, the
+ * section stays at opacity 0 forever.
+ *
+ * So intersection is treated as the FAST path, not the only path. A
+ * cheap geometric check runs on mount, shortly after, and on scroll
+ * until the element has been shown — then it detaches. Content can be
+ * late, but it can never be lost.
  */
+function useRevealed(ref, margin = 60) {
+  const inView = useInView(ref, { once: true, margin: `-${margin}px` });
+  const [shown, setShown] = useState(false);
+
+  useEffect(() => {
+    if (inView) setShown(true);
+  }, [inView]);
+
+  useEffect(() => {
+    if (shown) return;
+
+    /*
+     * Deterministic backstop.
+     *
+     * The first version listened for scroll events. That was not enough:
+     * fast or programmatic scrolling coalesces events, and an element
+     * could be scrolled past without a single handler running — leaving
+     * it hidden forever. Polling does not care how the viewport moved or
+     * whether any event was delivered.
+     *
+     * One cheap getBoundingClientRect every 250ms, per element that has
+     * not yet been revealed, and the timer clears itself the moment it
+     * has. In the worst case a reveal is 250ms late; it is never lost.
+     */
+    const check = () => {
+      const el = ref.current;
+      if (!el) return false;
+      const r = el.getBoundingClientRect();
+      const seen = r.top < window.innerHeight && r.bottom > 0;
+      const passed = r.bottom <= 0;
+      if (seen || passed) { setShown(true); return true; }
+      return false;
+    };
+
+    if (check()) return;
+    const id = setInterval(() => { if (check()) clearInterval(id); }, 250);
+    return () => clearInterval(id);
+  }, [shown, ref]);
+
+  return shown;
+}
+
 export function Reveal({
   children, from = "up", index = 0, delay = 0,
   className = "", style, once = true,
 }) {
   const rich = useRichMotion();
+  const ref = useRef(null);
+  const shown = useRevealed(ref);
   const offset = FROM[from] || FROM.up;
   const wait = delay + Math.min(index, 8) * sec(DURATION.stagger);
 
   return (
     <motion.div
+      ref={ref}
       className={className}
       style={style}
       initial={rich ? { opacity: 0, ...offset } : { opacity: 0 }}
-      whileInView={rich ? { opacity: 1, x: 0, y: 0, scale: 1 } : { opacity: 1 }}
-      viewport={{ once, margin: "-60px" }}
+      animate={shown ? { opacity: 1, x: 0, y: 0, scale: 1 } : undefined}
       transition={{
         duration: rich ? sec(DURATION.base) : sec(DURATION.instant),
         delay: wait,
