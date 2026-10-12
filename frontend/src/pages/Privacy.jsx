@@ -96,7 +96,7 @@ export default function Privacy() {
           ← Back to Home Visit
         </Link>
 
-        <h1 style={{ fontFamily: "'Playfair Display', Georgia, serif", fontSize: 40, fontWeight: 900, margin: "24px 0 8px", letterSpacing: "-0.02em" }}>
+        <h1 style={{ fontFamily: "var(--display)", fontSize: 40, fontWeight: 900, margin: "24px 0 8px", letterSpacing: "-0.02em" }}>
           Privacy Policy
         </h1>
         <p style={{ fontSize: 14, color: "rgba(22,33,31,0.62)", margin: 0 }}>

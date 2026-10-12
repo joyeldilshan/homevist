@@ -6,3 +6,6 @@ frontend/.env
 .env
 *.log
 dist/
+
+# Vite writes these while loading the config; never commit them
+vite.config.js.timestamp-*

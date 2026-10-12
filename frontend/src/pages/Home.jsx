@@ -230,9 +230,8 @@ export default function Home() {
           --gold:    #B8862E;
           --teal:    #0F6E62;
 
-          --display: "Playfair Display", Georgia, serif;
-          --sans:    "DM Sans", system-ui, -apple-system, sans-serif;
-          --mono:    "DM Mono", ui-monospace, "SF Mono", monospace;
+          --sans:    var(--sansf);
+          --mono:    var(--monof);
 
           background: var(--paper);
           color: var(--ink);

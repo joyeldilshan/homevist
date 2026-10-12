@@ -310,9 +310,6 @@ export default function UserDashboard() {
           --ink-40: var(--color-text-muted);
           --rule: var(--color-border-default);
           --crimson: var(--color-bg-accent);
-          --display: "Playfair Display", Georgia, serif;
-          --sansf:   "DM Sans", system-ui, -apple-system, sans-serif;
-          --monof:   "DM Mono", ui-monospace, "SF Mono", monospace;
 
           min-height: 100vh; min-height: 100dvh;
           background: var(--paper); color: var(--ink);

@@ -133,9 +133,6 @@ export default function AuthPage() {
           --lavender:#6E6AA8;
           --gold:    #B8862E;
           --teal:    #0F6E62;
-          --display: "Playfair Display", Georgia, serif;
-          --sansf:   "DM Sans", system-ui, -apple-system, sans-serif;
-          --monof:   "DM Mono", ui-monospace, "SF Mono", monospace;
 
           min-height: 100vh;
           min-height: 100dvh;

@@ -97,7 +97,7 @@ export default function Terms() {
           ← Back to Home Visit
         </Link>
 
-        <h1 style={{ fontFamily: "'Playfair Display', Georgia, serif", fontSize: 40, fontWeight: 900, margin: "24px 0 8px", letterSpacing: "-0.02em" }}>
+        <h1 style={{ fontFamily: "var(--display)", fontSize: 40, fontWeight: 900, margin: "24px 0 8px", letterSpacing: "-0.02em" }}>
           Terms of Service
         </h1>
 
