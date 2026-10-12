@@ -14,7 +14,17 @@ import "./index.css";
  */
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
-    <BrowserRouter>
+    {/*
+      * Opt in to the two v7 behaviours React Router already warns about
+      * on every page load. Both are safe here: there is no Suspense
+      * boundary for startTransition to interact with, and the only splat
+      * route ("*" -> NotFound) renders no nested relative links.
+      *
+      * Silences two console warnings per page view and removes two
+      * behaviour changes from the eventual v7 upgrade, which the
+      * dependency advisories will require anyway.
+      */}
+    <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <ErrorBoundary>
         <AuthProvider>
           <App />

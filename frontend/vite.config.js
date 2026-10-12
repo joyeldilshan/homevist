@@ -17,4 +17,12 @@ export default defineConfig({
       },
     },
   },
+  test: {
+    environment: "jsdom",
+    globals: true,
+    setupFiles: ["./src/test/setup.js"],
+    include: ["src/**/*.test.{js,jsx}"],
+    // Keep the build out of the test run.
+    exclude: ["node_modules", "dist"],
+  },
 });
