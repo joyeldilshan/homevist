@@ -1034,7 +1034,11 @@ function ParallaxPlate({ src, alt, caption, frameClass, slot, tape, tint, eager 
             src={src} alt={alt} className="plate-img" style={{ y }}
             loading={eager ? "eager" : "lazy"}
             decoding="async"
-            fetchPriority={eager ? "high" : "auto"}
+            /* Lowercase on purpose. React 18 does not recognise the
+               camelCase fetchPriority prop (that landed in React 19) and
+               warns, then drops it. Lowercase passes straight through to
+               the DOM, which is what the browser actually reads. */
+            fetchpriority={eager ? "high" : "auto"}
             onError={() => setFailed(true)}
           />
         )}
