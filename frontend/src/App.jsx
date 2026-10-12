@@ -1,16 +1,30 @@
+import { lazy, Suspense } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { useAuth } from "./context/AuthContext";
-import Home            from "./pages/Home";
-import AuthPage        from "./pages/Login";
-import UserDashboard   from "./pages/user/Dashboard";
-import PhleboDashboard from "./pages/phlebotomist/Dashboard";
-import AdminDashboard  from "./pages/admin/Dashboard";
-import MLTDashboard from "./pages/mlt/Dashboard";
-import Privacy         from "./pages/Privacy";
-import Terms           from "./pages/Terms";
 import StorageNotice   from "./components/StorageNotice";
-import NotFound        from "./pages/NotFound";
 import ServerWaking    from "./components/ServerWaking";
+
+/*
+ * Route-level code splitting.
+ *
+ * Everything used to ship in one ~641 kB chunk, so a visitor who only
+ * ever sees the landing page still downloaded all four dashboards. Each
+ * route is now its own chunk, fetched when it is first visited.
+ *
+ * Home is eagerly imported on purpose: it is the first paint for most
+ * visitors, and lazy-loading it would add a network round-trip before
+ * anything appears.
+ */
+import Home from "./pages/Home";
+
+const AuthPage        = lazy(() => import("./pages/Login"));
+const UserDashboard   = lazy(() => import("./pages/user/Dashboard"));
+const PhleboDashboard = lazy(() => import("./pages/phlebotomist/Dashboard"));
+const AdminDashboard  = lazy(() => import("./pages/admin/Dashboard"));
+const MLTDashboard    = lazy(() => import("./pages/mlt/Dashboard"));
+const Privacy         = lazy(() => import("./pages/Privacy"));
+const Terms           = lazy(() => import("./pages/Terms"));
+const NotFound        = lazy(() => import("./pages/NotFound"));
 
 // Maps each role to its dashboard path. Unknown roles → null (no redirect).
 const DASHBOARDS = {
@@ -44,7 +58,9 @@ export default function App() {
 
   return (
     <>
-      <Routes>
+      {/* Chunk fetches are fast; this only shows if the network is slow. */}
+      <Suspense fallback={<Loading />}>
+        <Routes>
         <Route path="/" element={ dash ? <Navigate to={dash} replace /> : <Home /> } />
 
         <Route path="/home"     element={<Home />} />
@@ -62,7 +78,8 @@ export default function App() {
 
         {/* Show a real 404 rather than silently bouncing the user. */}
         <Route path="*" element={<NotFound />} />
-      </Routes>
+        </Routes>
+      </Suspense>
       <StorageNotice />
       <ServerWaking />
     </>

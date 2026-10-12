@@ -8,7 +8,19 @@
    match the Figma variable names one for one:
      Figma  color/bg/primary   ->  CSS  --color-bg-primary
 
-   Direction: clinical teal, sharp buttons, quick restrained motion.
+   Direction: "clinical depth" — the clinical teal palette kept intact,
+   with depth added through gradients, elevation, glass and motion.
+
+   PHASE 1 NOTE. This file previously encoded "flat fills, no shadows,
+   colour-only hover, 120-200ms only". That rule is superseded: shadows,
+   glow and longer durations are now first-class. The palette itself is
+   unchanged — teal primary, terracotta accent.
+
+   CONTRAST RULE: terracotta (--color-bg-accent, #C9603A) is 3.1:1 on
+   paper. Use it for large text (18.66px bold / 24px regular and above),
+   icons, borders, and button fills carrying DARK text. Never for small
+   body copy. --color-text-accent is the darker variant that passes
+   4.5:1 for small text.
 
    Do not hard-code a hex value in a component. Add a token here.
    ============================================================ */
@@ -48,6 +60,8 @@
   --color-bg-primary:       var(--teal-700);
   --color-bg-primary-hover: var(--teal-800);
   --color-bg-accent:        var(--terracotta-600);
+  /* 4.5:1 on paper — use this when terracotta must carry small text. */
+  --color-text-accent:      var(--terracotta-700);
   --color-bg-subtle:        var(--teal-50);
 
   --color-text-primary:     var(--ink-900);
@@ -74,25 +88,96 @@
   --spacing-2xl: 32px;
   --spacing-3xl: 48px;
   --spacing-4xl: 64px;
+  --spacing-5xl: 96px;
+  --spacing-6xl: 128px;
 
   /* ── Radius ───────────────────────────────────────────── */
   --radius-none: 0;
   --radius-sm:   4px;
-  --radius-md:   6px;    /* buttons and inputs */
-  --radius-lg:   10px;   /* cards */
+  --radius-md:   8px;    /* buttons and inputs */
+  --radius-lg:   14px;   /* cards */
+  --radius-xl:   20px;   /* panels, modals */
+  --radius-2xl:  28px;   /* hero surfaces */
   --radius-full: 999px;  /* pills and badges only */
 
   /* ── Motion — quick & restrained ──────────────────────── */
   --ease:            cubic-bezier(.22, 1, .36, 1);
+  --ease-out-expo:   cubic-bezier(.16, 1, .3, 1);
+  --ease-spring:     cubic-bezier(.34, 1.56, .64, 1);
   --dur-instant:     120ms;  /* colour-only changes */
   --dur-fast:        180ms;  /* modals, small reveals */
-  --dur-base:        200ms;  /* page and section enters */
+  --dur-base:        240ms;  /* page and section enters */
+  --dur-slow:        420ms;  /* hero staging, aurora drift */
   --stagger:         40ms;   /* between list items */
 
   /* ── Typography ───────────────────────────────────────── */
-  --display: "Playfair Display", Georgia, serif;
-  --sansf:   "DM Sans", system-ui, -apple-system, sans-serif;
-  --monof:   "DM Mono", ui-monospace, "SF Mono", monospace;
+  --display: "Archivo", system-ui, -apple-system, sans-serif;
+  --sansf:   "Inter", system-ui, -apple-system, sans-serif;
+  --monof:   "JetBrains Mono", ui-monospace, "SF Mono", monospace;
+
+  /* ── Elevation ────────────────────────────────────────────
+     Two layers each: a tight contact shadow plus a wide ambient
+     one. Single-layer shadows are what make UI look cheap. */
+  --elev-0: none;
+  --elev-1: 0 1px 2px rgba(22,33,31,.06),  0 1px 3px rgba(22,33,31,.04);
+  --elev-2: 0 2px 4px rgba(22,33,31,.06),  0 6px 16px rgba(22,33,31,.07);
+  --elev-3: 0 4px 8px rgba(22,33,31,.07),  0 14px 32px rgba(22,33,31,.09);
+  --elev-4: 0 8px 16px rgba(22,33,31,.08), 0 28px 64px rgba(22,33,31,.12);
+
+  /* ── Glow — coloured, for hover and focus ─────────────────── */
+  --glow-primary: 0 0 0 1px rgba(15,110,98,.18), 0 8px 28px rgba(15,110,98,.22);
+  --glow-accent:  0 0 0 1px rgba(201,96,58,.20), 0 8px 28px rgba(201,96,58,.24);
+  --glow-focus:   0 0 0 4px rgba(15,110,98,.18);
+
+  /* ── Gradients ────────────────────────────────────────────
+     The aurora is four radial stops on a dark ground. Animate it
+     with transform only — never background-position, which
+     repaints the whole layer every frame. */
+  --grad-aurora:
+    radial-gradient(42% 46% at 18% 22%, rgba(26,155,139,.42) 0%, transparent 70%),
+    radial-gradient(38% 42% at 82% 18%, rgba(110,106,168,.36) 0%, transparent 70%),
+    radial-gradient(46% 48% at 70% 78%, rgba(201,96,58,.28) 0%, transparent 70%),
+    radial-gradient(40% 40% at 28% 82%, rgba(15,110,98,.34) 0%, transparent 70%);
+  --grad-primary: linear-gradient(135deg, var(--teal-600) 0%, var(--teal-800) 100%);
+  --grad-accent:  linear-gradient(135deg, var(--terracotta-600) 0%, var(--terracotta-700) 100%);
+  --grad-surface: linear-gradient(180deg, rgba(255,255,255,.92) 0%, rgba(255,255,255,.72) 100%);
+  --grad-text:    linear-gradient(120deg, var(--ink-900) 0%, var(--teal-700) 100%);
+
+  /* ── Glass ────────────────────────────────────────────────
+     backdrop-filter is GPU-expensive. Components gate it behind
+     the same check that protects mobile performance; --glass-bg
+     alone is a usable opaque fallback. */
+  --glass-bg:     rgba(255,255,255,.72);
+  --glass-dark:   rgba(22,33,31,.62);
+  --glass-border: rgba(255,255,255,.55);
+  --glass-blur:   blur(14px) saturate(1.3);
+
+  /* ── Dark ground, for aurora surfaces ─────────────────────── */
+  --ground-900: #0A100F;
+  --ground-800: #111A18;
+  --ground-700: #1A2624;
+
+  /* ── Type scale ───────────────────────────────────────────── */
+  --fs-hero:    clamp(44px, 8vw, 104px);
+  --fs-display: clamp(34px, 5vw, 60px);
+  --fs-h1:      clamp(27px, 3.4vw, 40px);
+  --fs-h2:      clamp(20px, 2vw, 26px);
+  --fs-h3:      18px;
+  --fs-body:    16px;
+  --fs-small:   13.5px;
+  --fs-label:   11.5px;
+
+  --tracking-tight: -0.03em;
+  --tracking-snug:  -0.015em;
+  --tracking-wide:  0.12em;
+  --leading-tight:  1.06;
+  --leading-snug:   1.3;
+  --leading-body:   1.65;
+
+  /* ── Layout rhythm ────────────────────────────────────────── */
+  --section-gap: clamp(72px, 10vw, 140px);
+  --gutter:      clamp(20px, 4vw, 56px);
+  --maxw:        1200px;
 
   /* ── Legacy aliases ───────────────────────────────────────
      The page style blocks were written against these names.
