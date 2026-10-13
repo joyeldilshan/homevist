@@ -49,7 +49,7 @@ Open http://localhost:5173.
 
 | Variable | Required | Notes |
 |---|---|---|
-| `MONGO_URI` | **yes** | Must include a database name: `.../homevisit_dev?retryWrites=true` |
+| `MONGO_URI` | **yes** | Must include a database name: `.../hemovisit_dev?retryWrites=true` |
 | `JWT_SECRET` | **yes** | Long random string. `node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"` |
 | `JWT_EXPIRES_IN` | no | Token lifetime, default `7d`. Accepts `15m`, `12h`, `7d`, or seconds. No refresh-token flow — on expiry the user signs in again. |
 | `PORT` | no | Default `5000` |
@@ -97,7 +97,7 @@ means editing those three places to accept an array.
 2. Database Access → add a user with **Read and write to any database**.
 3. Network Access → add `0.0.0.0/0` (Render has no static egress IP).
 4. Copy the connection string and **append a database name**:
-   `mongodb+srv://user:pass@cluster.mongodb.net/homevisit?retryWrites=true&w=majority`
+   `mongodb+srv://user:pass@cluster.mongodb.net/hemovisit?retryWrites=true&w=majority`
 
 ### Backend — Render
 
