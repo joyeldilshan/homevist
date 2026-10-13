@@ -28,6 +28,9 @@ const SIZES = [
 const PAGES = [
   ["/",         "landing"],
   ["/login",    "login"],
+  // Same component as /login, but it opens on the register tab, so it is
+  // a view of its own worth capturing.
+  ["/register", "register"],
   ["/privacy",  "privacy"],
   ["/terms",    "terms"],
   ["/nonsense", "404"],
