@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import api from "../../utils/api";
 import toast from "react-hot-toast";
-import { formatMoney, formatDate, formatLongDate } from "../../utils/format";
+import { formatMoney, formatDate, formatLongDate, formatRating, formatRatingSummary } from "../../utils/format";
 import { INK, CRIMSON, LAVENDER, GOLD, TEAL, BLUE, GREEN } from "../../theme";
 
 const STATUS_CONFIG = {
@@ -224,7 +224,7 @@ export default function PhleboDashboard() {
       <div className="side-user">
         <div style={{ fontWeight:700, fontSize:13, marginBottom:1 }}>{user?.name||"Phlebotomist"}</div>
         <div style={{ fontFamily:"var(--monof)", fontSize:10, letterSpacing:"0.1em", textTransform:"uppercase", color:"rgba(22,33,31,0.45)", marginBottom:4 }}>Phlebotomist</div>
-        <div style={{ fontSize:12, color:GOLD }}>⭐ {user?.rating?.toFixed(1)||"5.0"} · {user?.totalRatings||0} reviews</div>
+        <div style={{ fontSize:12, color:GOLD }}>{formatRatingSummary(user)}</div>
       </div>
       <button className="signout" onClick={()=>{ logout(); navigate("/login"); }}>Sign out</button>
     </aside>
@@ -472,7 +472,7 @@ export default function PhleboDashboard() {
                   { label:"Total jobs", value:bookings.length,                 tint:BLUE  },
                   { label:"Active",     value:active.length,                   tint:GOLD  },
                   { label:"Completed",  value:completed.length,                tint:GREEN },
-                  { label:"Rating",     value:user?.rating?.toFixed(1)||"5.0", tint:GOLD  },
+                  { label:formatRating(user) ? "Rating" : "Rating · no reviews yet", value:formatRating(user) || "—", tint:GOLD },
                 ].map(s=>(
                   <div key={s.label} className="stat" style={{ "--tint":s.tint }}>
                     <div className="stat-v">{s.value}</div>
@@ -548,7 +548,9 @@ export default function PhleboDashboard() {
                     <div style={{ fontSize:13, color:"var(--ink-60)", marginBottom:8 }}>{user?.email}</div>
                     <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
                       <span style={{ fontFamily:"var(--monof)", fontSize:9.5, letterSpacing:"0.1em", textTransform:"uppercase", background:"rgba(62,108,158,0.08)", color:BLUE, border:"1px solid rgba(62,108,158,0.3)", borderRadius:20, padding:"3px 10px" }}>Phlebotomist</span>
-                      <span style={{ fontFamily:"var(--monof)", fontSize:9.5, letterSpacing:"0.1em", textTransform:"uppercase", background:"rgba(184,137,46,0.08)", color:GOLD, border:"1px solid rgba(184,137,46,0.3)", borderRadius:20, padding:"3px 10px" }}>⭐ {user?.rating?.toFixed(1)||"5.0"}</span>
+                      {formatRating(user) && (
+                        <span style={{ fontFamily:"var(--monof)", fontSize:9.5, letterSpacing:"0.1em", textTransform:"uppercase", background:"rgba(184,137,46,0.08)", color:GOLD, border:"1px solid rgba(184,137,46,0.3)", borderRadius:20, padding:"3px 10px" }}>⭐ {formatRating(user)}</span>
+                      )}
                     </div>
                   </div>
                 </div>

@@ -23,7 +23,7 @@ const STATUS_STEPS = [
   { key:"pending",          icon:"📋", label:"Booking Received",      desc:"Your booking is received. Waiting for phlebotomist assignment." },
   { key:"confirmed",        icon:"✅", label:"Phlebotomist Assigned", desc:"A phlebotomist has been assigned and will visit you on schedule." },
   { key:"sample_collected", icon:"🩸", label:"Sample Collected",      desc:"Your blood sample has been collected and sent to the lab." },
-  { key:"processing",       icon:"🔬", label:"Lab Processing",        desc:"Your sample is being analysed in our certified laboratory." },
+  { key:"processing",       icon:"🔬", label:"Lab Processing",        desc:"Your sample is being analysed at the laboratory." },
   { key:"completed",        icon:"📄", label:"Report Ready",          desc:"Your results are ready! Download your verified PDF report." },
 ];
 

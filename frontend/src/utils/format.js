@@ -109,3 +109,25 @@ export function formatAddress(addressParts, legacyAddress) {
   }
   return legacyAddress || EMPTY;
 }
+
+/**
+ * A person's average rating, or null when nobody has rated them yet.
+ *
+ * New accounts are stored with rating 0 and totalRatings 0, and older
+ * documents may have neither field. Neither case is a real score, so the
+ * UI must say "No reviews yet" (or show nothing) — never a made-up 5.0.
+ */
+export function formatRating(person) {
+  const n = Number(person?.totalRatings) || 0;
+  const r = Number(person?.rating);
+  if (n < 1 || !Number.isFinite(r) || r <= 0) return null;
+  return r.toFixed(1);
+}
+
+/** "4.6 · 3 reviews", "5.0 · 1 review", or "No reviews yet". */
+export function formatRatingSummary(person) {
+  const r = formatRating(person);
+  if (!r) return "No reviews yet";
+  const n = Number(person.totalRatings);
+  return `⭐ ${r} · ${n} ${n === 1 ? "review" : "reviews"}`;
+}

@@ -4,7 +4,7 @@ import { useAuth } from "../../context/AuthContext";
 import api from "../../utils/api";
 import toast from "react-hot-toast";
 import EmailAuditLog from "./EmailAuditLog";
-import { formatMoney, formatMoneyCompact, formatDate, formatLongDate} from "../../utils/format";
+import { formatMoney, formatMoneyCompact, formatDate, formatLongDate, formatRating, formatRatingSummary } from "../../utils/format";
 import { INK, CRIMSON, LAVENDER, GOLD, TEAL, BLUE, GREEN } from "../../theme";
 
 const sUser   = b => b?.user?.name || "Unknown Patient";
@@ -788,7 +788,7 @@ export default function AdminDashboard() {
                           <div style={{ fontSize:12, color:"var(--ink-60)", lineHeight:1.8 }}>
                             📧 {p?.email||"—"} &nbsp; 📞 {p?.phone||"—"}<br />
                             📍 {p?.serviceArea||"—"} &nbsp; <span style={{ fontFamily:"var(--monof)", fontSize:10.5 }}>🪪 {p?.licenseNumber||"—"}</span><br />
-                            ⭐ {p?.rating?.toFixed(1)||"5.0"} · {p?.totalRatings||0} reviews
+                            {formatRatingSummary(p)}
                           </div>
                         </div>
                       </div>
@@ -885,7 +885,7 @@ export default function AdminDashboard() {
                   <div style={{ width:40, height:40, borderRadius:"50%", background:"rgba(201,96,58,0.07)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:18 }}>🧪</div>
                   <div>
                     <div style={{ fontWeight:700, fontSize:14 }}>{p?.name||"—"}</div>
-                    <div style={{ fontSize:12, color:"rgba(22,33,31,0.55)" }}>⭐ {p?.rating?.toFixed(1)||"5.0"} · {p?.serviceArea||"CF"}</div>
+                    <div style={{ fontSize:12, color:"rgba(22,33,31,0.55)" }}>{formatRating(p) ? `⭐ ${formatRating(p)}` : "No reviews yet"} · {p?.serviceArea||"CF"}</div>
                   </div>
                 </div>
                 <span style={{ fontFamily:"var(--monof)", fontSize:10, letterSpacing:"0.08em", textTransform:"uppercase", color:p?.isAvailable?GREEN:"rgba(22,33,31,0.4)" }}>

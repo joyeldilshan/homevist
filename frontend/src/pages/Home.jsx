@@ -163,7 +163,7 @@ export default function Home() {
   ];
 
   const faqs = [
-    { q: "How early can I book a slot?",       a: "You can book up to 7 days in advance. Same-day slots may be available depending on phlebotomist availability." },
+    { q: "How early can I book a slot?",       a: "You can choose any date from today onwards when you book. Your booking is confirmed once a phlebotomist has been assigned to it." },
     { q: "What are the phlebotomists' qualifications?", a: `Details of our phlebotomists' training and registration: ${PH}` },
     { q: "How long will my report take?",      a: `Expected turnaround for each test is shown when you book. Service-level commitments: ${PH}` },
     { q: "Do you cover my area?",              a: "We currently visit postcodes starting CF, covering Cardiff and the surrounding South Wales area. Enter your postcode when booking and we will tell you straight away if we can reach you." },

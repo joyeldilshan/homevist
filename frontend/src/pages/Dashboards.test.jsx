@@ -114,3 +114,26 @@ describe("Login specifics", () => {
     expect(container.textContent).not.toMatch(/phlebotomist1@example\.com/);
   });
 });
+
+describe("Phlebotomist rating", () => {
+  beforeEach(() => { vi.spyOn(console, "error").mockImplementation(() => {}); });
+  afterEach(() => { vi.restoreAllMocks(); setAuthUser(null); });
+
+  it("shows no made-up rating for someone nobody has rated", () => {
+    for (const u of [ROLE_USERS.phlebotomist, { ...ROLE_USERS.phlebotomist, rating: 0, totalRatings: 0 }]) {
+      setAuthUser(u);
+      const { container, unmount } = renderPage(<PhleboDash />);
+      // No star followed by a number: neither the old 5.0 fallback nor 0.0.
+      // (Plain /5\.0/ would hit the inline <style> block's rgba values.)
+      expect(container.textContent).not.toMatch(/⭐\s*\d/);
+      expect(container.textContent).toMatch(/No reviews yet/);
+      unmount();
+    }
+  });
+
+  it("shows the real average once there are reviews", () => {
+    setAuthUser({ ...ROLE_USERS.phlebotomist, rating: 4.25, totalRatings: 4 });
+    const { container } = renderPage(<PhleboDash />);
+    expect(container.textContent).toMatch(/4\.3 · 4 reviews/);
+  });
+});
