@@ -102,5 +102,13 @@ describe("Home (landing page)", () => {
     expect(text).not.toMatch(/the test is on us/i);
     expect(text).not.toMatch(/NABL/);
     expect(text).not.toMatch(/HIPAA/);
+    // Unconfirmed facts are left out, never shown as a placeholder.
+    expect(text).not.toMatch(/PLACEHOLDER/i);
+  });
+
+  it("uses one brand name, HemoVisit", () => {
+    const { container } = renderHome();
+    expect(container.textContent).toMatch(/HemoVisit/);
+    expect(container.textContent).not.toMatch(/Home Visit/);
   });
 });

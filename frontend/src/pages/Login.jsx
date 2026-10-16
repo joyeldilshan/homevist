@@ -7,7 +7,7 @@ import locale from "../config/locale";
 import { DEMO_MODE, DEMO_PASSWORD, DEMO_ACCOUNTS } from "../config/demo";
 
 /**
- * Home Visit — Sign in / Register.
+ * HemoVisit — Sign in / Register.
  *
  * PHASE 3. Rebuilt on the Phase 1 tokens so this page reads as the same
  * product as the landing: paper ground, Archivo display, teal primary,
@@ -497,7 +497,7 @@ export default function AuthPage() {
           <div className="panel-veil" />
           <div className="panel-in">
             <div className="panel-brand-row">
-              <div className="brand"><span className="brand-dot" />Home Visit</div>
+              <div className="brand"><span className="brand-dot" />HemoVisit</div>
             </div>
             <div>
               <div className="panel-title">Your health,<br />at your doorstep.</div>

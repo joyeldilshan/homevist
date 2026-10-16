@@ -229,7 +229,7 @@ export default function AdminDashboard() {
 
   const Sidebar = () => (
     <aside className="side">
-      <div className="brand"><span className="brand-dot" />Home Visit</div>
+      <div className="brand"><span className="brand-dot" />HemoVisit</div>
       <div className="console-chip">
         <div className="console-chip-t">Admin console</div>
         <div className="console-chip-s">Full access</div>
@@ -492,7 +492,7 @@ export default function AdminDashboard() {
       <div className="desktop-side"><Sidebar /></div>
 
       <div className="topbar">
-        <div className="brand" style={{ padding:0, marginBottom:0 }}><span className="brand-dot" />Home Visit · Admin</div>
+        <div className="brand" style={{ padding:0, marginBottom:0 }}><span className="brand-dot" />HemoVisit · Admin</div>
         <button onClick={()=>setSideOpen(true)} style={{ background:"none", border:"none", fontSize:20, cursor:"pointer", color:INK }}>☰</button>
       </div>
 
@@ -885,7 +885,7 @@ export default function AdminDashboard() {
                   <div style={{ width:40, height:40, borderRadius:"50%", background:"rgba(201,96,58,0.07)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:18 }}>🧪</div>
                   <div>
                     <div style={{ fontWeight:700, fontSize:14 }}>{p?.name||"—"}</div>
-                    <div style={{ fontSize:12, color:"rgba(22,33,31,0.55)" }}>{formatRating(p) ? `⭐ ${formatRating(p)}` : "No reviews yet"} · {p?.serviceArea||"CF"}</div>
+                    <div style={{ fontSize:12, color:"rgba(22,33,31,0.55)" }}>{formatRating(p) ? `⭐ ${formatRating(p)}` : "No reviews yet"} · {p?.serviceArea||"—"}</div>
                   </div>
                 </div>
                 <span style={{ fontFamily:"var(--monof)", fontSize:10, letterSpacing:"0.08em", textTransform:"uppercase", color:p?.isAvailable?GREEN:"rgba(22,33,31,0.4)" }}>

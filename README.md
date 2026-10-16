@@ -1,4 +1,4 @@
-# Home Visit — mobile blood-testing platform
+# HemoVisit — mobile blood-testing platform
 
 A full-stack web application for a home blood-sample collection service.
 Patients book a visit, a phlebotomist collects the sample at their address, a
@@ -259,9 +259,10 @@ Uploads accept PDF only, 10 MB maximum.
 
 ## Before you go live
 
-Everything below is a deliberate placeholder. The code is complete; these are
-business facts only the owner can supply. **Search the codebase for
-`[PLACEHOLDER` to find them all.**
+Everything below is a business fact only the owner can supply. The public web
+pages never show a placeholder: an unconfirmed fact is simply left out. The
+backend still marks its gaps with `[PLACEHOLDER` (search for it); the gaps in
+the legal pages are listed in [docs/LEGAL_TODO.md](docs/LEGAL_TODO.md).
 
 ### Must be true before you publish — do not guess
 
@@ -270,15 +271,15 @@ business facts only the owner can supply. **Search the codebase for
 | [backend/config/locale.js](backend/config/locale.js) | Registered address, contact phone, website. Currently printed on **every PDF report**. |
 | [backend/config/locale.js](backend/config/locale.js) | **Test prices** — the six GBP values are invented placeholders. Set real ones and flip `pricesArePlaceholder` to `false`. |
 | [backend/utils/reportGenerator.js](backend/utils/reportGenerator.js) | `VERIFY_BASE_URL` for the report verification link |
-| [frontend/src/pages/Home.jsx](frontend/src/pages/Home.jsx) | 4 markers: report turnaround, laboratory accreditation, phlebotomist qualifications, service-level commitments |
+| [frontend/src/pages/Home.jsx](frontend/src/pages/Home.jsx) | Left out of the landing page until confirmed: report turnaround, laboratory accreditation, phlebotomist qualifications, service-level commitments. Add each back only once it is true. |
 | [backend/config/locale.js](backend/config/locale.js) | `serviceAreaPrefixes` — currently `["CF"]` (Cardiff). Change for your area. |
 
 ### Needs a lawyer
 
 | Where | What |
 |---|---|
-| [frontend/src/pages/Privacy.jsx](frontend/src/pages/Privacy.jsx) | **11** `[PLACEHOLDER - legal review needed]` sections: data controller, lawful basis, retention, processors, transfers |
-| [frontend/src/pages/Terms.jsx](frontend/src/pages/Terms.jsx) | **14** sections: who provides the service, regulator registration, cancellation, liability, complaints, governing law |
+| [frontend/src/pages/Privacy.jsx](frontend/src/pages/Privacy.jsx) | **11** items to write, listed in [docs/LEGAL_TODO.md](docs/LEGAL_TODO.md): data controller, lawful basis, retention, processors, transfers |
+| [frontend/src/pages/Terms.jsx](frontend/src/pages/Terms.jsx) | **14** items, same file: who provides the service, regulator registration, cancellation, liability, complaints, governing law |
 
 Both pages carry a visible "draft, not reviewed by a lawyer" banner. **Nothing
 in this application claims to be GDPR-compliant, and nothing should be added

@@ -270,7 +270,7 @@ export default function UserDashboard() {
 
   const Sidebar = () => (
     <aside className="side">
-      <div className="brand"><span className="brand-dot" />Home Visit</div>
+      <div className="brand"><span className="brand-dot" />HemoVisit</div>
       <div className="side-sep" />
       {TABS.map(t => (
         <button key={t.id} onClick={() => { setTab(t.id); setStep(0); setSideOpen(false); }}
@@ -582,7 +582,7 @@ export default function UserDashboard() {
 
       {/* Mobile topbar */}
       <div className="topbar">
-        <div className="brand" style={{ padding:0 }}><span className="brand-dot" />Home Visit</div>
+        <div className="brand" style={{ padding:0 }}><span className="brand-dot" />HemoVisit</div>
         <button onClick={() => setSideOpen(true)} style={{ background:"none", border:"none", fontSize:20, cursor:"pointer", color:INK }}>☰</button>
       </div>
 

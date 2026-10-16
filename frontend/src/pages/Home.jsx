@@ -5,7 +5,7 @@ import { useRichMotion } from "../hooks/useRichMotion";
 import { Reveal, Stagger, StaggerItem, usePointerParallax } from "../motion";
 
 /**
- * Home Visit — landing page (Phase 2: cinematic).
+ * HemoVisit — landing page (Phase 2: cinematic).
  *
  * MOTION. Every effect is transform/opacity only and gated behind
  * useRichMotion(), so on a narrow viewport, a coarse pointer or with
@@ -15,24 +15,21 @@ import { Reveal, Stagger, StaggerItem, usePointerParallax } from "../motion";
  *
  * COPY RULES — unchanged and non-negotiable. Nothing asserts that this
  * service, any laboratory or any person is accredited, registered,
- * certified or compliant. Anything unverifiable carries
- * [PLACEHOLDER - add only if true]. No statistics, testimonials, team
+ * certified or compliant. A fact that is not confirmed is left out
+ * entirely, never shown as a placeholder. No statistics, testimonials, team
  * members or customer names appear anywhere on this page.
  *
  * PHOTOS live in frontend/public/images/.
  *   image1.jpg   phlebotomist with a patient at home  -> hero
  *   image 2.jpg  laboratory technician                -> band
  *   image 4.jpg  gloved hand with a sample tube       -> about aside
- *   image 5.png  brand mark                           -> footer
+ *   image 5.png  old logo, "HOME VISIT MOBILE LAB" baked in -> unused
  */
-
-const PH = "[PLACEHOLDER - add only if true]";
 
 const IMG = {
   hero: "/images/image1.jpg",
   lab:  "/images/image%202.jpg",
   tube: "/images/image%204.jpg",
-  logo: "/images/image%205.png",
 };
 
 const SECTIONS = [
@@ -130,11 +127,11 @@ export default function Home() {
   // ============== CONTENT ==============
   const features = [
     { icon: "🩸", tint: "crimson",  title: "Home Blood Collection", desc: "A phlebotomist comes to your home and collects your sample using sterile, single-use equipment." },
-    { icon: "⚡", tint: "gold",     title: "Digital Reports",       desc: `Your report is delivered digitally with a barcode reference. Typical turnaround: ${PH}` },
+    { icon: "⚡", tint: "gold",     title: "Digital Reports",       desc: "Your report is delivered digitally with a barcode reference." },
     { icon: "🔒", tint: "teal",     title: "Your Data",             desc: "We handle your health information in line with our Privacy Policy." },
     { icon: "📱", tint: "lavender", title: "Track Your Booking",    desc: "Follow your booking from request through to report, with status updates at each stage." },
     { icon: "🧬", tint: "crimson",  title: "Blood Test Panels",     desc: "Routine panels including full blood count, lipids, thyroid, liver function and HbA1c." },
-    { icon: "🏥", tint: "teal",     title: "Laboratory Processing", desc: `Samples are processed by an external laboratory. Accreditation (for example UKAS): ${PH}` },
+    { icon: "🏥", tint: "teal",     title: "Laboratory Processing", desc: "Samples are processed by an external laboratory." },
   ];
 
   const process = [
@@ -164,8 +161,7 @@ export default function Home() {
 
   const faqs = [
     { q: "How early can I book a slot?",       a: "You can choose any date from today onwards when you book. Your booking is confirmed once a phlebotomist has been assigned to it." },
-    { q: "What are the phlebotomists' qualifications?", a: `Details of our phlebotomists' training and registration: ${PH}` },
-    { q: "How long will my report take?",      a: `Expected turnaround for each test is shown when you book. Service-level commitments: ${PH}` },
+    { q: "How long will my report take?",      a: "Expected turnaround for each test is shown when you book." },
     { q: "Do you cover my area?",              a: "We currently visit postcodes starting CF, covering Cardiff and the surrounding South Wales area. Enter your postcode when booking and we will tell you straight away if we can reach you." },
     { q: "How is my health information handled?", a: "We handle your health information in line with our Privacy Policy, which explains what we collect, why, and how long we keep it." },
   ];
@@ -398,7 +394,7 @@ export default function Home() {
 
       {/* ===== NAV ===== */}
       <nav className={scrolled ? "nav on" : "nav"}>
-        <div className="brand"><span className="brand-dot" />Home Visit</div>
+        <div className="brand"><span className="brand-dot" />HemoVisit</div>
         <div className={open ? "nav-links open" : "nav-links"}>
           {NAV.map((s) => <button key={s.id} onClick={() => go(s.id)}>{s.name}</button>)}
         </div>
@@ -463,7 +459,7 @@ export default function Home() {
               <SpecimenLabel section={section("about")} />
               <h2 style={{ fontSize: "var(--fs-display)", marginBottom: 16, maxWidth: "14em", textWrap: "balance" }}>Every drop tells a story.</h2>
               <p style={{ fontSize: "var(--fs-body)", color: "var(--color-text-secondary)", maxWidth: "52ch" }}>
-                Home Visit connects patients in Cardiff and South Wales with a
+                HemoVisit connects patients in Cardiff and South Wales with a
                 phlebotomist who comes to them. The sample goes to a laboratory
                 for analysis, and the result comes back as a report you can
                 download from your account.
@@ -651,12 +647,12 @@ export default function Home() {
       {/* ===== FOOTER ===== */}
       <footer className="foot">
         <div className="wrap foot-row">
-          <img className="foot-logo" src={IMG.logo} alt="Home Visit Mobile Lab logo" loading="lazy" decoding="async" />
+          <div className="brand"><span className="brand-dot" />HemoVisit</div>
           <div>
             <Link to="/privacy">Privacy Policy</Link>
             <Link to="/terms">Terms of Service</Link>
           </div>
-          <small>© 2026 Home Visit · Cardiff, Wales</small>
+          <small>© 2026 HemoVisit · Cardiff, Wales</small>
         </div>
       </footer>
     </div>
