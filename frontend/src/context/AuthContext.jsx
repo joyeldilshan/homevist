@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect } from "react";
+import { createContext, useContext, useState } from "react";
 import api from "../utils/api";
 
 // ── Auth context ───────────────────────────────────────────────
@@ -8,25 +8,26 @@ export function AuthProvider({ children }) {
   // Restore user from sessionStorage on first load.
   // sessionStorage is cleared when the tab is closed, so a new visitor
   // always starts logged-out on the home page.
+  //
+  // Read synchronously, not in an effect: both values are in the same
+  // synchronous store, so there is nothing to wait for. The old effect
+  // made every first render the full-screen <Loading /> instead of the
+  // page, which flashed on every visit and would replace the
+  // pre-rendered landing page (scripts/prerender.mjs) on hydration.
+  // A stored user is only trusted alongside a token; api.js attaches the
+  // token to every request. On the server, sessionStorage does not exist
+  // and the catch returns null — the signed-out page, as pre-rendered.
   const [user, setUser] = useState(() => {
     try {
+      const token  = sessionStorage.getItem("token");
       const stored = sessionStorage.getItem("user");
-      return stored ? JSON.parse(stored) : null;
+      return token && stored ? JSON.parse(stored) : null;
     } catch {
       return null;
     }
   });
-  const [loading, setLoading] = useState(true);
-
-  // On mount, if a token exists, the stored user is trusted.
-  // (api.js auto-attaches the token to every request.)
-  useEffect(() => {
-    const token = sessionStorage.getItem("token");
-    if (!token) {
-      setUser(null);
-    }
-    setLoading(false);
-  }, []);
+  // Kept for the consumers that read it; restoring is now synchronous.
+  const loading = false;
 
   // Save auth data consistently
   const persist = (data) => {
