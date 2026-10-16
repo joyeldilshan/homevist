@@ -17,6 +17,7 @@ const { errorHandler }   = require("./middleware/error.middleware");
 const { securityHeaders } = require("./middleware/security.middleware");
 const { startSubscriptionScheduler } = require("./jobs/subscriptionScheduler");
 const logger = require("./utils/logger");
+const { checkDatabaseTarget, redactCredentials } = require("./utils/dbGuard");
 
 const app    = express();
 const server = http.createServer(app);
@@ -70,10 +71,32 @@ app.get("/api/health", (_req, res) => {
 
 app.use(errorHandler);
 
+/*
+ * Database safety guard. Outside production the database name must look
+ * like a development one, so a plain `npm run dev` can never write to the
+ * live database by accident. Only the name is logged, never the URI.
+ */
+const target = checkDatabaseTarget({
+  uri:           process.env.MONGO_URI,
+  nodeEnv:       process.env.NODE_ENV,
+  allowNonDevDb: process.env.ALLOW_NON_DEV_DB,
+});
+if (!target.ok) {
+  logger.error(target.error);
+  process.exit(1);
+}
+if (target.warning) {
+  logger.warn("");
+  logger.warn("  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+  logger.warn("  !!  " + target.warning);
+  logger.warn("  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+  logger.warn("");
+}
+
 mongoose
   .connect(process.env.MONGO_URI)
   .then(() => {
-    logger.startup("Connected to MongoDB");
+    logger.startup("Connected to MongoDB, database: " + (target.name || "(default)"));
     startSubscriptionScheduler(io);
     const PORT = process.env.PORT || 5000;
     server.listen(PORT, () => {
@@ -81,7 +104,7 @@ mongoose
     });
   })
   .catch((err) => {
-    logger.error("MongoDB connection failed:", err.message);
+    logger.error("MongoDB connection failed:", redactCredentials(err.message));
     process.exit(1);
   });
 

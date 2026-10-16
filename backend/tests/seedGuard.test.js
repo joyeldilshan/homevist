@@ -51,8 +51,8 @@ test("recognises development-looking database names", () => {
 
 test("REFUSES production-looking names — the whole point of the guard", () => {
   for (const bad of [
-    "homevisit",      // the real production database for this project
-    "hemovisit",
+    "hemovisit",      // the real production database for this project
+    "homevisit",      // the old misspelling, refused all the same
     "production",
     "prod",
     "main",

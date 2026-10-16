@@ -23,6 +23,7 @@ const crypto   = require("crypto");
 const User     = require("../models/User");
 const TestType = require("../models/TestType");
 const locale   = require("../config/locale");
+const { databaseNameFrom, SAFE_NAME } = require("./dbGuard");
 
 // ── Password resolution ──────────────────────────────────────────
 const generated = [];
@@ -172,20 +173,6 @@ const USERS = [
   },
 ];
 
-/**
- * Pull the database name out of a MongoDB connection string.
- * Handles mongodb:// and mongodb+srv://, with or without a query string.
- */
-function databaseNameFrom(uri) {
-  if (!uri || typeof uri !== "string") return null;
-  const afterHost = uri.split("://")[1];
-  if (!afterHost) return null;
-  const path = afterHost.split("/").slice(1).join("/");
-  if (!path) return null;
-  const name = path.split("?")[0].trim();
-  return name || null;
-}
-
 /** Ask on the terminal and resolve with what was typed. */
 function ask(question) {
   return new Promise((resolve) => {
@@ -198,8 +185,6 @@ function ask(question) {
     });
   });
 }
-
-const SAFE_NAME = /(dev|test|local|sandbox|staging)/i;
 
 /**
  * Three gates before anything is deleted.
@@ -219,7 +204,7 @@ async function guard() {
   }
   if (!name) {
     console.error("Refusing to seed: could not read a database name from MONGO_URI.");
-    console.error("Add an explicit database name, e.g. .../homevisit_dev?retryWrites=true");
+    console.error("Add an explicit database name, e.g. .../hemovisit_dev?retryWrites=true");
     process.exit(1);
   }
 

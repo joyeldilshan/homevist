@@ -22,11 +22,39 @@ npm run install:all          # installs backend + frontend
 cp backend/.env.example  backend/.env
 cp frontend/.env.example frontend/.env
 # edit backend/.env — at minimum MONGO_URI and JWT_SECRET
+# MONGO_URI must name a development database, e.g. .../hemovisit_dev
 
 npm run dev                  # backend :5000 and frontend :5173 together
 ```
 
 Open http://localhost:5173.
+
+### Local database and the startup guard
+
+For local development, point `MONGO_URI` in `backend/.env` at a **development**
+database, never the live one. The database name is the path segment after the
+host:
+
+```
+mongodb+srv://<user>:<password>@<cluster>.mongodb.net/hemovisit_dev?retryWrites=true&w=majority
+                                                      ^^^^^^^^^^^^^
+```
+
+A local MongoDB works the same way: `mongodb://127.0.0.1:27017/hemovisit_dev`.
+
+When `NODE_ENV` is anything other than `production`, the server checks that
+name before it connects. If the name does not contain `dev`, `test`, `local`,
+`sandbox` or `staging`, or there is no name at all, it refuses to start:
+
+```
+Refusing to connect: database "hemovisit" does not look like a development database. ...
+```
+
+`ALLOW_NON_DEV_DB=true` overrides the check for one run and prints a loud
+warning. In production (`NODE_ENV=production`) the check is skipped, because the
+deployed server is meant to use the live database. The startup log shows only
+the database name, never the URI or password. The check lives in
+`backend/utils/dbGuard.js`, and the seed script uses the same rule.
 
 ### Root scripts
 
@@ -37,7 +65,7 @@ Open http://localhost:5173.
 | `npm run dev:api` / `npm run dev:web` | Run one side only |
 | `npm run build` | Production build of the frontend |
 | `npm start` | Start the backend |
-| `npm test` | Backend test suite (41 tests) |
+| `npm test` | Backend test suite (52 tests) |
 | `npm run seed` | Seed sample data — **guarded, see below** |
 | `npm run audit` | `npm audit` on both packages |
 
@@ -49,7 +77,8 @@ Open http://localhost:5173.
 
 | Variable | Required | Notes |
 |---|---|---|
-| `MONGO_URI` | **yes** | Must include a database name: `.../hemovisit_dev?retryWrites=true` |
+| `MONGO_URI` | **yes** | Must include a database name: `.../hemovisit_dev?retryWrites=true`. Outside production the name must look like a development one — see [the startup guard](#local-database-and-the-startup-guard). |
+| `ALLOW_NON_DEV_DB` | no | `true` lets a non-production server connect to a database whose name fails the guard. Logs a warning. Leave unset. |
 | `JWT_SECRET` | **yes** | Long random string. `node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"` |
 | `JWT_EXPIRES_IN` | no | Token lifetime, default `7d`. Accepts `15m`, `12h`, `7d`, or seconds. No refresh-token flow — on expiry the user signs in again. |
 | `PORT` | no | Default `5000` |
@@ -269,8 +298,8 @@ any real patient result is reported.
 - **Bundle size.** The frontend builds to ~641 kB in one chunk, over Vite's
   500 kB warning. Route-level code splitting is the fix and has not been done.
 - **Dependency advisories.** See the dedicated section below.
-- **No automated frontend tests.** The 41 tests cover backend validators,
-  formatters, rate limiting and the seed guard.
+- **No automated frontend tests.** The 52 tests cover backend validators,
+  formatters, rate limiting, the seed guard and the startup database guard.
 - **Images.** 1.1 MB total; `image 5.png` is 660 kB for a logo shown at 54 px.
 
 ---
