@@ -370,9 +370,11 @@ export default function AuthPage() {
         }
 
         .au .eye {
-          position: absolute; right: 10px; bottom: 8px;
+          position: absolute; right: 6px; bottom: 6px;
+          min-width: 32px; min-height: 32px; padding: 0;
+          display: inline-flex; align-items: center; justify-content: center;
           background: none; border: none; cursor: pointer;
-          font-size: 15px; color: var(--ink-40); padding: 4px;
+          font-size: 15px; color: var(--ink-40);
         }
 
         /* buttons */
@@ -477,7 +479,7 @@ export default function AuthPage() {
 
       <button className="home-btn" onClick={()=>navigate("/")}>← Home</button>
 
-      <div className="shell">
+      <main className="shell">
 
         {/* ---------- LEFT: photo panel ---------- */}
         <div className="panel">
@@ -486,6 +488,7 @@ export default function AuthPage() {
               src="/images/image%204.jpg"
               alt="A gloved hand holding a labelled blood sample tube"
               className="panel-img"
+              fetchpriority="high"
               onError={() => setImgOk(false)}
             />
           ) : (
@@ -658,7 +661,7 @@ export default function AuthPage() {
             )}
           </div>
         </div>
-      </div>
+      </main>
     </div>
   );
 }

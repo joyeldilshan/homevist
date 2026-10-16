@@ -410,6 +410,9 @@ export default function Home() {
         </div>
       </nav>
 
+      {/* One <main> landmark: everything between the nav and the footer. */}
+      <main>
+
       {/* ===== HERO ===== */}
       <header id="hero" className="wrap hero">
         <div className="hero-grid">
@@ -642,6 +645,8 @@ export default function Home() {
           </div>
         </Reveal>
       </section>
+
+      </main>
 
       {/* ===== FOOTER ===== */}
       <footer className="foot">

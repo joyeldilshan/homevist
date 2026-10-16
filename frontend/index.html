@@ -5,9 +5,35 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <title>Home Visit — Mobile Blood Testing</title>
+    <meta name="description" content="Book a blood test at home in Cardiff and South Wales. A phlebotomist visits your address, a laboratory analyses the sample, and you follow each stage and get your report online." />
+    <script>
+      /*
+       * Start the LCP image download before React mounts. The hero and auth
+       * photos only exist after the bundle runs, so the browser cannot find
+       * them in the HTML on its own. One image per route, nothing elsewhere.
+       */
+      (function () {
+        var p = location.pathname;
+        var src = p === "/" || p === "/home" ? "/images/image1.jpg"
+                : p === "/login" || p === "/register" ? "/images/image%204.jpg"
+                : null;
+        if (!src) return;
+        var l = document.createElement("link");
+        l.rel = "preload"; l.as = "image"; l.href = src;
+        l.setAttribute("fetchpriority", "high");
+        document.head.appendChild(l);
+      })();
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800;900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <!--
+      Fonts load without blocking first paint: the stylesheet is fetched as
+      media="print" (non-blocking) and switched to "all" once it arrives.
+      display=swap already meant fallback text first, so nothing new is
+      visible; this only stops the fonts CSS from holding up the page.
+    -->
+    <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800;900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" media="print" onload="this.media='all'" />
+    <noscript><link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800;900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" /></noscript>
   </head>
   <body>
     <div id="root"></div>

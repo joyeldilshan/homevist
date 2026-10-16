@@ -90,7 +90,7 @@ const SECTIONS = [
 export default function Privacy() {
   return (
     <div style={{ background: "#F4F2ED", minHeight: "100vh", color: "#16211F" }}>
-      <div style={{ maxWidth: 760, margin: "0 auto", padding: "48px 20px 80px" }}>
+      <main style={{ maxWidth: 760, margin: "0 auto", padding: "48px 20px 80px" }}>
 
         <Link to="/" style={{ fontSize: 13, color: "#0F6E62", textDecoration: "none" }}>
           ← Back to Home Visit
@@ -127,7 +127,7 @@ export default function Privacy() {
         <p style={{ fontSize: 13, color: "rgba(22,33,31,0.55)", marginTop: 40, paddingTop: 20, borderTop: "1px solid rgba(22,33,31,0.12)" }}>
           See also our <Link to="/terms" style={{ color: "#0F6E62" }}>Terms of Service</Link>.
         </p>
-      </div>
+      </main>
     </div>
   );
 }

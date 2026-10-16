@@ -12,3 +12,4 @@ vite.config.js.timestamp-*
 
 # Phase screenshots: review artefacts, large and regenerable. Keep them local.
 docs/screenshots/
+docs/lighthouse/

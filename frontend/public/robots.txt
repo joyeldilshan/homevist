@@ -1,0 +1,9 @@
+# Public pages: landing, sign in, register, privacy, terms.
+User-agent: *
+Allow: /
+
+# Signed-in dashboards have nothing for a crawler.
+Disallow: /user
+Disallow: /admin
+Disallow: /phlebotomist
+Disallow: /mlt

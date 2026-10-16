@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
+    "lighthouse": "node scripts/lighthouse.mjs",
     "test": "vitest run",
     "test:watch": "vitest"
   },
