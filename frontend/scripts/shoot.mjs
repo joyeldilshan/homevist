@@ -117,7 +117,7 @@ for (const { w, h, tag } of SIZES) {
      */
     const countHidden = () => page.evaluate(() => {
       let n = 0;
-      for (const el of document.querySelectorAll("section, header, .card, .role, .flow-item, .step, .faq, .cta")) {
+      for (const el of document.querySelectorAll("section, header, [data-reveal], .lp-card, .lp-step, .lp-faq, .lp-cta, .card, .role, .flow-item, .step, .faq, .cta")) {
         const cs = getComputedStyle(el);
         const r = el.getBoundingClientRect();
         if (r.height > 20 && Number(cs.opacity) < 0.05) n++;

@@ -48,8 +48,14 @@ describe("Home (landing page)", () => {
     expect(messages).not.toMatch(/Each child in a list should have a unique "key"/i);
   });
 
-  it("renders every section heading, so none silently disappears", () => {
+  /*
+   * Everything below the hero is a lazy chunk, so these wait for it.
+   * Headings are split into animated words; the full sentence is kept in
+   * a visually hidden span, which is what these queries find.
+   */
+  it("renders every section heading, so none silently disappears", async () => {
     renderHome();
+    await screen.findByText(/what you get/i);
     for (const heading of [
       /what you get/i,         // features
       /four steps\. one report/i,   // process
@@ -66,8 +72,9 @@ describe("Home (landing page)", () => {
    * render its OWN name — the bug made the FAQ block display "Contact",
    * which threw no error and would have shipped unnoticed.
    */
-  it("labels each section with its own name and code", () => {
+  it("labels each section with its own name and code", async () => {
     const { container } = renderHome();
+    await screen.findByText(/common questions/i);
 
     const codes = [...container.querySelectorAll(".label-code")].map((n) => n.textContent);
     const names = [...container.querySelectorAll(".label-name")].map((n) => n.textContent);
@@ -92,8 +99,9 @@ describe("Home (landing page)", () => {
     expect(codes[contactIndex]).toBe("HV-08");
   });
 
-  it("makes no unverifiable claims in the rendered copy", () => {
+  it("makes no unverifiable claims in the rendered copy", async () => {
     const { container } = renderHome();
+    await screen.findByText(/common questions/i);
     const text = container.textContent;
 
     // These were removed deliberately; a regression must fail loudly.
@@ -104,10 +112,20 @@ describe("Home (landing page)", () => {
     expect(text).not.toMatch(/HIPAA/);
     // Unconfirmed facts are left out, never shown as a placeholder.
     expect(text).not.toMatch(/PLACEHOLDER/i);
+    // No ratings, review counts or invented ETAs.
+    expect(text).not.toMatch(/★|⭐|reviews?|ETA|minutes away/i);
   });
 
-  it("uses one brand name, HemoVisit", () => {
+  it("counts up only the numbers from config/product.js", async () => {
     const { container } = renderHome();
+    await screen.findByText(/common questions/i);
+    const stats = [...container.querySelectorAll(".lp-stat-v")].map((n) => n.textContent);
+    expect(stats).toEqual(["6", "5", "4"]);
+  });
+
+  it("uses one brand name, HemoVisit", async () => {
+    const { container } = renderHome();
+    await screen.findByText(/common questions/i);
     expect(container.textContent).toMatch(/HemoVisit/);
     expect(container.textContent).not.toMatch(/Home Visit/);
   });
