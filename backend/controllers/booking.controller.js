@@ -131,7 +131,11 @@ exports.verifyBooking = async (req, res, next) => {
       .populate("testType",     "name code price")
       .populate("testTypes",    "name code price");
 
-    if (!booking) return res.status(404).json({ success:false, message:"Booking not found." });
+    // A phlebotomist may look up only the visits assigned to them.
+    if (!booking || (req.user.role === "phlebotomist"
+        && String(booking.phlebotomist?._id || "") !== String(req.user._id))) {
+      return res.status(404).json({ success:false, message:"Booking not found." });
+    }
 
     const tests = booking.testTypes?.length ? booking.testTypes : [booking.testType].filter(Boolean);
 
