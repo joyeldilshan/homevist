@@ -40,12 +40,12 @@ function pdfText(file) {
   return out.replace(/\s+/g, " ");
 }
 
+// Uses the name the generator returns, not a before/after listing of the
+// folder: other test files write to it in parallel.
 async function render(opts) {
-  const before = new Set(listReports());
   const rel = await generateReport(booking(), opts);
-  const added = listReports().filter((f) => !before.has(f));
-  assert.equal(added.length, 1, "exactly one file written");
-  const file = path.join(reportsDir, added[0]);
+  const file = path.join(reportsDir, rel);
+  assert.ok(fs.existsSync(file), "the returned file was written");
   try { return { rel, text: pdfText(file) }; } finally { fs.unlinkSync(file); }
 }
 
