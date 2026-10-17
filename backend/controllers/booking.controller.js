@@ -7,6 +7,8 @@ const { isValidUkPostcode, POSTCODE_MESSAGE, isInServiceArea, outOfAreaMessage }
 const { formatDate } = require("../utils/format");
 const logger = require("../utils/logger");
 
+const BOOKING_STATUSES = Booking.schema.path("status").enumValues;
+
 // POST /api/bookings — Patient creates booking (supports multiple tests)
 exports.createBooking = async (req, res, next) => {
   try {
@@ -88,13 +90,18 @@ exports.getBookings = async (req, res, next) => {
   try {
     let filter = {};
     if (req.user.role === "user") filter.user = req.user._id;
-    if (req.user.role === "phlebotomist") {
-      filter.$or = [
-        { phlebotomist: req.user._id },
-        { phlebotomist: null, status: "pending" },
-      ];
+    // A phlebotomist sees only the visits assigned to them. This used to
+    // add every unassigned pending booking (any patient's name, phone and
+    // address); jobs are assigned by an admin.
+    if (req.user.role === "phlebotomist") filter.phlebotomist = req.user._id;
+    if (req.query.status !== undefined) {
+      // A plain status name only: ?status[$ne]=x arrives as an object and
+      // would otherwise become a query operator.
+      if (typeof req.query.status !== "string" || !BOOKING_STATUSES.includes(req.query.status)) {
+        return res.status(400).json({ success:false, message:"Unknown status filter." });
+      }
+      filter.status = req.query.status;
     }
-    if (req.query.status) filter.status = req.query.status;
 
     const bookings = await Booking.find(filter)
       .populate("user",         "name phone email")
@@ -150,13 +157,21 @@ exports.verifyBooking = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+// The states each non-admin change may start from.
+const FROM = {
+  user:         { cancelled: ["pending","confirmed"] },
+  phlebotomist: { confirmed: ["pending"], rejected: ["pending","confirmed"], sample_collected: ["confirmed"] },
+};
+
 // PATCH /api/bookings/:id/status
 exports.updateStatus = async (req, res, next) => {
   try {
     const { status, note } = req.body;
+    // Processing and completed follow the lab's sample and report steps, so
+    // a phlebotomist no longer sets them directly.
     const allowed = {
       admin:        ["confirmed","cancelled","rejected","processing","completed","sample_collected"],
-      phlebotomist: ["confirmed","sample_collected","processing","completed","rejected"],
+      phlebotomist: ["confirmed","sample_collected","rejected"],
       user:         ["cancelled"],
     };
     if (!allowed[req.user.role]?.includes(status)) {
@@ -168,7 +183,21 @@ exports.updateStatus = async (req, res, next) => {
       .populate("testType", "name")
       .populate("testTypes","name");
 
-    if (!booking) return res.status(404).json({ success:false, message:"Booking not found." });
+    // Object-level checks: the role allows the status, but only on the
+    // caller's own booking (patients) or a booking assigned to them
+    // (phlebotomists). Someone else's booking is "not found", so its
+    // existence is not revealed. These used to be missing: any patient
+    // could cancel, and any phlebotomist change, any booking by ID.
+    const mine = (ref) => ref && String(ref._id || ref) === String(req.user._id);
+    if (!booking
+      || (req.user.role === "user"         && !mine(booking.user))
+      || (req.user.role === "phlebotomist" && !mine(booking.phlebotomist))) {
+      return res.status(404).json({ success:false, message:"Booking not found." });
+    }
+    const from = FROM[req.user.role]?.[status];
+    if (from && !from.includes(booking.status)) {
+      return res.status(409).json({ success:false, message:`A ${booking.status.replace("_", " ")} booking cannot be changed to ${status.replace("_", " ")}.` });
+    }
 
     booking.status = status;
     booking.statusHistory.push({ status, updatedBy:req.user._id, note:note||"" });
