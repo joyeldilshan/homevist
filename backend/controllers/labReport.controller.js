@@ -41,6 +41,12 @@ exports.createReport = async (req, res, next) => {
     if (!sample) {
       return res.status(404).json({ success: false, message: "Sample not found." });
     }
+    // Only while the lab is processing it. A report could be uploaded at
+    // any stage (before the sample reached the lab, or replacing one the
+    // patient had already been sent).
+    if (sample.status !== "processing") {
+      return res.status(409).json({ success: false, message: "A report can be uploaded only while the sample is processing." });
+    }
 
     let report = await LabReport.findOne({ sample: sampleId });
     if (!req.file && !report) {
