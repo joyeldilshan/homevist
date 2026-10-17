@@ -29,7 +29,28 @@ const tpl  = await readFile(file, "utf8");
 if (!tpl.includes(MARK)) throw new Error(`prerender: ${MARK} not found in dist/index.html`);
 if (!html.includes('id="hero"')) throw new Error("prerender: rendered HTML has no hero; refusing to write it");
 
+/*
+ * The landing page is a lazy route with its own CSS (see App.jsx), so
+ * the client build links neither in the shell. The pre-rendered page
+ * needs both straight away: its stylesheet before first paint, and its
+ * chunk preloaded so hydration is not a second round-trip. Only
+ * index.html gets them; app.html (every other route) stays lean.
+ */
+const manifest = JSON.parse(await readFile(path.join(dist, ".vite", "manifest.json"), "utf8"));
+// Rollup may merge Home.jsx into a chunk shared with BelowFold (both use
+// motion/lite and landing/parts); then the manifest keys it "_Home-…js"
+// with no src. Look it up by source first, then by that chunk's name.
+const chunks = Object.values(manifest);
+const home = chunks.find((c) => c.src === "src/pages/Home.jsx")
+          || chunks.find((c) => c.isDynamicEntry && c.name === "Home");
+if (!home?.file || !home.css?.length) throw new Error("prerender: Home chunk or its CSS missing from the Vite manifest");
+const headTags = [
+  ...home.css.map((f) => `<link rel="stylesheet" crossorigin href="/${f}">`),
+  `<link rel="modulepreload" crossorigin href="/${home.file}">`,
+].join("\n    ");
+if (!tpl.includes("</head>")) throw new Error("prerender: no </head> in dist/index.html");
+
 await writeFile(path.join(dist, "app.html"), tpl.replace(MARK, ""));
-await writeFile(file, tpl.replace(MARK, html));
+await writeFile(file, tpl.replace(MARK, html).replace("</head>", `  ${headTags}\n  </head>`));
 await rm(ssr, { recursive: true, force: true });   // server bundle is build-only
 console.log(`prerender: / -> dist/index.html (${(html.length / 1024).toFixed(1)} kB of markup); other routes -> dist/app.html`);

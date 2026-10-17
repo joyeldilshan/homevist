@@ -11,11 +11,16 @@ import ServerWaking    from "./components/ServerWaking";
  * ever sees the landing page still downloaded all four dashboards. Each
  * route is now its own chunk, fetched when it is first visited.
  *
- * Home is eagerly imported on purpose: it is the first paint for most
- * visitors, and lazy-loading it would add a network round-trip before
- * anything appears.
+ * Home is lazy too, so its stylesheet (pages/landing/landing.css, most
+ * of the app's CSS) is split out and /login, /register and the
+ * dashboards never download it. It costs the landing page nothing: "/"
+ * is pre-rendered, so it paints from HTML before any JS, and
+ * scripts/prerender.mjs links Home's CSS and modulepreloads its chunk
+ * in that page's <head>. On a client-side visit, Vite's dynamic-import
+ * helper waits for the CSS before the page renders, so there is no
+ * unstyled flash.
  */
-import Home from "./pages/Home";
+const Home            = lazy(() => import("./pages/Home"));
 
 const AuthPage        = lazy(() => import("./pages/Login"));
 const UserDashboard   = lazy(() => import("./pages/user/Dashboard"));

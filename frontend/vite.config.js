@@ -36,6 +36,9 @@ export default defineConfig({
       },
     },
   },
+  // dist/.vite/manifest.json: scripts/prerender.mjs reads it to find
+  // the landing chunk's CSS and JS.
+  build: { manifest: true },
   test: {
     environment: "jsdom",
     globals: true,
