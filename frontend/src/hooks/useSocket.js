@@ -1,8 +1,9 @@
 import { useEffect, useRef } from "react";
 import { io } from "socket.io-client";
 
-// Single shared socket instance
+// Single shared socket instance, and the sign-in token it connected with.
 let socket = null;
+let socketToken = null;
 
 /*
  * Socket.IO lives at the server's root, not under /api. VITE_API_URL is
@@ -15,9 +16,20 @@ export function socketOrigin(apiUrl = import.meta.env.VITE_API_URL) {
   try { return new URL(apiUrl).origin; } catch { return apiUrl.replace(/\/api\/?$/, ""); }
 }
 
+/*
+ * The server accepts signed-in sockets only (backend utils/socketAuth.js)
+ * and checks every room join against that user. If the stored token has
+ * changed since the socket was made (logged out, or another account
+ * signed in), the old socket is dropped so it never carries the previous
+ * user's identity.
+ */
 function getSocket() {
+  const token = sessionStorage.getItem("token");
+  if (socket && socketToken !== token) { socket.disconnect(); socket = null; }
   if (!socket) {
+    socketToken = token;
     socket = io(socketOrigin(), {
+      auth:            { token },
       autoConnect:     false,
       reconnection:    true,
       reconnectionDelay:    1000,

@@ -45,6 +45,7 @@ const subscriptionRoutes  = require("./routes/subscription.routes");
 const { errorHandler }   = require("./middleware/error.middleware");
 const { securityHeaders } = require("./middleware/security.middleware");
 const { startSubscriptionScheduler } = require("./jobs/subscriptionScheduler");
+const { registerSocketHandlers } = require("./utils/socketAuth");
 
 const app    = express();
 const server = http.createServer(app);
@@ -68,12 +69,8 @@ app.set("etag", false);
 
 app.use((req, _res, next) => { req.io = io; next(); });
 
-io.on("connection", (socket) => {
-  logger.debug("Socket connected:", socket.id);
-  socket.on("join_booking", (bookingId) => socket.join(bookingId));
-  socket.on("join_admin",   ()          => socket.join("admin_room"));
-  socket.on("disconnect",   ()          => logger.debug("Socket disconnected:", socket.id));
-});
+// Signed-in sockets only, and only the rooms the user is entitled to.
+registerSocketHandlers(io);
 
 app.use(securityHeaders());
 app.use(cors({ origin: process.env.CLIENT_URL || "http://localhost:5173", credentials: true }));
