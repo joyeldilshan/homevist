@@ -199,6 +199,21 @@ from the patient's view, go to `docs/screenshots/phase4/` (gitignored). The
 register limiter allows five sign-ups per hour per IP; restart the backend
 after five runs in an hour.
 
+### API authorization tests
+
+`npm run test:api` (in `frontend/`, same backend and database rules as above;
+no browser or preview needed) calls the API directly with users it creates
+for the run. It checks the password rule on every path that sets one, and
+object-level access: patient A cannot read, change, cancel, rate or download
+anything of patient B's (bookings, reports, profile, subscriptions); a
+phlebotomist sees and acts only on bookings assigned to them; lab steps only
+move forward and a report can be uploaded only while the sample is processing;
+a normal user gets 403 on admin and staff routes; malformed or other users' IDs
+give 403/404 without internals in the response; a deactivated account is
+refused everywhere; sockets need a token and only join rooms the user is
+entitled to. Each run makes two (refused) register attempts, which count
+against the register limiter of five an hour; restart the backend if it trips.
+
 **Deploy order:** backend first, so you have its URL for `VITE_API_URL`; then the
 frontend; then go back and set `CLIENT_URL` on Render to the Vercel URL.
 
@@ -295,6 +310,33 @@ frontend/src/
 Rate limiting on `/login` (10 failed attempts / 15 min), `/register` (5 / hour)
 and `/change-password` (5 / hour). `trust proxy` is set to 1 for Render.
 Helmet supplies CSP, HSTS (production), `nosniff` and frame protection.
+
+**Access to records.** Every route checks the record, not only the role.
+Someone else's record answers 404, as if it did not exist; a malformed ID is
+also 404, and 500 responses carry a generic message (details go to the server
+log only). Behaviour changes for API clients, all from the authorization audit:
+
+- Phlebotomists see (`GET /api/bookings`) and change only bookings assigned to
+  them; they may set `confirmed`, `rejected` and `sample_collected`, but not
+  `processing` or `completed`, which follow the lab's steps. Patients may
+  cancel only their own pending or confirmed bookings. A change from the wrong
+  state is 409.
+- `GET /api/bookings/verify/:bookingId` (barcode lookup) now requires sign-in
+  as admin, lab technician or the assigned phlebotomist. It used to be public.
+- `PATCH /api/samples/:id/status` only moves forward (`received`, then
+  `processing`). `completed` comes only from sending the report.
+  `POST /api/reports` needs the sample to be `processing`.
+- `PATCH`/`DELETE /api/phlebotomists/:id` act only on phlebotomist accounts.
+- Subscriptions: pause needs an active plan, resume a paused one; a cancelled
+  plan cannot be resumed.
+- `?status=` filters take a plain status name only, otherwise 400.
+
+**Real-time (Socket.io).** A socket must send the same JWT as the API
+(`io(origin, { auth: { token } })`) for an active account, or it is refused.
+`join_booking` is honoured only for the booking's patient, its assigned
+phlebotomist or an admin; `join_admin` only for admins. A socket keeps the
+identity it connected with, so an account deactivated mid-session stays in its
+rooms until it disconnects.
 
 ### Report files (patient PDFs)
 
