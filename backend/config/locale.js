@@ -37,7 +37,7 @@ module.exports = {
    * or leave the placeholder visible so it is obvious they are missing.
    */
   organisation: {
-    name:        "Home Visit",
+    name:        "HemoVisit",
     cityCountry: "Cardiff, Wales",
     addressLine: "[PLACEHOLDER - add registered address]",
     phone:       "[PLACEHOLDER - add contact number]",

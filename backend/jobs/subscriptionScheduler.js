@@ -62,7 +62,7 @@ async function generateDueVisits(io) {
       }
       if (sub.user?.phone) {
         await sendSMS(sub.user.phone,
-          `Home Visit: Your subscription visit #${booking.bookingId} is scheduled for ${formatDate(booking.appointmentDate)} at ${booking.appointmentTime}.`);
+          `HemoVisit: Your subscription visit #${booking.bookingId} is scheduled for ${formatDate(booking.appointmentDate)} at ${booking.appointmentTime}.`);
       }
       if (sub.user) {
         sendBookingEmails(booking, sub.user).catch(err => logger.error("📧 Subscription email error:", err.message));

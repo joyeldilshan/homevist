@@ -38,7 +38,7 @@ async function generateReport(booking) {
     .fillColor("white")
     .fontSize(22)
     .font("Helvetica-Bold")
-    .text("Home Visit", 65, 64);
+    .text("HemoVisit", 65, 64);
   doc
     .fontSize(9)
     .font("Helvetica")
@@ -80,7 +80,7 @@ async function generateReport(booking) {
 
   // Generate QR PNG buffer
   const qrPayload = [
-    "HOME VISIT PATIENT RECORD",
+    "HEMOVISIT PATIENT RECORD",
     `Booking ID  : ${booking.bookingId}`,
     `Patient     : ${booking.user.name}`,
     `Age/Gender  : ${booking.user.age || "—"} / ${booking.user.gender || "—"}`,
@@ -261,7 +261,7 @@ async function generateReport(booking) {
   doc.moveTo(50, rowY).lineTo(50 + usable, rowY).strokeColor(RED).lineWidth(1.5).stroke();
   rowY += 6;
   doc.rect(50, rowY, usable, 36).fill(GREY);
-  doc.fillColor(DARK).font("Helvetica-Bold").fontSize(8).text("Home Visit Laboratory", 58, rowY + 6);
+  doc.fillColor(DARK).font("Helvetica-Bold").fontSize(8).text("HemoVisit Laboratory", 58, rowY + 6);
   doc.fillColor(MUTED).font("Helvetica").fontSize(7.5)
      .text(`${locale.organisation.addressLine}  |  Tel: ${locale.organisation.phone}  |  ${locale.organisation.website}`, 58, rowY + 18);
   doc.fillColor(MUTED).font("Helvetica-Oblique").fontSize(7)
@@ -272,7 +272,7 @@ async function generateReport(booking) {
   // Disclaimer
   doc.fillColor(MUTED).font("Helvetica-Oblique").fontSize(6.5)
      .text(
-       "DISCLAIMER: This report is based on samples collected via Home Visit's mobile phlebotomy service. " +
+       "DISCLAIMER: This report is based on samples collected via HemoVisit's mobile phlebotomy service. " +
        "Results must be interpreted by a qualified medical professional. Valid only with authorised signature.",
        50, rowY, { width: usable, align: "center" }
      );

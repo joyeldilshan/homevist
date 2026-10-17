@@ -33,7 +33,7 @@ const reportTemplate = (data) => `
   <tr><td style="background:#1E6F5C;border-radius:14px 14px 0 0;padding:28px 34px;text-align:center;">
     <div style="font-size:34px;margin-bottom:6px;">🧬</div>
     <h1 style="color:#fff;margin:0;font-size:21px;font-weight:700;">Your Lab Report is Ready</h1>
-    <p style="color:rgba(255,255,255,.85);margin:6px 0 0;font-size:13px;">Home Visit · Your Test Results</p>
+    <p style="color:rgba(255,255,255,.85);margin:6px 0 0;font-size:13px;">HemoVisit · Your Test Results</p>
   </td></tr>
   <tr><td style="background:#fff;padding:30px 34px;border-radius:0 0 14px 14px;box-shadow:0 4px 18px rgba(0,0,0,.07);">
     <p style="font-size:15px;color:#1A202C;margin:0 0 22px;">
@@ -60,7 +60,7 @@ const reportTemplate = (data) => `
     </div>
   </td></tr>
   <tr><td style="padding:16px 0;text-align:center;">
-    <p style="font-size:11px;color:#A0AEC0;margin:0;">🩸 Home Visit · Cardiff, Wales · ${new Date().getFullYear()}</p>
+    <p style="font-size:11px;color:#A0AEC0;margin:0;">🩸 HemoVisit · Cardiff, Wales · ${new Date().getFullYear()}</p>
   </td></tr>
 </table>
 </td></tr>
@@ -75,9 +75,9 @@ exports.sendReportToPatient = async (data) => {
   if (!data.to) throw new Error("No patient email address.");
 
   const mail = {
-    from:    `"Home Visit Lab 🧬" <${process.env.EMAIL_USER}>`,
+    from:    `"HemoVisit Lab 🧬" <${process.env.EMAIL_USER}>`,
     to:      data.to,
-    subject: `🧬 Your Lab Report — ${data.reportId} | Home Visit`,
+    subject: `🧬 Your Lab Report — ${data.reportId} | HemoVisit`,
     html:    reportTemplate(data),
     attachments: [],
   };
