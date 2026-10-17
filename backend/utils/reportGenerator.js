@@ -17,11 +17,44 @@ const GREY  = "#F5F5F5";
 const MUTED = "#757575";
 
 /**
- * generateReport(booking)
- * booking must be populated: user, testType, phlebotomist
- * Returns the relative file path of the saved PDF.
+ * generateReport(booking, { results, remarks })
+ *
+ * booking must be populated: user, testType (or testTypes), phlebotomist.
+ * results: the measured values, one row per parameter:
+ *   [{ name, result, unit?, refRange?, flag? }]   flag: "H" | "L" | ""
+ * remarks: optional free text from the laboratory, printed as given.
+ *
+ * Honesty rules (this generator used to break all of them):
+ *   - No results, no report. It refuses rather than print defaults: it
+ *     once fell back to a hard-coded "mock" full blood count.
+ *   - Nothing clinical is invented: no named signatory, no registration
+ *     number, no fixed "results are within acceptable ranges" remark.
+ *     The authorising signature line is left blank for the laboratory.
+ *   - Units and reference ranges are printed only as supplied with the
+ *     results (CLINICAL_REVIEW.md: the catalogue's ranges are unreviewed).
+ *
+ * Not currently called anywhere: reports are PDFs uploaded by the lab.
  */
-async function generateReport(booking) {
+class ReportDataError extends Error {}
+
+function validateResults(results, testLabel) {
+  if (!Array.isArray(results) || results.length === 0) {
+    throw new ReportDataError(`Cannot generate a report for ${testLabel}: no results were provided. Reports are only produced from real results.`);
+  }
+  results.forEach((r, i) => {
+    const value = r?.result;
+    if (!r?.name || value === undefined || value === null || String(value).trim() === "") {
+      throw new ReportDataError(`Cannot generate a report for ${testLabel}: result ${i + 1}${r?.name ? ` (${r.name})` : ""} has no value.`);
+    }
+  });
+}
+
+async function generateReport(booking, { results, remarks } = {}) {
+  const testLabel = booking?.testTypes?.length
+    ? booking.testTypes.map((t) => t.name).join(", ")
+    : (booking?.testType?.name || "this booking");
+  validateResults(results, testLabel);
+
   const fileName = `report_${booking.bookingId}_${Date.now()}.pdf`;
   const filePath = path.join(UPLOAD_DIR, fileName);
 
@@ -85,11 +118,12 @@ async function generateReport(booking) {
     `Patient     : ${booking.user.name}`,
     `Age/Gender  : ${booking.user.age || "—"} / ${booking.user.gender || "—"}`,
     `Phone       : ${booking.user.phone}`,
-    `Test        : ${booking.testType.name}`,
+    `Test        : ${testLabel}`,
     `Date        : ${formatAppointment(booking.appointmentDate, booking.appointmentTime)}`,
     `Phlebotomist: ${booking.phlebotomist?.name || "—"}`,
     `Status      : ${booking.status.toUpperCase()}`,
-    `Verify      : ${process.env.VERIFY_BASE_URL || "[PLACEHOLDER - add verification URL]"}/${booking.bookingId}`,
+    // Only when a real verification page is configured.
+    ...(process.env.VERIFY_BASE_URL ? [`Verify      : ${process.env.VERIFY_BASE_URL}/${booking.bookingId}`] : []),
   ].join("\n");
 
   let qrBuf;
@@ -132,7 +166,7 @@ async function generateReport(booking) {
     .fillColor(RED)
     .font("Helvetica-Bold")
     .fontSize(11)
-    .text(`TEST REPORT — ${booking.testType.name.toUpperCase()}`, 60, titleY + 7, { width: usable - 20, align: "center" });
+    .text(`TEST REPORT — ${testLabel.toUpperCase()}`, 60, titleY + 7, { width: usable - 20, align: "center" });
 
   // ── 4. PATIENT + BOOKING INFO ──────────────────────────────────
   const infoY = titleY + 34;
@@ -190,22 +224,9 @@ async function generateReport(booking) {
        .text(h, colXs[i] + 3, tblY + 4, { width: cols[i] * usable - 6, align: "center" });
   });
 
-  // Rows from testType.parameters, or fall back to mock CBC rows
-  const parameters = booking.testType.parameters?.length
-    ? booking.testType.parameters
-    : [
-        { name: "Haemoglobin (Hb)",      result: "14.2",   unit: "g/dL",      refRange: "13.0 – 17.0",    flag: "" },
-        { name: "Red Blood Cells (RBC)", result: "4.85",   unit: "mill/cumm", refRange: "4.50 – 5.50",    flag: "" },
-        { name: "WBC",                   result: "9,200",  unit: "/cumm",     refRange: "4,000 – 11,000", flag: "" },
-        { name: "Platelets",             result: "148,000",unit: "/cumm",     refRange: "150,000 – 400,000", flag: "L" },
-        { name: "PCV",                   result: "42.3",   unit: "%",         refRange: "40 – 50",         flag: "" },
-        { name: "MCV",                   result: "86.2",   unit: "fL",        refRange: "80 – 100",        flag: "" },
-        { name: "MCH",                   result: "29.3",   unit: "pg",        refRange: "27 – 32",         flag: "" },
-        { name: "MCHC",                  result: "33.6",   unit: "g/dL",      refRange: "31.5 – 34.5",     flag: "" },
-        { name: "Neutrophils",           result: "62",     unit: "%",         refRange: "40 – 75",         flag: "" },
-        { name: "Lymphocytes",           result: "30",     unit: "%",         refRange: "20 – 45",         flag: "" },
-        { name: "ESR",                   result: "18",     unit: "mm/hr",     refRange: "0 – 20",          flag: "" },
-      ];
+  // Only the measured values passed in. (This used to read the catalogue's
+  // parameter list, which holds no results, and fell back to a made-up CBC.)
+  const parameters = results;
 
   let rowY = tblY + 18;
   parameters.forEach((p, i) => {
@@ -213,7 +234,7 @@ async function generateReport(booking) {
     doc.rect(50, rowY, usable, 14).fill(bg);
 
     const flagColor = p.flag === "H" ? "#C62828" : p.flag === "L" ? "#F57F17" : DARK;
-    const vals = [p.name, p.result || p.unit, p.unit, p.refRange, p.flag || ""];
+    const vals = [p.name, String(p.result), p.unit, p.refRange, p.flag || ""];
     vals.forEach((v, ci) => {
       const isResult = ci === 1;
       doc
@@ -226,36 +247,38 @@ async function generateReport(booking) {
     rowY += 14;
   });
 
-  // Legend
+  // Legend: only what the flags mean, and only if any row is flagged.
+  if (parameters.some((p) => p.flag)) {
+    rowY += 6;
+    doc.rect(50, rowY, usable, 16).fill(GREY);
+    doc.fillColor(MUTED).font("Helvetica").fontSize(7.5)
+       .text("Flags:  H = above the reference range given  |  L = below the reference range given",
+         56, rowY + 4, { width: usable - 12 });
+    rowY += 18;
+  }
   rowY += 6;
-  doc.rect(50, rowY, usable, 16).fill(GREY);
-  doc.fillColor(MUTED).font("Helvetica").fontSize(7.5)
-     .text("Legend:  H = Above normal range  |  L = Below normal range  |  No flag = Within normal range",
-       56, rowY + 4, { width: usable - 12 });
-  rowY += 24;
 
-  // ── 6. REMARKS ────────────────────────────────────────────────
-  doc.fillColor(RED).font("Helvetica-Bold").fontSize(9).text("CLINICAL REMARKS", 50, rowY);
-  doc.moveTo(50, rowY + 13).lineTo(50 + usable, rowY + 13).strokeColor("#E0E0E0").lineWidth(0.5).stroke();
-  doc.fillColor(DARK).font("Helvetica").fontSize(8.5)
-     .text(
-       "Results are within acceptable ranges except where flagged. Please correlate with clinical history. " +
-       "Repeat testing recommended if clinically indicated.",
-       50, rowY + 18, { width: usable, lineGap: 2 }
-     );
-  rowY += 52;
+  // ── 6. REMARKS: only the laboratory's own, if it gave any ─────
+  if (remarks && String(remarks).trim()) {
+    doc.fillColor(RED).font("Helvetica-Bold").fontSize(9).text("LABORATORY REMARKS", 50, rowY);
+    doc.moveTo(50, rowY + 13).lineTo(50 + usable, rowY + 13).strokeColor("#E0E0E0").lineWidth(0.5).stroke();
+    doc.fillColor(DARK).font("Helvetica").fontSize(8.5).text(String(remarks).trim(), 50, rowY + 18, { width: usable, lineGap: 2 });
+    rowY = doc.y + 12;
+  }
 
   // ── 7. SIGNATURES ─────────────────────────────────────────────
+  // Who collected the sample comes from the booking. The authorising
+  // signature is left blank for the laboratory: this application does not
+  // know who reported the result, so it must not name anyone.
   const sigColW = usable / 2 - 10;
-  [[50, "Dr. S. Arulnathan, MBBS", "Lab Director & Reporting Pathologist", "SLMC-29481"],
-   [50 + sigColW + 20, booking.phlebotomist?.name || "Phlebotomist", "Phlebotomist", booking.phlebotomist?._id?.toString().slice(-6).toUpperCase() || "—"]
-  ].forEach(([x, name, title, reg]) => {
+  [[50, "", "Authorised by the processing laboratory"],
+   [50 + sigColW + 20, booking.phlebotomist?.name || "—", "Sample collected by (phlebotomist)"],
+  ].forEach(([x, name, title]) => {
     doc.moveTo(x, rowY + 24).lineTo(x + sigColW, rowY + 24).strokeColor(DARK).lineWidth(0.5).stroke();
-    doc.fillColor(DARK).font("Helvetica-Bold").fontSize(8).text(name,  x, rowY + 28);
-    doc.fillColor(MUTED).font("Helvetica").fontSize(7.5)  .text(title, x, rowY + 40);
-    doc.fillColor(MUTED).font("Helvetica").fontSize(7)    .text(`Reg: ${reg}`, x, rowY + 52);
+    if (name) doc.fillColor(DARK).font("Helvetica-Bold").fontSize(8).text(name, x, rowY + 28);
+    doc.fillColor(MUTED).font("Helvetica").fontSize(7.5).text(title, x, rowY + (name ? 40 : 28));
   });
-  rowY += 68;
+  rowY += 56;
 
   // ── 8. FOOTER ─────────────────────────────────────────────────
   doc.moveTo(50, rowY).lineTo(50 + usable, rowY).strokeColor(RED).lineWidth(1.5).stroke();
@@ -285,4 +308,4 @@ async function generateReport(booking) {
   });
 }
 
-module.exports = { generateReport };
+module.exports = { generateReport, ReportDataError };

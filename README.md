@@ -2,7 +2,7 @@
 
 A full-stack web application for a home blood-sample collection service.
 Patients book a visit, a phlebotomist collects the sample at their address, a
-laboratory processes it, and a verified PDF report is emailed back.
+laboratory processes it, and the PDF report is made available to the patient.
 
 React + Vite frontend, Node/Express + MongoDB backend, four user roles,
 real-time booking updates over Socket.io.

@@ -45,7 +45,7 @@ const ROLES = [
     desc: "Sees assigned visits, sets availability, and updates each booking as the sample is collected.",
     can: ["See assigned home visits", "Set availability", "Mark a sample as collected"] },
   { key: "lab",     label: "Lab technician", tint: "lavender",
-    desc: "Receives samples, records results, and uploads the verified PDF report.",
+    desc: "Receives samples, records results, and uploads the PDF report.",
     can: ["Receive collected samples", "Record results", "Upload the PDF report"] },
   { key: "admin",   label: "Admin",          tint: "teal",
     desc: "Assigns phlebotomists, manages the test catalogue and plans, and reviews the email audit log.",
