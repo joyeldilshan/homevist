@@ -175,6 +175,13 @@ exports.updateProfile = async (req, res, next) => {
       if (req.body[field] !== undefined) updates[field] = req.body[field];
     });
 
+    // A phlebotomist's availability toggle. The dashboard always sent
+    // this, but it was not in the allow-list, so it was silently dropped
+    // and the toggle never persisted. Phlebotomists only; boolean only.
+    if (req.user.role === "phlebotomist" && typeof req.body.isAvailable === "boolean") {
+      updates.isAvailable = req.body.isAvailable;
+    }
+
     // findByIdAndUpdate bypasses the pre-save hooks, so normalise here.
     if (updates.phone !== undefined) {
       const phone = normaliseUkPhone(updates.phone);
