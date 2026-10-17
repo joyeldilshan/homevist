@@ -1,43 +1,11 @@
-const jwt  = require("jsonwebtoken");
-const User = require("../models/User");
-
 /**
- * protect — verifies the JWT and attaches req.user.
- * Looks for "Authorization: Bearer <token>".
+ * Kept so existing imports keep working. There is ONE authentication
+ * implementation: middleware/auth.middleware.js.
+ *
+ * This file used to carry its own protect(), used by the sample and
+ * report routes, which did not check isActive: a deactivated lab
+ * technician or phlebotomist could keep using those routes with a token
+ * issued before deactivation. Re-exporting means every route now gets the
+ * same checks (valid token, user exists, account active).
  */
-exports.protect = async (req, res, next) => {
-  try {
-    let token;
-    if (req.headers.authorization?.startsWith("Bearer")) {
-      token = req.headers.authorization.split(" ")[1];
-    }
-    if (!token) {
-      return res.status(401).json({ success: false, message: "Not authorized — no token." });
-    }
-
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const user = await User.findById(decoded.id).select("-password");
-    if (!user) {
-      return res.status(401).json({ success: false, message: "User no longer exists." });
-    }
-
-    req.user = user;
-    next();
-  } catch (err) {
-    return res.status(401).json({ success: false, message: "Not authorized — token failed." });
-  }
-};
-
-/**
- * authorize(...roles) — restricts a route to specific roles.
- * Usage: router.post("/", protect, authorize("mlt"), handler)
- */
-exports.authorize = (...roles) => (req, res, next) => {
-  if (!roles.includes(req.user.role)) {
-    return res.status(403).json({
-      success: false,
-      message: `Access denied. This action requires role: ${roles.join(" or ")}.`,
-    });
-  }
-  next();
-};
+module.exports = require("./auth.middleware");
