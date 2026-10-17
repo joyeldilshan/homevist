@@ -1,172 +1,96 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import api from "../../utils/api";
-import { formatDate } from "../../utils/format";
-import { CRIMSON, LAVENDER, GOLD, TEAL, BLUE, GREEN } from "../../theme";
+import { formatDate, formatDateTime } from "../../utils/format";
+import { PageHeader, StatusPill, LoadingCards, EmptyState, ErrorState, DataTable, Card, Meta } from "../../dashboard/kit";
+import { SAMPLE_STATUS, testNames } from "../../dashboard/status";
 
 /**
- * EmailAuditLog — admin tab with two views:
+ * Admin "Email & audit" tab:
  *   1. Email history — every report emailed to a patient
- *   2. Sample audit trail — full movement history of every sample
- * Rendered inside the admin dashboard as the "Email & Audit" tab.
+ *   2. Audit trail — the movement history of every sample
  */
-
-
-const STEP_LABEL = {
-  collected:    "Collected",
-  sent_to_lab:  "Sent to Lab",
-  received:     "Received at Lab",
-  processing:   "Processing",
-  completed:    "Completed",
-};
-const STEP_COLOR = {
-  collected:   BLUE,
-  sent_to_lab: BLUE,
-  received:    LAVENDER,
-  processing:  GOLD,
-  completed:   GREEN,
-};
-
 export default function EmailAuditLog() {
-  const [view,    setView]    = useState("emails"); // emails | audit
+  const [view,    setView]    = useState("emails");
   const [reports, setReports] = useState([]);
   const [samples, setSamples] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [status,  setStatus]  = useState("loading");
+  const [error,   setError]   = useState("");
 
-  const load = async () => {
-    setLoading(true);
+  const load = useCallback(async () => {
     try {
-      const [r, s] = await Promise.all([ api.get("/reports"), api.get("/samples") ]);
+      const [r, s] = await Promise.all([api.get("/reports"), api.get("/samples")]);
       setReports(r.data.reports || []);
       setSamples(s.data.samples || []);
+      setError(""); setStatus("ready");
     } catch (e) {
-      console.error(e?.response?.data || e.message);
-    } finally {
-      setLoading(false);
+      setError(e?.response?.data?.message || "Could not load the email and audit log.");
+      setStatus("error");
     }
-  };
+  }, []);
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [load]);
 
-  const sentReports = reports.filter(r => r.sentToPatient);
-  const testNames   = (obj) => obj?.sample?.testTypes?.map(t => t.name).join(", ")
-                          || obj?.testTypes?.map(t => t.name).join(", ")
-                          || "—";
+  const sent = reports.filter((r) => r.sentToPatient);
+  const testsOf = (obj) => (obj?.sample ? testNames(obj.sample) : testNames(obj));
 
   return (
-    <div className="fade-up">
-      <div className="head">
-        <div className="sl">
-          <div className="sl-cap" style={{ background:GOLD }} />
-          <div className="sl-body">
-            <span className="sl-code">HV-36</span>
-            <span className="sl-name">Audit</span>
-            <span className="sl-bar" />
-          </div>
-        </div>
-        <h1>Email &amp; audit log.</h1>
-        <p className="sub">Track sent reports and full sample movement history</p>
-      </div>
+    <>
+      <PageHeader eyebrow="Audit" title="Email & audit log." sub="Reports sent to patients, and every sample's movements." />
 
-      {/* Sub-tabs */}
-      <div style={{ display:"flex", gap:8, marginBottom:24, flexWrap:"wrap" }}>
-        {[
-          { id:"emails", label:`📧 Email history (${sentReports.length})` },
-          { id:"audit",  label:`🗂 Audit trail (${samples.length})` },
-        ].map(t => (
-          <button key={t.id} onClick={() => setView(t.id)}
-            style={{
-              padding:"9px 18px", borderRadius:9, cursor:"pointer",
-              fontFamily:"var(--sansf)", fontWeight:600, fontSize:13,
-              border:"1px solid", transition:"all .15s",
-              borderColor: view===t.id ? "#16211F" : "rgba(22,33,31,0.15)",
-              background:  view===t.id ? "#16211F" : "transparent",
-              color:       view===t.id ? "#F4F2ED" : "rgba(22,33,31,0.6)",
-            }}>
-            {t.label}
-          </button>
+      <div className="db-seg" role="tablist" aria-label="Log view">
+        {[{ id: "emails", label: `Email history (${sent.length})` }, { id: "audit", label: `Audit trail (${samples.length})` }].map((t) => (
+          <button key={t.id} type="button" role="tab" aria-selected={view === t.id} onClick={() => setView(t.id)}>{t.label}</button>
         ))}
       </div>
 
-      {loading ? (
-        <div style={{ textAlign:"center", padding:"60px 0", color:"var(--ink-40)" }}>⏳ Loading...</div>
-      ) : view === "emails" ? (
-        /* ── EMAIL HISTORY ── */
-        sentReports.length === 0 ? (
-          <div className="card" style={{ padding:"60px", textAlign:"center" }}>
-            <div style={{ fontSize:40, marginBottom:12 }}>📭</div>
-            <div style={{ fontWeight:600, color:"var(--ink-60)" }}>No reports emailed yet</div>
-          </div>
-        ) : (
-          <div className="table scrollx">
-            <div>
-              <div style={{ display:"grid", gridTemplateColumns:"1.4fr 1.6fr 1.4fr 1fr 1fr", padding:"11px 18px", background:"rgba(22,33,31,0.03)", borderBottom:"1px solid var(--rule)" }}>
-                {["Patient","Tests","Report ID","Sent","Status"].map(h => (
-                  <div key={h} className="th">{h}</div>
-                ))}
-              </div>
-              {sentReports.map(r => (
-                <div key={r._id} className="trow" style={{ display:"grid", gridTemplateColumns:"1.4fr 1.6fr 1.4fr 1fr 1fr" }}>
-                  <div>
-                    <div style={{ fontSize:13, fontWeight:600 }}>{r.patient?.name || "—"}</div>
-                    <div style={{ fontSize:11, color:"var(--ink-40)" }}>{r.patient?.email || "—"}</div>
+      {status === "loading" ? <LoadingCards count={3} label="Loading the log" />
+        : status === "error" ? <ErrorState message={error} onRetry={load} />
+        : view === "emails" ? (
+          <DataTable caption="Reports emailed to patients" rows={sent}
+            empty={<EmptyState icon="mail" title="No reports emailed yet">Reports appear here once the lab sends them to a patient.</EmptyState>}
+            columns={[
+              { key: "p", header: "Patient", render: (r) => <><span className="db-cell-strong">{r.patient?.name || "—"}</span><span className="db-cell-sub">{r.patient?.email || "—"}</span></> },
+              { key: "t", header: "Tests", render: (r) => testsOf(r) },
+              { key: "id", header: "Report", render: (r) => <span className="db-code">{r.reportId}</span> },
+              { key: "s", header: "Sent", render: (r) => formatDate(r.sentAt) },
+              { key: "st", header: "Status", render: () => <span className="db-pill tone-green"><span className="db-pill-dot" />Sent</span> },
+            ]} />
+        ) : samples.length === 0
+          ? <EmptyState icon="list" title="No sample activity yet">Each sample's movements are recorded here from collection to report.</EmptyState>
+          : (
+            <div className="db-stack">
+              {samples.map((s, i) => (
+                <Card key={s._id} i={i} tone={SAMPLE_STATUS[s.status]?.tone || "grey"}>
+                  <div className="db-row">
+                    <div className="db-row-main">
+                      <h3 className="db-card-title">{s.patient?.name || "Patient"}</h3>
+                      <div className="db-metas">
+                        <span className="db-code">Sample {s.sampleId}</span>
+                        <span className="db-code">Booking {s.booking?.bookingId || "—"}</span>
+                        <Meta icon="tube">{testsOf(s)}</Meta>
+                      </div>
+                    </div>
+                    <div className="db-row-side"><StatusPill status={s.status} kind="sample" /></div>
                   </div>
-                  <div style={{ fontSize:12, color:"var(--ink-60)" }}>{testNames(r)}</div>
-                  <div style={{ fontFamily:"var(--monof)", fontSize:11.5, color:"var(--ink-60)" }}>{r.reportId}</div>
-                  <div style={{ fontSize:12, color:"var(--ink-60)" }}>{formatDate(r.sentAt)}</div>
-                  <span style={{ display:"inline-flex", alignItems:"center", gap:5, padding:"3px 10px", borderRadius:20, fontFamily:"var(--monof)", fontSize:9.5, letterSpacing:"0.08em", textTransform:"uppercase", background:"rgba(46,125,87,0.10)", color:GREEN, border:"1px solid rgba(46,125,87,0.35)", width:"fit-content" }}>
-                    ✓ Sent
-                  </span>
-                </div>
+                  <hr className="db-divider" />
+                  <ol className="db-tracker" aria-label="Movement history">
+                    {(s.movements || []).map((m, j) => (
+                      <li key={j} className="db-tracker-step is-done">
+                        <span className="db-tracker-dot" aria-hidden="true">{j + 1}</span>
+                        <span className="db-tracker-text">
+                          <span className="db-tracker-label">{SAMPLE_STATUS[m.status]?.label || m.status}</span>
+                          <span className="db-tracker-desc">
+                            {m.by?.name ? `${m.by.name} (${m.by.role}) · ` : ""}{m.at ? formatDateTime(m.at) : ""}
+                            {m.note ? ` · “${m.note}”` : ""}
+                          </span>
+                        </span>
+                      </li>
+                    ))}
+                  </ol>
+                </Card>
               ))}
             </div>
-          </div>
-        )
-      ) : (
-        /* ── AUDIT TRAIL ── */
-        samples.length === 0 ? (
-          <div className="card" style={{ padding:"60px", textAlign:"center" }}>
-            <div style={{ fontSize:40, marginBottom:12 }}>🗂</div>
-            <div style={{ fontWeight:600, color:"var(--ink-60)" }}>No sample activity yet</div>
-          </div>
-        ) : (
-          samples.map(s => (
-            <div key={s._id} className="card" style={{ padding:"20px 22px", marginBottom:12, borderLeft:`4px solid ${STEP_COLOR[s.status] || CRIMSON}` }}>
-              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", flexWrap:"wrap", gap:10, marginBottom:16 }}>
-                <div>
-                  <div style={{ fontWeight:700, fontSize:15, marginBottom:3 }}>{s.patient?.name || "Patient"}</div>
-                  <div style={{ fontSize:12, color:"var(--ink-60)" }}>
-                    <span style={{ fontFamily:"var(--monof)", fontSize:11 }}>🔖 {s.sampleId}</span> &nbsp;·&nbsp; Booking <span style={{ fontFamily:"var(--monof)", fontSize:11 }}>{s.booking?.bookingId || "—"}</span> &nbsp;·&nbsp; {testNames(s)}
-                  </div>
-                </div>
-                <span style={{ display:"inline-flex", alignItems:"center", gap:5, padding:"4px 10px", borderRadius:20, fontFamily:"var(--monof)", fontSize:9.5, letterSpacing:"0.08em", textTransform:"uppercase", color:STEP_COLOR[s.status] || CRIMSON, border:`1px solid ${STEP_COLOR[s.status] || CRIMSON}44`, background:`${STEP_COLOR[s.status] || CRIMSON}11` }}>
-                  {STEP_LABEL[s.status] || s.status}
-                </span>
-              </div>
-
-              {/* Movement timeline */}
-              <div style={{ paddingTop:14, borderTop:"1px solid var(--rule)" }}>
-                <div style={{ fontFamily:"var(--monof)", fontSize:9.5, letterSpacing:"0.14em", textTransform:"uppercase", color:"var(--ink-40)", marginBottom:12 }}>Movement history</div>
-                {(s.movements || []).map((m, i) => (
-                  <div key={i} style={{ display:"flex", gap:12, paddingBottom:i < s.movements.length-1 ? 14 : 0, position:"relative" }}>
-                    <div style={{ display:"flex", flexDirection:"column", alignItems:"center" }}>
-                      <div style={{ width:12, height:12, borderRadius:"50%", background:STEP_COLOR[m.status] || "rgba(22,33,31,0.25)", flexShrink:0, marginTop:3 }} />
-                      {i < s.movements.length-1 && <div style={{ width:2, flex:1, background:"var(--rule)", marginTop:2 }} />}
-                    </div>
-                    <div style={{ paddingBottom:6 }}>
-                      <div style={{ fontSize:13, fontWeight:700 }}>{STEP_LABEL[m.status] || m.status}</div>
-                      <div style={{ fontSize:12, color:"var(--ink-60)", marginTop:1 }}>
-                        {m.by?.name ? <>by {m.by.name} <span style={{ color:"var(--ink-40)" }}>({m.by.role})</span> · </> : ""}
-                        {m.at ? new Date(m.at).toLocaleString() : ""}
-                      </div>
-                      {m.note && <div style={{ fontSize:12, color:"var(--ink-60)", marginTop:3, fontStyle:"italic" }}>"{m.note}"</div>}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ))
-        )
-      )}
-    </div>
+          )}
+    </>
   );
 }
