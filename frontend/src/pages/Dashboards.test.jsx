@@ -21,10 +21,12 @@ vi.mock("../../utils/api", () => makeApiMock());
 // Socket hook: no server in tests.
 vi.mock("../hooks/useSocket", () => ({
   useBookingSocket: () => ({ connected: false }),
+  useAdminSocket: () => {},
   useSocket: () => ({ connected: false }),
 }));
 vi.mock("../../hooks/useSocket", () => ({
   useBookingSocket: () => ({ connected: false }),
+  useAdminSocket: () => {},
   useSocket: () => ({ connected: false }),
 }));
 
@@ -119,21 +121,24 @@ describe("Phlebotomist rating", () => {
   beforeEach(() => { vi.spyOn(console, "error").mockImplementation(() => {}); });
   afterEach(() => { vi.restoreAllMocks(); setAuthUser(null); });
 
-  it("shows no made-up rating for someone nobody has rated", () => {
+  // Stats render once the (mocked) bookings request has resolved, after
+  // the loading skeleton, so these wait for the stat label.
+  it("shows no made-up rating for someone nobody has rated", async () => {
     for (const u of [ROLE_USERS.phlebotomist, { ...ROLE_USERS.phlebotomist, rating: 0, totalRatings: 0 }]) {
       setAuthUser(u);
       const { container, unmount } = renderPage(<PhleboDash />);
+      await screen.findByText(/Rating · No reviews yet/);
       // No star followed by a number: neither the old 5.0 fallback nor 0.0.
-      // (Plain /5\.0/ would hit the inline <style> block's rgba values.)
       expect(container.textContent).not.toMatch(/⭐\s*\d/);
-      expect(container.textContent).toMatch(/No reviews yet/);
       unmount();
     }
   });
 
-  it("shows the real average once there are reviews", () => {
+  it("shows the real average once there are reviews", async () => {
     setAuthUser({ ...ROLE_USERS.phlebotomist, rating: 4.25, totalRatings: 4 });
     const { container } = renderPage(<PhleboDash />);
-    expect(container.textContent).toMatch(/4\.3 · 4 reviews/);
+    // The stat shows the average and, in its label, how many reviews it is from.
+    await screen.findByText(/Average rating · 4 reviews/);
+    expect(container.textContent).toMatch(/4\.3/);
   });
 });
