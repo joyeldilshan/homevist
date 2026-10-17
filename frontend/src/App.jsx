@@ -39,10 +39,14 @@ const DASHBOARDS = {
   mlt:          "/mlt",
 };
 
+// Shown while a page's chunk loads. Same paper ground and brand dot as
+// the pages themselves (it used to be a near-black screen with an emoji).
 function Loading() {
   return (
-    <div style={{ display:"flex", alignItems:"center", justifyContent:"center", height:"100vh", background:"#07080F" }}>
-      <div style={{ fontSize:40 }}>🩸</div>
+    <div role="status" style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:12, minHeight:"100vh",
+                                background:"var(--color-bg-page)", color:"var(--color-text-secondary)", fontFamily:"var(--sansf)", fontSize:15 }}>
+      <span aria-hidden="true" style={{ width:12, height:12, borderRadius:"50%", background:"var(--terracotta-600)", animation:"ping 1.2s ease-out infinite" }} />
+      Loading…
     </div>
   );
 }

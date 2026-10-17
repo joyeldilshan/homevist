@@ -20,13 +20,17 @@ export default function AppShell() {
         <Toaster
           position="top-right"
           toastOptions={{
+            // Ink and paper from theme.css (was an unrelated navy palette).
             style: {
-              background: "#1a2235",
-              color:      "#F1F5F9",
-              border:     "1px solid #1e2d45",
+              background:   "#16211F",
+              color:        "#F4F2ED",
+              border:       "1px solid rgba(255,255,255,0.08)",
+              borderRadius: "12px",
+              fontFamily:   "var(--sansf)",
+              fontSize:     "14px",
             },
-            success: { iconTheme: { primary: "#10B981", secondary: "#fff" } },
-            error:   { iconTheme: { primary: "#C62828", secondary: "#fff" } },
+            success: { iconTheme: { primary: "#2E7D57", secondary: "#fff" } },
+            error:   { iconTheme: { primary: "#B3261E", secondary: "#fff" } },
           }}
         />
       </AuthProvider>
