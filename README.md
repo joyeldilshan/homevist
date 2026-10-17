@@ -65,7 +65,7 @@ the database name, never the URI or password. The check lives in
 | `npm run dev:api` / `npm run dev:web` | Run one side only |
 | `npm run build` | Production build of the frontend |
 | `npm start` | Start the backend |
-| `npm test` | Backend test suite (52 tests) |
+| `npm test` | Backend test suite (61 tests) |
 | `npm run seed` | Seed sample data — **guarded, see below** |
 | `npm run audit` | `npm audit` on both packages |
 
@@ -170,6 +170,34 @@ never the dev server (all write to the gitignored `docs/`):
 | `node scripts/smoke-routes.mjs` | Every public route loads with no console errors (so no hydration mismatch); the landing hydrates instead of re-rendering; no other route shows landing markup; a signed-in visitor on `/` goes to their dashboard |
 | `node scripts/landing-capture.mjs [--video] [--reduced]` | Section and full-page screenshots at 1440 and 390 after scrolling, content stuck invisible, overflow, console errors; `--video` records a 25 s scroll |
 | `node scripts/lighthouse.mjs` | Lighthouse 13.5 on `/`, `/login`, `/register`; refuses to run against the dev server |
+
+### End-to-end test (all four roles)
+
+`npm run test:e2e` (in `frontend/`) drives real browsers through the whole
+lifecycle: a patient registers and books, the admin sees it live and assigns a
+phlebotomist, the phlebotomist sends the sample to the lab, the lab technician
+processes it and uploads and sends a PDF, and the patient downloads it. The
+patient's page is checked for each live status change without reloading. It
+also checks a wrong password, a patient opening admin pages and admin API
+routes, sign-in with a short pre-2026 password, the 404 page, an expired
+session, and keyboard use (skip link, navigation, modal focus).
+
+Run it against a **development database only**:
+
+1. `backend`: `EMAIL_USER= EMAIL_PASS= CLIENT_URL=http://localhost:4173 node server.js`
+   and confirm it logs `database: hemovisit_dev`. Blank email credentials put
+   email in mock mode, so no mail is sent.
+2. `frontend`: `npm run build && npx vite preview --port 4173 --strictPort`
+3. `frontend`: `npm run test:e2e`
+
+The suite refuses to run unless `backend/.env`'s database name passes the same
+guard as the server. It creates its own users (`e2e-<run>-…@example.com`) and
+deletes them, their bookings, samples, reports and uploaded PDFs at the end,
+pass or fail. Generated passwords and tokens are never printed. Screenshots of
+every dashboard tab at 1440 and 390 px, and a ~30 s recording of the lifecycle
+from the patient's view, go to `docs/screenshots/phase4/` (gitignored). The
+register limiter allows five sign-ups per hour per IP; restart the backend
+after five runs in an hour.
 
 **Deploy order:** backend first, so you have its URL for `VITE_API_URL`; then the
 frontend; then go back and set `CLIENT_URL` on Render to the Vercel URL.
@@ -314,9 +342,11 @@ any real patient result is reported.
   gzip). The landing page adds its own 14 kB of JS and 33 kB of CSS (7 kB gzip),
   which no other page downloads, plus a 17 kB below-the-fold chunk.
 - **Dependency advisories.** See the dedicated section below.
-- **Test coverage.** 52 backend tests (validators, formatters, rate limiting,
-  the seed guard, the startup database guard) and 27 frontend tests (render
-  smoke tests for every page, the landing's copy and numbers, the legal pages).
+- **Test coverage.** 61 backend tests (validators, formatters, rate limiting,
+  the seed and startup database guards, email mock mode, the sender address),
+  29 frontend tests (render tests for every page, the landing's copy and
+  numbers, the legal pages, the socket URL), and a 20-step end-to-end suite
+  across all four roles (see above).
 - **Images.** The hero ships as AVIF/WebP with a JPEG fallback. `image 5.png`
   (660 kB, an old logo with "HOME VISIT MOBILE LAB" baked in) is no longer used.
 
