@@ -18,8 +18,14 @@ const friendly = (message) => (req, res) => {
   res.status(429).json({ success: false, message });
 };
 
+/*
+ * Each limiter is built by a factory so tests can get a fresh one with
+ * its own in-memory store. The app uses the single shared instances
+ * exported below; their behaviour is unchanged.
+ */
+
 /** Login: 10 attempts per 15 minutes per IP. */
-const loginLimiter = rateLimit({
+const createLoginLimiter = () => rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 10,
   standardHeaders: true,   // RateLimit-* headers
@@ -32,7 +38,7 @@ const loginLimiter = rateLimit({
 });
 
 /** Registration: 5 new accounts per hour per IP. */
-const registerLimiter = rateLimit({
+const createRegisterLimiter = () => rateLimit({
   windowMs: 60 * 60 * 1000,
   max: 5,
   standardHeaders: true,
@@ -44,7 +50,7 @@ const registerLimiter = rateLimit({
 });
 
 /** Password change: 5 per hour for a signed-in user. */
-const passwordLimiter = rateLimit({
+const createPasswordLimiter = () => rateLimit({
   windowMs: 60 * 60 * 1000,
   max: 5,
   standardHeaders: true,
@@ -54,4 +60,11 @@ const passwordLimiter = rateLimit({
   ),
 });
 
-module.exports = { loginLimiter, registerLimiter, passwordLimiter };
+const loginLimiter    = createLoginLimiter();
+const registerLimiter = createRegisterLimiter();
+const passwordLimiter = createPasswordLimiter();
+
+module.exports = {
+  loginLimiter, registerLimiter, passwordLimiter,
+  createLoginLimiter, createRegisterLimiter, createPasswordLimiter,
+};
