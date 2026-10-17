@@ -84,11 +84,18 @@ async function findOwnedSubscription(req) {
   return Subscription.findOne(filter);
 }
 
+// Pause only an active plan, resume only a paused one, cancel anything not
+// already cancelled. "Resume" used to re-activate a cancelled plan, and the
+// scheduler then went back to creating visits for it.
+const conflict = (res, sub, verb) =>
+  res.status(409).json({ success: false, message: `This subscription is ${sub.status} and cannot be ${verb}.` });
+
 // PATCH /api/subscriptions/:id/pause
 exports.pauseSubscription = async (req, res, next) => {
   try {
     const sub = await findOwnedSubscription(req);
     if (!sub) return res.status(404).json({ success: false, message: "Subscription not found." });
+    if (sub.status !== "active") return conflict(res, sub, "paused");
     sub.status = "paused";
     await sub.save();
     res.json({ success: true, subscription: sub });
@@ -100,6 +107,7 @@ exports.resumeSubscription = async (req, res, next) => {
   try {
     const sub = await findOwnedSubscription(req);
     if (!sub) return res.status(404).json({ success: false, message: "Subscription not found." });
+    if (sub.status !== "paused") return conflict(res, sub, "resumed");
     sub.status = "active";
     // If the paused visit date has already passed, push it to today so it's picked up on the next run.
     const today = new Date(); today.setHours(0, 0, 0, 0);
@@ -114,6 +122,7 @@ exports.cancelSubscription = async (req, res, next) => {
   try {
     const sub = await findOwnedSubscription(req);
     if (!sub) return res.status(404).json({ success: false, message: "Subscription not found." });
+    if (sub.status === "cancelled") return conflict(res, sub, "cancelled");
     sub.status = "cancelled";
     await sub.save();
     res.json({ success: true, subscription: sub });
