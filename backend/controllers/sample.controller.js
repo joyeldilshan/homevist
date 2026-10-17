@@ -2,6 +2,18 @@ const Sample  = require("../models/Sample");
 const Booking = require("../models/Booking");
 const logger = require("../utils/logger");
 
+/*
+ * Patients follow a booking in real time by joining a socket room named
+ * after its bookingId (frontend hooks/useSocket.js, "join_booking") and
+ * listening for "status_update". Every step that changes a booking's
+ * status must emit there, or the patient's page never hears about it.
+ */
+const emitBookingStatus = (io, booking, status) => {
+  if (io && booking?.bookingId) {
+    io.to(booking.bookingId).emit("status_update", { bookingId: booking.bookingId, status });
+  }
+};
+
 /**
  * POST /api/samples
  * Phlebotomist collects a sample and sends it to the lab.
@@ -60,6 +72,7 @@ exports.sendToLab = async (req, res, next) => {
 
     booking.status = "sample_collected";
     await booking.save();
+    emitBookingStatus(req.io, booking, "sample_collected");
 
     if (req.io) {
       req.io.to("mlt_room").emit("new_sample", {
@@ -121,6 +134,20 @@ exports.updateSampleStatus = async (req, res, next) => {
 
     if (req.io && sample.booking) {
       req.io.to(String(sample.booking)).emit("sample_update", { sampleId: sample.sampleId, status });
+    }
+
+    // The booking's own "processing" stage was never reached: lab steps
+    // only moved the sample, so the patient's tracker jumped from
+    // "sample collected" straight to "report ready". Starting processing
+    // now moves the booking too (only forward, from sample_collected).
+    if (status === "processing" && sample.booking) {
+      const booking = await Booking.findById(sample.booking);
+      if (booking && booking.status === "sample_collected") {
+        booking.status = "processing";
+        booking.statusHistory.push({ status: "processing", updatedBy: req.user._id, note: "Laboratory started processing" });
+        await booking.save();
+        emitBookingStatus(req.io, booking, "processing");
+      }
     }
 
     res.json({ success: true, sample });

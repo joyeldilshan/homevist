@@ -128,6 +128,12 @@ exports.sendReport = async (req, res, next) => {
 
     if (req.io && report.booking) {
       req.io.to(String(report.booking._id)).emit("report_ready", { reportId: report.reportId });
+      // The patient's page listens on the bookingId room (see
+      // sample.controller.js emitBookingStatus); without this it never
+      // learned that the report was ready.
+      if (report.booking.bookingId) {
+        req.io.to(report.booking.bookingId).emit("status_update", { bookingId: report.booking.bookingId, status: "completed" });
+      }
     }
 
     res.json({ success: true, message: "Report sent to patient.", report });
