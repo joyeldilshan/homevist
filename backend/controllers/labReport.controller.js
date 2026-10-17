@@ -151,8 +151,10 @@ exports.sendReport = async (req, res, next) => {
 
     res.json({ success: true, message: "Report sent to patient.", report });
   } catch (err) {
+    // Logged in full; the client gets a plain message (mail errors can
+    // carry server names, addresses and credentials hints).
     logger.error("📧 Report send error:", err.message);
-    res.status(500).json({ success: false, message: "Failed to send report: " + err.message });
+    res.status(500).json({ success: false, message: "The report could not be sent. Please try again." });
   }
 };
 
