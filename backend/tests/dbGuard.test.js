@@ -1,9 +1,9 @@
 const test   = require("node:test");
 const assert = require("node:assert/strict");
 const path   = require("node:path");
-const { spawnSync } = require("node:child_process");
+const { spawn, spawnSync } = require("node:child_process");
 
-const { checkDatabaseTarget, redactCredentials } = require("../utils/dbGuard");
+const { checkDatabaseTarget, redactCredentials, connectionFailedMessage } = require("../utils/dbGuard");
 
 const DEV_URI  = "mongodb+srv://user:s3cretPW@cluster.example.net/hemovisit_dev?retryWrites=true";
 const LIVE_URI = "mongodb+srv://user:s3cretPW@cluster.example.net/hemovisit?retryWrites=true";
@@ -76,7 +76,22 @@ test("redactCredentials strips user:password from connection strings", () => {
   );
 });
 
+test("the connection-failure log line never carries the password", () => {
+  const msg = connectionFailedMessage(new Error(
+    "connect ECONNREFUSED for mongodb://user:s3cretPW@127.0.0.1:1/hemovisit"
+  ));
+  assert.match(msg, /^MongoDB connection failed: /);
+  assert.doesNotMatch(msg, /s3cretPW/);
+  assert.equal(connectionFailedMessage(undefined), "MongoDB connection failed: undefined");
+});
+
 // ── The real server process ──────────────────────────────────────
+/*
+ * server.js runs the guard before it loads express, mongoose and the
+ * routes, so these tests only depend on that small first step. They used
+ * to wait for the whole ~2,700-module load; on a cold disk cache that
+ * once took 16 s and intermittently crossed the 20 s timeout.
+ */
 // Port 1 on loopback: nothing listens there, so even a guard failure
 // could not reach a real database.
 const SERVER = path.join(__dirname, "..", "server.js");
@@ -98,14 +113,33 @@ test("server.js exits before connecting when MONGO_URI names a live database", (
   assert.doesNotMatch(out, /s3cretPW/);
 });
 
-test("server.js with the override logs a loud warning and never the password", () => {
-  const r = runServer({
-    MONGO_URI: "mongodb://user:s3cretPW@127.0.0.1:1/hemovisit?serverSelectionTimeoutMS=300",
-    ALLOW_NON_DEV_DB: "true",
+test("server.js with the override logs a loud warning and never the password", async () => {
+  // Spawned, not spawnSync: the warning is printed by the guard, before
+  // the heavy modules load, and the test stops the server as soon as it
+  // has seen it. Connecting is not part of what is being checked here.
+  const child = spawn(process.execPath, [SERVER], {
+    cwd: path.join(__dirname, ".."),
+    env: {
+      ...process.env, NODE_ENV: "development", PORT: "0",
+      MONGO_URI: "mongodb://user:s3cretPW@127.0.0.1:1/hemovisit?serverSelectionTimeoutMS=300",
+      ALLOW_NON_DEV_DB: "true",
+    },
   });
-  const out = r.stdout + r.stderr;
-  assert.match(out, /!! {2}ALLOW_NON_DEV_DB=true/);
-  assert.match(out, /MongoDB connection failed/); // got past the guard, then hit the dead port
+  let out = "";
+  const sawWarning = new Promise((resolve, reject) => {
+    const onData = (d) => {
+      out += d;
+      if (/!! {2}ALLOW_NON_DEV_DB=true/.test(out)) resolve();
+    };
+    child.stdout.on("data", onData);
+    child.stderr.on("data", onData);
+    child.on("exit", () => reject(new Error("server exited before printing the override warning:\n" + out)));
+  });
+  try {
+    await sawWarning;
+  } finally {
+    child.kill();
+  }
+  assert.match(out, /"hemovisit"/);
   assert.doesNotMatch(out, /s3cretPW/);
-  assert.equal(r.status, 1);
 });

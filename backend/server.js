@@ -1,4 +1,34 @@
 require("dotenv").config();
+const logger = require("./utils/logger");
+const { checkDatabaseTarget, connectionFailedMessage } = require("./utils/dbGuard");
+
+/*
+ * Database safety guard. Outside production the database name must look
+ * like a development one, so a plain `npm run dev` can never write to the
+ * live database by accident. Only the name is logged, never the URI.
+ *
+ * It runs FIRST, before express, mongoose and the routes are loaded
+ * (~2,700 modules). Refusing should not wait on all that: on a cold disk
+ * cache that load once took 16 s, which also made the guard's own test
+ * intermittently hit its timeout.
+ */
+const target = checkDatabaseTarget({
+  uri:           process.env.MONGO_URI,
+  nodeEnv:       process.env.NODE_ENV,
+  allowNonDevDb: process.env.ALLOW_NON_DEV_DB,
+});
+if (!target.ok) {
+  logger.error(target.error);
+  process.exit(1);
+}
+if (target.warning) {
+  logger.warn("");
+  logger.warn("  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+  logger.warn("  !!  " + target.warning);
+  logger.warn("  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+  logger.warn("");
+}
+
 const express    = require("express");
 const http       = require("http");
 const { Server } = require("socket.io");
@@ -16,8 +46,6 @@ const subscriptionRoutes  = require("./routes/subscription.routes");
 const { errorHandler }   = require("./middleware/error.middleware");
 const { securityHeaders } = require("./middleware/security.middleware");
 const { startSubscriptionScheduler } = require("./jobs/subscriptionScheduler");
-const logger = require("./utils/logger");
-const { checkDatabaseTarget, redactCredentials } = require("./utils/dbGuard");
 
 const app    = express();
 const server = http.createServer(app);
@@ -71,28 +99,6 @@ app.get("/api/health", (_req, res) => {
 
 app.use(errorHandler);
 
-/*
- * Database safety guard. Outside production the database name must look
- * like a development one, so a plain `npm run dev` can never write to the
- * live database by accident. Only the name is logged, never the URI.
- */
-const target = checkDatabaseTarget({
-  uri:           process.env.MONGO_URI,
-  nodeEnv:       process.env.NODE_ENV,
-  allowNonDevDb: process.env.ALLOW_NON_DEV_DB,
-});
-if (!target.ok) {
-  logger.error(target.error);
-  process.exit(1);
-}
-if (target.warning) {
-  logger.warn("");
-  logger.warn("  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-  logger.warn("  !!  " + target.warning);
-  logger.warn("  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-  logger.warn("");
-}
-
 mongoose
   .connect(process.env.MONGO_URI)
   .then(() => {
@@ -104,7 +110,7 @@ mongoose
     });
   })
   .catch((err) => {
-    logger.error("MongoDB connection failed:", redactCredentials(err.message));
+    logger.error(connectionFailedMessage(err));
     process.exit(1);
   });
 

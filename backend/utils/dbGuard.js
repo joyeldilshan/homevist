@@ -75,4 +75,9 @@ function redactCredentials(text) {
   return String(text).replace(/(mongodb(?:\+srv)?:\/\/)[^@/\s]+@/gi, "$1<credentials>@");
 }
 
-module.exports = { databaseNameFrom, SAFE_NAME, checkDatabaseTarget, redactCredentials };
+/** The log line for a failed connection. Driver errors can echo the URI. */
+function connectionFailedMessage(err) {
+  return "MongoDB connection failed: " + redactCredentials(err && err.message);
+}
+
+module.exports = { databaseNameFrom, SAFE_NAME, checkDatabaseTarget, redactCredentials, connectionFailedMessage };
