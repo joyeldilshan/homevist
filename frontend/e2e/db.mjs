@@ -31,10 +31,14 @@ const User      = requireBackend("./models/User");
 const Booking   = requireBackend("./models/Booking");
 const Sample    = requireBackend("./models/Sample");
 const LabReport = requireBackend("./models/LabReport");
+const Subscription = requireBackend("./models/Subscription");
+const Plan      = requireBackend("./models/Plan");
 const { storedNameOf, pathFor } = requireBackend("./utils/reportFiles");
 
 export const RUN = `${Date.now().toString(36)}${crypto.randomBytes(2).toString("hex")}`;
 export const emailFor = (role) => `e2e-${RUN}-${role}@example.com`;
+/** Plans have no owner, so test plans carry the run tag in their name. */
+export const planName = (label) => `E2E-${RUN} ${label}`;
 const RUN_EMAIL = new RegExp(`^e2e-${RUN}-`);
 
 /** A password that meets the current rule. Never printed. */
@@ -90,6 +94,8 @@ export async function cleanup() {
     if (file && fs.existsSync(file)) { fs.unlinkSync(file); files++; }
   }
   const removed = {
+    subscriptions: (await Subscription.deleteMany({ user: { $in: ids } })).deletedCount,
+    plans:    (await Plan.deleteMany({ name: new RegExp(`^E2E-${RUN} `) })).deletedCount,
     reports:  (await LabReport.deleteMany({ booking: { $in: bIds } })).deletedCount,
     samples:  (await Sample.deleteMany({ booking: { $in: bIds } })).deletedCount,
     bookings: (await Booking.deleteMany({ _id: { $in: bIds } })).deletedCount,
@@ -97,6 +103,11 @@ export async function cleanup() {
     files,
   };
   return removed;
+}
+
+/** Deactivate / reactivate a test account (only this run's users). */
+export async function setActive(userId, isActive) {
+  await User.updateOne({ _id: userId, email: RUN_EMAIL }, { isActive });
 }
 
 export async function disconnect() { await mongoose.disconnect(); }
