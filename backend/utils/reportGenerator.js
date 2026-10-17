@@ -42,7 +42,7 @@ async function generateReport(booking) {
   doc
     .fontSize(9)
     .font("Helvetica")
-    .text("Mobile Blood Testing Laboratory", 65, 92)
+    .text("Home blood collection service", 65, 92)
     .text(`${locale.organisation.cityCountry} · ${locale.organisation.phone} · ${locale.organisation.website}`, 65, 106);
 
   doc
@@ -261,7 +261,7 @@ async function generateReport(booking) {
   doc.moveTo(50, rowY).lineTo(50 + usable, rowY).strokeColor(RED).lineWidth(1.5).stroke();
   rowY += 6;
   doc.rect(50, rowY, usable, 36).fill(GREY);
-  doc.fillColor(DARK).font("Helvetica-Bold").fontSize(8).text("HemoVisit Laboratory", 58, rowY + 6);
+  doc.fillColor(DARK).font("Helvetica-Bold").fontSize(8).text("Laboratory report · Analysed by the processing laboratory", 58, rowY + 6);
   doc.fillColor(MUTED).font("Helvetica").fontSize(7.5)
      .text(`${locale.organisation.addressLine}  |  Tel: ${locale.organisation.phone}  |  ${locale.organisation.website}`, 58, rowY + 18);
   doc.fillColor(MUTED).font("Helvetica-Oblique").fontSize(7)
