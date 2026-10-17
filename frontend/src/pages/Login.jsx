@@ -2,7 +2,7 @@ import { useState, useRef } from "react";
 import { useNavigate, useLocation, Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import toast from "react-hot-toast";
-import { isValidUkPhone, normaliseUkPhone, PHONE_MESSAGE } from "../utils/validators";
+import { isValidUkPhone, normaliseUkPhone, PHONE_MESSAGE, isValidPassword, PASSWORD_MESSAGE, PASSWORD_MIN } from "../utils/validators";
 import locale from "../config/locale";
 import { DEMO_MODE, DEMO_PASSWORD, DEMO_ACCOUNTS } from "../config/demo";
 
@@ -124,7 +124,9 @@ export default function AuthPage() {
     const { name, email, phone, password, confirm } = rForm;
     if (!name||!email||!phone||!password||!confirm) { toast.error("Fill in all fields."); return; }
     if (password !== confirm) { toast.error("Passwords do not match."); return; }
-    if (password.length < 6)  { toast.error("Password must be at least 6 characters."); return; }
+    // Same rule as the backend (8+ characters, a letter and a number); the
+    // old 6-character check let people through the form to a server error.
+    if (!isValidPassword(password)) { toast.error(PASSWORD_MESSAGE); return; }
     if (!isValidUkPhone(phone)) { toast.error(PHONE_MESSAGE); return; }
     if (!consent) { toast.error("Please confirm you have read the Privacy Policy."); return; }
     setLoading(true);
@@ -548,12 +550,12 @@ export default function AuthPage() {
             {isLogin && (
               <form onSubmit={handleLogin} className={toggling?"form-exit":"form-enter-r"}>
                 <div style={{ marginBottom:14 }}>
-                  <label className="lbl">Email address</label>
-                  <input className="inp" type="email" placeholder="you@example.com" value={lForm.email} onChange={e=>setL("email",e.target.value)} />
+                  <label className="lbl" htmlFor="login-email">Email address</label>
+                  <input id="login-email" className="inp" type="email" autoComplete="email" placeholder="you@example.com" value={lForm.email} onChange={e=>setL("email",e.target.value)} />
                 </div>
                 <div style={{ marginBottom:2, position:"relative" }}>
-                  <label className="lbl">Password</label>
-                  <input id="login-password" className="inp" type={showPw?"text":"password"} placeholder="••••••••" value={lForm.password} onChange={e=>setL("password",e.target.value)} style={{ paddingRight:44 }} />
+                  <label className="lbl" htmlFor="login-password">Password</label>
+                  <input id="login-password" autoComplete="current-password" className="inp" type={showPw?"text":"password"} placeholder="••••••••" value={lForm.password} onChange={e=>setL("password",e.target.value)} style={{ paddingRight:44 }} />
                   <button type="button" className="eye" onClick={()=>setShowPw(v=>!v)} aria-label="Show password">{showPw?"🙈":"👁"}</button>
                 </div>
                 <div className="forgot"><span>Forgot password?</span></div>
@@ -607,25 +609,25 @@ export default function AuthPage() {
               <form onSubmit={handleRegister} className={toggling?"form-exit":"form-enter-l"}>
                 <div className="reg-grid" style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"0 14px" }}>
                   <div style={{ gridColumn:"1/-1", marginBottom:14 }}>
-                    <label className="lbl">Full name</label>
-                    <input className="inp" type="text" placeholder="Jane Smith" value={rForm.name} onChange={e=>setR("name",e.target.value)} />
+                    <label className="lbl" htmlFor="reg-name">Full name</label>
+                    <input id="reg-name" className="inp" type="text" autoComplete="name" placeholder="Jane Smith" value={rForm.name} onChange={e=>setR("name",e.target.value)} />
                   </div>
                   <div style={{ marginBottom:14 }}>
-                    <label className="lbl">Email</label>
-                    <input className="inp" type="email" placeholder="you@email.com" value={rForm.email} onChange={e=>setR("email",e.target.value)} />
+                    <label className="lbl" htmlFor="reg-email">Email</label>
+                    <input id="reg-email" className="inp" type="email" autoComplete="email" placeholder="you@email.com" value={rForm.email} onChange={e=>setR("email",e.target.value)} />
                   </div>
                   <div style={{ marginBottom:14 }}>
-                    <label className="lbl">Phone</label>
-                    <input className="inp" type="tel" placeholder={locale.examplePhone} value={rForm.phone} onChange={e=>setR("phone",e.target.value)} />
+                    <label className="lbl" htmlFor="reg-phone">Phone</label>
+                    <input id="reg-phone" className="inp" type="tel" autoComplete="tel" placeholder={locale.examplePhone} value={rForm.phone} onChange={e=>setR("phone",e.target.value)} />
                   </div>
                   <div style={{ marginBottom:14, position:"relative" }}>
-                    <label className="lbl">Password</label>
-                    <input className="inp" type={showPw?"text":"password"} placeholder="Min 6 chars" value={rForm.password} onChange={e=>setR("password",e.target.value)} style={{ paddingRight:44 }} />
+                    <label className="lbl" htmlFor="reg-password">Password</label>
+                    <input id="reg-password" className="inp" autoComplete="new-password" type={showPw?"text":"password"} placeholder={`${PASSWORD_MIN}+ chars, letter & number`} value={rForm.password} onChange={e=>setR("password",e.target.value)} style={{ paddingRight:44 }} />
                     <button type="button" className="eye" onClick={()=>setShowPw(v=>!v)} aria-label="Show password">{showPw?"🙈":"👁"}</button>
                   </div>
                   <div style={{ marginBottom:14, position:"relative" }}>
-                    <label className="lbl">Confirm password</label>
-                    <input className="inp" type={showCPw?"text":"password"} placeholder="Repeat" value={rForm.confirm} onChange={e=>setR("confirm",e.target.value)} style={{ paddingRight:44 }} />
+                    <label className="lbl" htmlFor="reg-confirm">Confirm password</label>
+                    <input id="reg-confirm" className="inp" autoComplete="new-password" type={showCPw?"text":"password"} placeholder="Repeat" value={rForm.confirm} onChange={e=>setR("confirm",e.target.value)} style={{ paddingRight:44 }} />
                     <button type="button" className="eye" onClick={()=>setShowCPw(v=>!v)} aria-label="Show password">{showCPw?"🙈":"👁"}</button>
                   </div>
                 </div>

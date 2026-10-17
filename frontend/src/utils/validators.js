@@ -71,3 +71,13 @@ export function outOfAreaMessage(postcode, prefixes = locale.serviceAreaPrefixes
     `Please contact us if you would like to be told when we reach your area.`
   );
 }
+
+// ── Password ─────────────────────────────────────────────────────
+// MIRRORS backend/utils/validators.js isValidPassword. New passwords
+// only (registration, new accounts); sign-in never checks it, so older
+// accounts with shorter passwords still sign in.
+export const PASSWORD_MIN = 8;
+export const isValidPassword = (v) =>
+  typeof v === "string" && v.length >= PASSWORD_MIN && /[A-Za-z]/.test(v) && /[0-9]/.test(v);
+export const PASSWORD_MESSAGE =
+  `Choose a password of at least ${PASSWORD_MIN} characters that includes at least one letter and one number.`;
