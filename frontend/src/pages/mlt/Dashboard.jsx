@@ -1,57 +1,28 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import api from "../../utils/api";
 import toast from "react-hot-toast";
 import { formatDate } from "../../utils/format";
-import { INK, CRIMSON, LAVENDER, GOLD, TEAL, BLUE, GREEN } from "../../theme";
+import {
+  Shell, PageHeader, Stats, StatusPill, LoadingCards, EmptyState, ErrorState, Button, Field, Modal, Meta, Card, I,
+} from "../../dashboard/kit";
+import { testNames } from "../../dashboard/status";
 
-const STATUS = {
-  collected:   { color:BLUE,     label:"Collected"   },
-  sent_to_lab: { color:BLUE,     label:"Sent to Lab" },
-  received:    { color:LAVENDER, label:"Received"    },
-  processing:  { color:GOLD,     label:"Processing"  },
-  completed:   { color:GREEN,    label:"Completed"   },
-};
+/**
+ * Lab technician (MLT) dashboard. Same API calls and 10-second polling as
+ * before; the shared shell replaces the page's own sidebar and styles.
+ */
 
-const normalizeStatus = (status) => (status ? String(status).toLowerCase().trim() : "");
+const NAV = [
+  { id: "samples", label: "Incoming samples", short: "Samples", icon: "inbox" },
+  { id: "reports", label: "Reports",          icon: "file"  },
+  { id: "history", label: "Completed",        icon: "check" },
+];
 
-function Badge({ status }) {
-  const c = STATUS[normalizeStatus(status)] || STATUS.sent_to_lab;
-  return (
-    <span style={{ display:"inline-flex", alignItems:"center", gap:6, padding:"4px 11px", borderRadius:20, fontFamily:"var(--monof)", fontSize:9.5, fontWeight:500, letterSpacing:"0.08em", textTransform:"uppercase", background:`${c.color}14`, color:c.color, border:`1px solid ${c.color}55`, whiteSpace:"nowrap" }}>
-      <span style={{ width:6, height:6, borderRadius:"50%", background:c.color }} />
-      {c.label}
-    </span>
-  );
-}
-
-function Modal({ title, onClose, children }) {
-  return (
-    <div style={{ position:"fixed", inset:0, background:"rgba(22,33,31,0.5)", backdropFilter:"blur(4px)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:300, padding:20 }}>
-      <div style={{ background:"#FBF9F5", border:"1px solid rgba(22,33,31,0.13)", borderRadius:14, padding:28, width:"100%", maxWidth:460, maxHeight:"85vh", overflowY:"auto", boxShadow:"0 30px 70px rgba(22,33,31,0.3)" }}>
-        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:20 }}>
-          <h2 style={{ fontFamily:"var(--display)", fontSize:22, fontWeight:900, letterSpacing:"-0.01em", margin:0 }}>{title}</h2>
-          <button onClick={onClose} style={{ width:30, height:30, borderRadius:"50%", background:"rgba(22,33,31,0.06)", border:"none", cursor:"pointer", fontSize:14, color:"rgba(22,33,31,0.6)" }}>✕</button>
-        </div>
-        {children}
-      </div>
-    </div>
-  );
-}
-
-function SpecimenLabel({ code, name, cap }) {
-  return (
-    <div className="sl">
-      <div className="sl-cap" style={{ background:cap }} />
-      <div className="sl-body">
-        <span className="sl-code">{code}</span>
-        <span className="sl-name">{name}</span>
-        <span className="sl-bar" />
-      </div>
-    </div>
-  );
-}
+const norm = (s) => (s ? String(s).toLowerCase().trim() : "");
+const TONE = { collected: "blue", sent_to_lab: "blue", received: "violet", processing: "amber", completed: "green" };
+const MAX_MB = 10;
 
 export default function MLTDashboard() {
   const { user, logout } = useAuth();
@@ -59,63 +30,56 @@ export default function MLTDashboard() {
   const [tab,         setTab]         = useState("samples");
   const [samples,     setSamples]     = useState([]);
   const [reports,     setReports]     = useState([]);
-  const [sideOpen,    setSideOpen]    = useState(false);
+  const [status,      setStatus]      = useState("loading");
+  const [loadError,   setLoadError]   = useState("");
   const [reportModal, setReportModal] = useState(null);
-  const [debug,       setDebug]       = useState("");
+  const [sendTarget,  setSendTarget]  = useState(null);
+  const [sendingId,   setSendingId]   = useState(null);
+  const [movingId,    setMovingId]    = useState(null);
 
   const [file,        setFile]        = useState(null);
   const [labComments, setLabComments] = useState("");
   const [dragActive,  setDragActive]  = useState(false);
   const [uploading,   setUploading]   = useState(false);
   const fileInputRef = useRef(null);
-  const loadingRef   = useRef(false);   // prevents overlapping polls
+  const loadingRef   = useRef(false);   // stops overlapping polls
 
-  // Robust: pull the array out no matter the response shape
-  const extractArray = (data, key) => {
-    if (!data) return [];
-    if (Array.isArray(data)) return data;
-    return data[key] || data.data || data.results || [];
-  };
+  // Pull the array out whatever the response shape.
+  const extractArray = (data, key) => (!data ? [] : Array.isArray(data) ? data : data[key] || data.data || data.results || []);
 
-  const load = async () => {
-    // Skip if a previous poll is still running (stops requests piling up)
+  const load = useCallback(async () => {
     if (loadingRef.current) return;
     loadingRef.current = true;
     try {
-      // 1) Samples FIRST and independently — reports must never block this
-      try {
-        const s = await api.get("/samples");
-        const sampleArr = extractArray(s.data, "samples");
-        setSamples(sampleArr);
-        const statuses = sampleArr.map(x => x.status).join(", ") || "none";
-        setDebug(`Loaded ${sampleArr.length} sample(s) · statuses: [${statuses}]`);
-      } catch(e) {
-        setDebug("SAMPLES ERROR: " + (e?.response?.status || "") + " " + (e?.response?.data?.message || e.message));
+      // Both at once, settled independently: a reports failure must not hide
+      // the sample queue. Rendering only after both means the stat tiles
+      // never flash "0 reports" while the second request is in flight.
+      const [s, r] = await Promise.allSettled([api.get("/samples"), api.get("/reports")]);
+      if (r.status === "fulfilled") setReports(extractArray(r.value.data, "reports"));
+      if (s.status === "fulfilled") {
+        setSamples(extractArray(s.value.data, "samples"));
+        setLoadError(""); setStatus("ready");
+      } else {
+        setLoadError(s.reason?.response?.data?.message || "We could not load the sample queue.");
+        setStatus((st) => (st === "ready" ? st : "error"));   // keep showing data we already have
       }
-      // 2) Reports SECOND and independently — a failure here won't hide samples
-      try {
-        const r = await api.get("/reports");
-        setReports(extractArray(r.data, "reports"));
-      } catch(e) {
-        console.error("REPORTS ERROR:", e?.response?.data || e.message);
-      }
-    } finally {
-      loadingRef.current = false;
-    }
-  };
+    } finally { loadingRef.current = false; }
+  }, []);
 
   useEffect(() => {
     load();
-    const interval = setInterval(load, 10000);  // poll every 10s
-    return () => clearInterval(interval);
-  }, []);
+    const id = setInterval(load, 10000);
+    return () => clearInterval(id);
+  }, [load]);
 
-  const moveStatus = async (id, status) => {
+  const moveStatus = async (id, next) => {
+    setMovingId(id);
     try {
-      await api.patch(`/samples/${id}/status`, { status });
-      toast.success(`Sample → ${STATUS[status]?.label || status}`);
+      await api.patch(`/samples/${id}/status`, { status: next });
+      toast.success(next === "received" ? "Sample marked received." : "Processing started.");
       load();
-    } catch(e) { toast.error(e.response?.data?.message || "Update failed."); }
+    } catch (e) { toast.error(e.response?.data?.message || "Update failed."); }
+    finally { setMovingId(null); }
   };
 
   const handleDrag = (e) => {
@@ -126,472 +90,205 @@ export default function MLTDashboard() {
   const validateAndSet = (f) => {
     if (!f) return;
     if (f.type !== "application/pdf") { toast.error("Only PDF files are allowed."); return; }
-    if (f.size > 10 * 1024 * 1024)    { toast.error("File must be under 10 MB."); return; }
+    if (f.size > MAX_MB * 1024 * 1024) { toast.error(`File must be under ${MAX_MB} MB.`); return; }
     setFile(f);
   };
-  const handleDrop = (e) => {
-    e.preventDefault(); e.stopPropagation(); setDragActive(false);
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) validateAndSet(e.dataTransfer.files[0]);
-  };
-  const handleBrowse = (e) => { if (e.target.files && e.target.files[0]) validateAndSet(e.target.files[0]); };
+  const handleDrop = (e) => { e.preventDefault(); e.stopPropagation(); setDragActive(false); validateAndSet(e.dataTransfer.files?.[0]); };
   const openReportModal = (sample) => { setReportModal(sample); setFile(null); setLabComments(""); setDragActive(false); };
 
   const saveReport = async () => {
-    if (!file) { toast.error("Please drop or select a PDF file."); return; }
+    if (!file) { toast.error("Choose a PDF file first."); return; }
     setUploading(true);
     try {
       const fd = new FormData();
       fd.append("report", file);
       fd.append("sampleId", reportModal._id);
       fd.append("labComments", labComments);
-
-      // Use fetch and DO NOT set Content-Type — the browser adds
-      // "multipart/form-data; boundary=..." automatically. Setting it by
-      // hand drops the boundary and makes multer hang forever.
-      // NOTE: token lives in sessionStorage (auto-logout on tab close).
+      // fetch without a Content-Type header: the browser adds the multipart
+      // boundary itself. Setting it by hand drops the boundary and multer hangs.
       const token = sessionStorage.getItem("token");
       const base  = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
-
-      const resp = await fetch(`${base}/reports`, {
-        method: "POST",
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-        body: fd,
-      });
-
+      const resp  = await fetch(`${base}/reports`, { method: "POST", headers: token ? { Authorization: `Bearer ${token}` } : {}, body: fd });
       if (!resp.ok) {
         let msg = "Upload failed.";
-        try { const j = await resp.json(); msg = j.message || msg; } catch {}
+        try { msg = (await resp.json()).message || msg; } catch { /* not JSON */ }
         throw new Error(msg);
       }
-
-      toast.success("Report uploaded! You can now send it.");
+      toast.success("Report uploaded. You can now send it to the patient.");
       setReportModal(null); setFile(null); setLabComments(""); load();
-    } catch(e) {
-      toast.error(e.message || "Upload failed.");
-    } finally {
-      setUploading(false);
-    }
+    } catch (e) { toast.error(e.message || "Upload failed."); }
+    finally { setUploading(false); }
   };
 
-  const sendReport = async (reportId) => {
-    if (!window.confirm("Send this report to the patient by email?")) return;
-    const tId = toast.loading("Sending report...");
+  const sendReport = async () => {
+    const id = sendTarget?._id;
+    setSendTarget(null);
+    if (!id) return;
+    setSendingId(id);
     try {
-      await api.patch(`/reports/${reportId}/send`);
-      toast.success("📧 Report emailed to patient!", { id:tId });
+      await api.patch(`/reports/${id}/send`);
+      toast.success("Report sent to the patient.");
       load();
-    } catch(e) { toast.error(e.response?.data?.message || "Send failed.", { id:tId }); }
+    } catch (e) { toast.error(e.response?.data?.message || "Send failed."); }
+    finally { setSendingId(null); }
   };
 
   const reportForSample = (sampleId) =>
-    reports.find(r => {
-      if (!r.sample) return false;
-      const id = typeof r.sample === "object" ? r.sample._id : r.sample;
-      return String(id) === String(sampleId);
-    });
+    reports.find((r) => r.sample && String(typeof r.sample === "object" ? r.sample._id : r.sample) === String(sampleId));
 
-  // INCOMING = anything that is NOT completed. This way no status can hide a sample.
-  const incoming  = samples.filter(s => normalizeStatus(s.status) !== "completed");
-  const done      = samples.filter(s => normalizeStatus(s.status) === "completed");
-  const testNames = (s) => s.testTypes?.map(t => t.name).join(", ") || "—";
+  // Incoming = anything not completed, so no unexpected status can hide a sample.
+  const incoming   = samples.filter((s) => norm(s.status) !== "completed");
+  const done       = samples.filter((s) => norm(s.status) === "completed");
+  const processing = samples.filter((s) => norm(s.status) === "processing");
+  const nav = NAV.map((n) => ({ ...n, badge: n.id === "samples" ? incoming.length : 0 }));
+  const signOut = () => { logout(); navigate("/login"); };
 
-  const TABS = [
-    { id:"samples", icon:"🧫", label:"Incoming Samples", cap:BLUE,  badge:incoming.length },
-    { id:"reports", icon:"📄", label:"Reports",          cap:GOLD  },
-    { id:"history", icon:"✅", label:"Completed",        cap:GREEN },
-  ];
-
-  const Sidebar = () => (
-    <aside className="side">
-      <div className="brand"><span className="brand-dot" style={{ background:`radial-gradient(circle at 35% 35%, #1A9B8B, ${TEAL})` }} />HemoVisit Lab</div>
-      <div className="console-chip">
-        <div className="console-chip-t">MLT console</div>
-        <div className="console-chip-s">Lab technician</div>
-      </div>
-      {TABS.map(t => (
-        <button key={t.id} onClick={() => { setTab(t.id); setSideOpen(false); }}
-          className={`side-tab ${tab===t.id?"on":""}`}>
-          <span className="side-cap" style={{ background:t.cap }} />
-          <span style={{ fontSize:15 }}>{t.icon}</span>
-          <span style={{ flex:1, textAlign:"left" }}>{t.label}</span>
-          {t.badge > 0 && <span className="side-badge">{t.badge}</span>}
-        </button>
-      ))}
-      <div className="side-user">
-        <div style={{ fontWeight:700, fontSize:13, marginBottom:1 }}>{user?.name||"MLT"}</div>
-        <div style={{ fontFamily:"var(--monof)", fontSize:10, letterSpacing:"0.1em", textTransform:"uppercase", color:"rgba(22,33,31,0.45)" }}>Lab technician</div>
-      </div>
-      <button className="signout" onClick={() => { logout(); navigate("/login"); }}>Sign out</button>
-    </aside>
-  );
-
-  const SampleCard = ({ s }) => {
+  const SampleCard = (s, i) => {
     const rep = reportForSample(s._id);
-    const st  = normalizeStatus(s.status);
+    const st  = norm(s.status);
     return (
-      <div className="scard" style={{ borderLeft:`4px solid ${STATUS[st]?.color || BLUE}` }}>
-        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", flexWrap:"wrap", gap:10, marginBottom:14 }}>
-          <div>
-            <div style={{ fontWeight:700, fontSize:15, marginBottom:4 }}>{s.patient?.name||"Patient"}</div>
-            <div style={{ fontSize:12, color:"var(--ink-60)", lineHeight:1.9 }}>
-              🧫 {testNames(s)}<br />
-              <span style={{ fontFamily:"var(--monof)", fontSize:11 }}>🔖 {s.sampleId}</span> &nbsp;·&nbsp; Booking: <span style={{ fontFamily:"var(--monof)", fontSize:11 }}>{s.booking?.bookingId||"—"}</span><br />
-              🧪 Collected by: {s.phlebotomist?.name||"—"}
+      <Card key={s._id} i={i} tone={TONE[st] || "blue"}>
+        <div className="db-row" data-sample={s.sampleId}>
+          <div className="db-row-main">
+            <h3 className="db-card-title">{s.patient?.name || "Patient"}</h3>
+            <div className="db-metas">
+              <Meta icon="tube">{testNames(s)}</Meta>
+              <span className="db-code">Sample {s.sampleId}</span>
+              <span className="db-code">Booking {s.booking?.bookingId || "—"}</span>
+              <Meta icon="user">Collected by {s.phlebotomist?.name || "—"}</Meta>
             </div>
           </div>
-          <Badge status={s.status} />
+          <div className="db-row-side"><StatusPill status={st} kind="sample" /></div>
         </div>
-        <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
+        <div className="db-actions">
           {(st === "sent_to_lab" || st === "collected") && (
-            <button className="act" style={{ color:LAVENDER, borderColor:`${LAVENDER}55` }} onClick={() => moveStatus(s._id,"received")}>📥 Mark received</button>
+            <Button size="sm" icon="inbox" busy={movingId === s._id} onClick={() => moveStatus(s._id, "received")}>Mark received</Button>
           )}
           {st === "received" && (
-            <button className="act" style={{ color:GOLD, borderColor:`${GOLD}55` }} onClick={() => moveStatus(s._id,"processing")}>🔬 Start processing</button>
+            <Button size="sm" icon="flask" busy={movingId === s._id} onClick={() => moveStatus(s._id, "processing")}>Start processing</Button>
           )}
           {st === "processing" && (
             <>
-              <button className="act" style={{ color:BLUE, borderColor:`${BLUE}55` }} onClick={() => openReportModal(s)}>
-                {rep ? "✏ Replace report" : "📤 Upload report"}
-              </button>
-              {rep && (
-                <button className="act act-solid" onClick={() => sendReport(rep._id)}>
-                  📧 Send report to patient
-                </button>
-              )}
+              <Button size="sm" variant={rep ? "ghost" : "primary"} icon="upload" onClick={() => openReportModal(s)}>{rep ? "Replace report" : "Upload report"}</Button>
+              {rep && <Button size="sm" icon="mail" busy={sendingId === rep._id} onClick={() => setSendTarget(rep)}>Send report to patient</Button>}
             </>
           )}
-          {st === "completed" && (
-            <span style={{ fontFamily:"var(--monof)", fontSize:10.5, letterSpacing:"0.08em", textTransform:"uppercase", color:GREEN, fontWeight:500, display:"flex", alignItems:"center", gap:6 }}>
-              <span style={{ width:7, height:7, borderRadius:"50%", background:GREEN, display:"inline-block" }} />
-              Report sent to patient
-            </span>
-          )}
+          {st === "completed" && <span className="db-meta"><I.check size={16} />Report sent to the patient</span>}
         </div>
-      </div>
+      </Card>
     );
   };
 
+  const loadingOrError = status === "loading" ? <LoadingCards count={3} label="Loading samples" />
+    : status === "error" ? <ErrorState message={loadError} onRetry={load} /> : null;
+
   return (
-    <div className="ml">
-      <style>{`
-        .ml {
-          --paper: var(--color-bg-page);
-          --card:    #FBF9F5;
-          --ink: var(--color-text-primary);
-          --ink-60: var(--color-text-secondary);
-          --ink-40: var(--color-text-muted);
-          --rule: var(--color-border-default);
-          --teal:    #0F6E62;
-
-          min-height: 100vh; min-height: 100dvh;
-          background: var(--paper); color: var(--ink);
-          font-family: var(--sansf); display: flex; position: relative;
-        }
-        .ml *, .ml *::before, .ml *::after { box-sizing: border-box; }
-        .ml :focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
-
-        @keyframes fadeUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
-        .ml .fade-up { animation: fadeUp .4s ease forwards; }
-
-        .ml h1 {
-          font-family: var(--display); font-weight: 900;
-          font-size: clamp(26px, 3.2vw, 34px); letter-spacing: -0.015em; margin: 0 0 4px;
-        }
-        .ml .sub { color: var(--ink-60); font-size: 14px; margin: 0 0 24px; }
-
-        .ml .sl {
-          display: inline-flex; align-items: stretch;
-          border: 1px solid var(--rule); border-radius: 3px;
-          background: var(--card); overflow: hidden; margin-bottom: 14px;
-        }
-        .ml .sl-cap  { width: 7px; }
-        .ml .sl-body { padding: 5px 10px; display: flex; align-items: center; gap: 10px; }
-        .ml .sl-code { font-family: var(--monof); font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; }
-        .ml .sl-name { font-family: var(--monof); font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-40); }
-        .ml .sl-bar {
-          width: 36px; align-self: stretch; min-height: 12px; opacity: .7;
-          background-image: repeating-linear-gradient(90deg,
-            var(--ink) 0 1px, transparent 1px 3px,
-            var(--ink) 3px 5px, transparent 5px 6px,
-            var(--ink) 6px 7px, transparent 7px 10px);
-        }
-
-        /* sidebar */
-        .ml .side {
-          width: 246px; flex-shrink: 0;
-          background: var(--card); border-right: 1px solid var(--rule);
-          padding: 22px 14px; display: flex; flex-direction: column; gap: 3px;
-          position: sticky; top: 0; height: 100vh; height: 100dvh; overflow-y: auto; z-index: 10;
-        }
-        .ml .brand {
-          display: flex; align-items: center; gap: 9px; padding: 4px 10px 2px; margin-bottom: 12px;
-          font-family: var(--monof); font-size: 12.5px; font-weight: 500;
-          letter-spacing: 0.18em; text-transform: uppercase;
-        }
-        .ml .brand-dot {
-          width: 10px; height: 10px; border-radius: 50%;
-          animation: pulse 2.4s ease-in-out infinite;
-        }
-        @keyframes pulse {
-          0%,100% { box-shadow: 0 0 0 0 rgba(28,122,107,0.35); }
-          50%     { box-shadow: 0 0 0 6px rgba(28,122,107,0); }
-        }
-        .ml .console-chip {
-          margin: 0 4px 14px; padding: 10px 12px; border-radius: 8px;
-          background: linear-gradient(120deg, var(--ink), #0e3730 80%);
-        }
-        .ml .console-chip-t { font-family: var(--monof); font-size: 9.5px; letter-spacing: 0.14em; text-transform: uppercase; color: #fff; margin-bottom: 2px; }
-        .ml .console-chip-s { font-size: 11.5px; color: rgba(255,255,255,0.55); }
-
-        .ml .side-tab {
-          display: flex; align-items: center; gap: 10px;
-          padding: 10px 12px; border: none; border-radius: 8px;
-          background: transparent; cursor: pointer; width: 100%;
-          font-family: var(--sansf); font-size: 13.5px; font-weight: 500;
-          color: var(--ink-60); transition: background .15s, color .15s;
-        }
-        .ml .side-tab:hover { background: rgba(22,33,31,0.05); color: var(--ink); }
-        .ml .side-tab.on { background: var(--ink); color: var(--paper); font-weight: 600; }
-        .ml .side-cap { width: 4px; height: 17px; border-radius: 2px; flex-shrink: 0; opacity: .4; transition: opacity .15s; }
-        .ml .side-tab.on .side-cap, .ml .side-tab:hover .side-cap { opacity: 1; }
-        .ml .side-badge {
-          background: var(--teal); color: #fff; border-radius: 20px;
-          min-width: 19px; height: 19px; padding: 0 5px;
-          display: flex; align-items: center; justify-content: center;
-          font-size: 10px; font-weight: 700; font-family: var(--monof);
-        }
-        .ml .side-tab.on .side-badge { background: var(--paper); color: var(--ink); }
-        .ml .side-user {
-          margin-top: auto; padding: 12px; border-radius: 10px;
-          background: var(--paper); border: 1px solid var(--rule);
-        }
-        .ml .signout {
-          margin-top: 8px; padding: 9px; border: 1px solid var(--rule); border-radius: 8px;
-          background: transparent; color: var(--ink-60); cursor: pointer;
-          font-family: var(--monof); font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase;
-          transition: all .15s;
-        }
-        .ml .signout:hover { border-color: var(--teal); color: var(--teal); }
-
-        /* cards */
-        .ml .card { background: var(--card); border: 1px solid var(--rule); border-radius: 12px; }
-        .ml .scard {
-          background: var(--card); border: 1px solid var(--rule);
-          border-radius: 12px; padding: 18px 20px; margin-bottom: 12px;
-          transition: transform .2s, box-shadow .2s;
-        }
-        .ml .scard:hover { box-shadow: 0 10px 24px rgba(22,33,31,0.08); }
-
-        .ml .stat {
-          background: var(--card); border: 1px solid var(--rule);
-          border-radius: 12px; padding: 18px;
-          border-top: 3px solid var(--tint, var(--teal));
-        }
-        .ml .stat-v { font-family: var(--display); font-weight: 900; font-size: clamp(22px,2.6vw,30px); line-height: 1; color: var(--tint, var(--ink)); }
-        .ml .stat-l {
-          font-family: var(--monof); font-size: 9.5px; letter-spacing: 0.12em;
-          text-transform: uppercase; color: var(--ink-40); margin-top: 8px;
-        }
-
-        /* buttons & inputs */
-        .ml .act {
-          padding: 7px 14px; border-radius: 7px; font-family: var(--sansf);
-          font-weight: 700; font-size: 12px; cursor: pointer; transition: all .15s;
-          background: transparent; border: 1px solid;
-        }
-        .ml .act:hover { }
-        .ml .act-solid {
-          background: var(--teal); color: #fff; border-color: transparent;
-          box-shadow: 0 6px 16px rgba(28,122,107,0.3);
-        }
-        .ml .act-solid:hover { background: #145d51; }
-
-        .ml .btn-upload {
-          width: 100%; padding: 13px 20px; margin-top: 4px;
-          background: var(--teal); color: #fff;
-          border: none; border-radius: 9px; cursor: pointer;
-          font-family: var(--sansf); font-size: 14px; font-weight: 700;
-          box-shadow: 0 8px 22px rgba(28,122,107,0.3);
-          transition: background .2s, transform .15s;
-        }
-        .ml .btn-upload:hover { background: var(--color-bg-primary-hover); }
-        .ml .btn-upload:disabled { opacity: .4; cursor: default; }
-
-        .ml .lbl {
-          display: block; margin-bottom: 6px;
-          font-family: var(--monof); font-size: 10px; font-weight: 500;
-          letter-spacing: 0.13em; text-transform: uppercase; color: var(--ink-60);
-        }
-        .ml .inp {
-          width: 100%; padding: 11px 13px;
-          background: #fff; color: var(--ink);
-          border: 1px solid var(--rule); border-radius: 8px;
-          font-family: var(--sansf); font-size: 14px;
-          transition: border-color .2s, box-shadow .2s;
-        }
-        .ml .inp:focus { outline: none; border-color: var(--teal); box-shadow: 0 0 0 3px rgba(28,122,107,0.12); }
-
-        /* mobile */
-        .ml .topbar {
-          display: none; position: fixed; top: 0; left: 0; right: 0; height: 56px;
-          background: rgba(251,249,245,0.92); backdrop-filter: blur(10px);
-          border-bottom: 1px solid var(--rule); z-index: 100;
-          align-items: center; justify-content: space-between; padding: 0 16px;
-        }
-        .ml .overlay { position: fixed; inset: 0; background: rgba(22,33,31,0.45); z-index: 200; }
-        .ml .drawer {
-          position: fixed; left: 0; top: 0; bottom: 0; width: 268px; z-index: 210;
-          background: var(--card); border-right: 1px solid var(--rule); overflow-y: auto;
-        }
-        .ml .main { flex: 1; padding: 32px 40px; overflow-y: auto; position: relative; z-index: 1; }
-        .ml .inner { max-width: 860px; margin: 0 auto; }
-
-        @media (max-width: 768px) {
-          .ml .desktop-side { display: none; }
-          .ml .topbar { display: flex; }
-          .ml .main { padding: 76px 14px 24px; }
-          .ml .stats4 { grid-template-columns: repeat(2,1fr) !important; }
-        }
-        @media (prefers-reduced-motion: reduce) {
-          .ml * { animation: none !important; transition: none !important; }
-        }
-      `}</style>
-
-      <div className="desktop-side"><Sidebar /></div>
-
-      <div className="topbar">
-        <div className="brand" style={{ padding:0, marginBottom:0 }}>
-          <span className="brand-dot" style={{ background:`radial-gradient(circle at 35% 35%, #1A9B8B, ${TEAL})` }} />
-          HemoVisit Lab
-        </div>
-        <button onClick={() => setSideOpen(true)} style={{ background:"none", border:"none", fontSize:20, cursor:"pointer", color:INK }}>☰</button>
-      </div>
-
-      {sideOpen && (
+    <Shell role="Lab technician" items={nav} active={tab} onNavigate={setTab} user={user} onSignOut={signOut}>
+      {tab === "samples" && (
         <>
-          <div className="overlay" onClick={() => setSideOpen(false)} />
-          <div className="drawer"><Sidebar /></div>
+          <PageHeader eyebrow="Laboratory" title="Incoming samples." sub="Receive, process and report. The queue refreshes every 10 seconds." />
+          {loadingOrError || (
+            <>
+              <Stats items={[
+                { label: "Incoming",   value: incoming.length,   icon: "inbox", tone: "blue"   },
+                { label: "Processing", value: processing.length, icon: "flask", tone: "amber"  },
+                { label: "Reports",    value: reports.length,    icon: "file",  tone: "violet" },
+                { label: "Completed",  value: done.length,       icon: "check", tone: "green"  },
+              ]} />
+              <div style={{ height: 22 }} />
+              {incoming.length
+                ? <div className="db-stack">{incoming.map(SampleCard)}</div>
+                : <EmptyState icon="inbox" title="No incoming samples">Samples appear here when a phlebotomist sends them to the lab.</EmptyState>}
+            </>
+          )}
         </>
       )}
 
-      <main className="main">
-        <div className="inner">
-
-          <div className="stats4" style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:12, marginBottom:26 }}>
-            {[
-              { label:"Incoming",   value:incoming.length,                                                    tint:BLUE     },
-              { label:"Processing", value:samples.filter(s=>normalizeStatus(s.status)==="processing").length, tint:GOLD     },
-              { label:"Reports",    value:reports.length,                                                     tint:LAVENDER },
-              { label:"Completed",  value:done.length,                                                        tint:GREEN    },
-            ].map(s => (
-              <div key={s.label} className="stat" style={{ "--tint":s.tint }}>
-                <div className="stat-v">{s.value}</div>
-                <div className="stat-l">{s.label}</div>
-              </div>
-            ))}
-          </div>
-
-          {tab === "samples" && (
-            <div className="fade-up">
-              <SpecimenLabel code="HV-40" name="Lab intake" cap={BLUE} />
-              <h1>Incoming samples.</h1>
-              <p className="sub">Process samples through the lab pipeline</p>
-              {incoming.length === 0
-                ? <div className="card" style={{ padding:"60px", textAlign:"center" }}>
-                    <div style={{ fontSize:40, marginBottom:12 }}>🧫</div>
-                    <div style={{ fontWeight:600, color:"var(--ink-60)" }}>No incoming samples</div>
-                  </div>
-                : incoming.map(s => <SampleCard key={s._id} s={s} />)
-              }
-            </div>
-          )}
-
-          {tab === "reports" && (
-            <div className="fade-up">
-              <SpecimenLabel code="HV-41" name="Reports" cap={GOLD} />
-              <h1>Reports.</h1>
-              <p className="sub">{reports.length} reports created</p>
-              {reports.length === 0
-                ? <div className="card" style={{ padding:"60px", textAlign:"center" }}>
-                    <div style={{ fontSize:40, marginBottom:12 }}>📄</div>
-                    <div style={{ fontWeight:600, color:"var(--ink-60)" }}>No reports yet</div>
-                  </div>
-                : reports.map(r => (
-                  <div key={r._id} className="scard" style={{ borderLeft:`4px solid ${r.sentToPatient?GREEN:GOLD}` }}>
-                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", flexWrap:"wrap", gap:10 }}>
-                      <div>
-                        <div style={{ fontWeight:700, fontSize:15, marginBottom:4 }}>{r.patient?.name||"Patient"}</div>
-                        <div style={{ fontSize:12, color:"var(--ink-60)", lineHeight:1.8 }}>
-                          📄 <span style={{ fontFamily:"var(--monof)", fontSize:11 }}>{r.reportId}</span> &nbsp;·&nbsp; 🔖 <span style={{ fontFamily:"var(--monof)", fontSize:11 }}>{r.booking?.bookingId||"—"}</span><br />
-                          🔗 <a href={r.fileUrl} target="_blank" rel="noreferrer" style={{ color:TEAL, fontWeight:600 }}>View PDF</a>
-                          {r.labComments && <><br />💬 {r.labComments}</>}
+      {tab === "reports" && (
+        <>
+          <PageHeader eyebrow="Laboratory" title="Reports." sub={`${reports.length} report${reports.length === 1 ? "" : "s"} uploaded`} />
+          {reports.length === 0
+            ? <EmptyState icon="file" title="No reports yet">Upload a report from a sample that is being processed.</EmptyState>
+            : <div className="db-stack">
+                {reports.map((r, i) => (
+                  <Card key={r._id} i={i} tone={r.sentToPatient ? "green" : "amber"}>
+                    <div className="db-row">
+                      <div className="db-row-main">
+                        <h3 className="db-card-title">{r.patient?.name || "Patient"}</h3>
+                        <div className="db-metas">
+                          <span className="db-code">Report {r.reportId}</span>
+                          <span className="db-code">Booking {r.booking?.bookingId || "—"}</span>
+                          {r.fileUrl && <a className="db-meta" href={r.fileUrl} target="_blank" rel="noreferrer"><I.file size={15} />View PDF</a>}
                         </div>
+                        {r.labComments && <p className="db-note-box">{r.labComments}</p>}
                       </div>
-                      <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:8 }}>
+                      <div className="db-row-side">
                         {r.sentToPatient
-                          ? <span style={{ fontFamily:"var(--monof)", fontSize:10.5, letterSpacing:"0.08em", textTransform:"uppercase", color:GREEN }}>✅ Sent {r.sentAt?formatDate(r.sentAt):""}</span>
-                          : <button className="act act-solid" onClick={() => sendReport(r._id)}>📧 Send to patient</button>
-                        }
+                          ? <span className="db-pill tone-green"><span className="db-pill-dot" />Sent {r.sentAt ? formatDate(r.sentAt) : ""}</span>
+                          : <Button size="sm" icon="mail" busy={sendingId === r._id} onClick={() => setSendTarget(r)}>Send to patient</Button>}
                       </div>
                     </div>
-                  </div>
-                ))
-              }
-            </div>
-          )}
-
-          {tab === "history" && (
-            <div className="fade-up">
-              <SpecimenLabel code="HV-42" name="Archive" cap={GREEN} />
-              <h1>Completed.</h1>
-              <p className="sub">{done.length} completed samples</p>
-              {done.length === 0
-                ? <div className="card" style={{ padding:"60px", textAlign:"center" }}>
-                    <div style={{ fontSize:40, marginBottom:12 }}>✅</div>
-                    <div style={{ fontWeight:600, color:"var(--ink-60)" }}>No completed samples yet</div>
-                  </div>
-                : done.map(s => <SampleCard key={s._id} s={s} />)
-              }
-            </div>
-          )}
-        </div>
-      </main>
-
-      {reportModal && (
-        <Modal title="Upload report" onClose={() => setReportModal(null)}>
-          <div style={{ background:"rgba(28,122,107,0.07)", border:"1px solid rgba(28,122,107,0.3)", borderRadius:10, padding:"12px 16px", marginBottom:18, fontSize:13, color:TEAL }}>
-            Patient: <strong>{reportModal.patient?.name}</strong><br />
-            Tests: {testNames(reportModal)}<br />
-            Sample: <span style={{ fontFamily:"var(--monof)", fontSize:12 }}>{reportModal.sampleId}</span>
-          </div>
-          <div
-            onDragEnter={handleDrag} onDragOver={handleDrag} onDragLeave={handleDrag} onDrop={handleDrop}
-            onClick={() => fileInputRef.current?.click()}
-            style={{ border:`2px dashed ${dragActive ? TEAL : file ? GREEN : "rgba(22,33,31,0.25)"}`, borderRadius:12, padding:"32px 20px", textAlign:"center", cursor:"pointer", background:dragActive ? "rgba(28,122,107,0.06)" : file ? "rgba(46,125,87,0.06)" : "rgba(22,33,31,0.02)", transition:"all 0.2s", marginBottom:16 }}>
-            <input ref={fileInputRef} type="file" accept="application/pdf" onChange={handleBrowse} style={{ display:"none" }} />
-            {file ? (
-              <>
-                <div style={{ fontSize:36, marginBottom:10 }}>📄</div>
-                <div style={{ fontSize:14, fontWeight:700, color:GREEN, marginBottom:4 }}>{file.name}</div>
-                <div style={{ fontSize:12, color:"var(--ink-60)" }}>{(file.size/1024/1024).toFixed(2)} MB · click to change</div>
-              </>
-            ) : (
-              <>
-                <div style={{ fontSize:36, marginBottom:10 }}>{dragActive ? "📥" : "⬆️"}</div>
-                <div style={{ fontSize:14, fontWeight:700, color:"var(--ink-60)", marginBottom:4 }}>{dragActive ? "Drop the PDF here" : "Drag & drop your report PDF"}</div>
-                <div style={{ fontSize:12, color:"var(--ink-40)" }}>or click to browse · PDF only · max 10 MB</div>
-              </>
-            )}
-          </div>
-          <div style={{ marginBottom:18 }}>
-            <label className="lbl">Lab comments (optional)</label>
-            <textarea className="inp" rows={3} placeholder="Any notes for the patient..." value={labComments} onChange={e=>setLabComments(e.target.value)} style={{ resize:"vertical" }} />
-          </div>
-          <button className="btn-upload" onClick={saveReport} disabled={uploading || !file}>
-            {uploading ? "Uploading..." : "Upload report"}
-          </button>
-        </Modal>
+                  </Card>
+                ))}
+              </div>}
+        </>
       )}
-    </div>
+
+      {tab === "history" && (
+        <>
+          <PageHeader eyebrow="Laboratory" title="Completed." sub={`${done.length} completed sample${done.length === 1 ? "" : "s"}`} />
+          {done.length ? <div className="db-stack">{done.map(SampleCard)}</div>
+            : <EmptyState icon="check" title="No completed samples yet">Samples move here once their report has been sent.</EmptyState>}
+        </>
+      )}
+
+      <Modal open={!!reportModal} onClose={() => setReportModal(null)} title="Upload report">
+        {reportModal && (
+          <>
+            <dl className="db-summary" style={{ marginBottom: 18 }}>
+              <div><dt>Patient</dt><dd>{reportModal.patient?.name || "—"}</dd></div>
+              <div><dt>Tests</dt><dd>{testNames(reportModal)}</dd></div>
+              <div><dt>Sample</dt><dd className="db-code">{reportModal.sampleId}</dd></div>
+            </dl>
+            <input ref={fileInputRef} type="file" accept="application/pdf" className="sr-only" tabIndex={-1} aria-hidden="true"
+                   onChange={(e) => validateAndSet(e.target.files?.[0])} />
+            <button type="button" className={`db-drop${dragActive ? " is-drag" : ""}${file ? " has-file" : ""}`}
+                    onDragEnter={handleDrag} onDragOver={handleDrag} onDragLeave={handleDrag} onDrop={handleDrop}
+                    onClick={() => fileInputRef.current?.click()} aria-describedby="drop-hint">
+              {file ? (
+                <>
+                  <I.file size={28} />
+                  <strong>{file.name}</strong>
+                  <span className="db-fineprint">{(file.size / 1024 / 1024).toFixed(2)} MB · choose a different file</span>
+                </>
+              ) : (
+                <>
+                  <I.upload size={28} />
+                  <strong>{dragActive ? "Drop the PDF here" : "Drop the report PDF here, or choose a file"}</strong>
+                  <span id="drop-hint" className="db-fineprint">PDF only · up to {MAX_MB} MB</span>
+                </>
+              )}
+            </button>
+            <div style={{ height: 16 }} />
+            <Field label="Comments for the patient (optional)">
+              <textarea rows={3} placeholder="Anything the patient should know about this report" value={labComments} onChange={(e) => setLabComments(e.target.value)} />
+            </Field>
+            <Button className="db-btn-block" icon="upload" busy={uploading} disabled={!file} onClick={saveReport}>
+              {uploading ? "Uploading…" : "Upload report"}
+            </Button>
+          </>
+        )}
+      </Modal>
+
+      <Modal open={!!sendTarget} onClose={() => setSendTarget(null)} title="Send report to patient?">
+        <p className="db-sub" style={{ marginTop: 0 }}>
+          {sendTarget?.patient?.name || "The patient"} will be emailed the report, and the booking will be marked complete.
+        </p>
+        <div className="db-actions">
+          <Button variant="ghost" onClick={() => setSendTarget(null)}>Not yet</Button>
+          <Button icon="mail" onClick={sendReport}>Send report</Button>
+        </div>
+      </Modal>
+    </Shell>
   );
 }
