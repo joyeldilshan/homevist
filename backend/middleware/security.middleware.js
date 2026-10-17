@@ -16,11 +16,12 @@ const helmet = require("helmet");
  *    Both need to be allowed in style-src and font-src.
  *
  * 3. The Vercel frontend origin. crossOriginResourcePolicy defaults to
- *    "same-origin", which would block the Vercel app from reading the
- *    PDF reports served from /uploads. Set to "cross-origin".
+ *    "same-origin", which would block the Vercel app from reading report
+ *    PDFs from GET /api/reports/:id/file. Set to "cross-origin" (the
+ *    route itself requires a signed-in, authorised caller).
  *
  * Note that the CSP here protects responses served BY THIS BACKEND
- * (the /uploads static files and JSON). The React app is served by
+ * (report PDFs and JSON). The React app is served by
  * Vercel and gets its own headers from there — this is not a substitute
  * for configuring Vercel.
  */
@@ -46,7 +47,7 @@ function securityHeaders() {
       },
     },
 
-    // Let the Vercel-hosted frontend read PDFs from /uploads.
+    // Let the Vercel-hosted frontend read report PDFs from the API.
     crossOriginResourcePolicy: { policy: "cross-origin" },
 
     // COEP would block those same cross-origin reads. Off on purpose.

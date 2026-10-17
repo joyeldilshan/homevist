@@ -17,6 +17,13 @@ const labReportSchema = new mongoose.Schema({
   patient: { type: mongoose.Schema.Types.ObjectId, ref: "User",    required: true },
   mlt:     { type: mongoose.Schema.Types.ObjectId, ref: "User" },
 
+  // fileName: the server-generated name on disk (utils/reportFiles.js).
+  // Never sent to clients. Records from before it existed have only
+  // fileUrl, which then holds the old public URL; reportFiles.storedNameOf
+  // reads the name from it.
+  fileName:    { type: String },
+  // What clients see is always the authenticated download route (set in
+  // toJSON below), never a path to the file itself.
   fileUrl:     { type: String, required: true },
   labComments: { type: String, default: "" },
 
@@ -24,6 +31,15 @@ const labReportSchema = new mongoose.Schema({
   sentToPatient: { type: Boolean, default: false },
   sentAt:        { type: Date },
 
-}, { timestamps: true });
+}, {
+  timestamps: true,
+  toJSON: {
+    transform(_doc, ret) {
+      ret.fileUrl = `/api/reports/${ret._id}/file`;
+      delete ret.fileName;
+      return ret;
+    },
+  },
+});
 
 module.exports = mongoose.model("LabReport", labReportSchema);

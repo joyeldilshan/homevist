@@ -7,6 +7,7 @@ import toast from "react-hot-toast";
 import { formatMoney, formatDate, formatLongDate } from "../../utils/format";
 import { isValidUkPostcode, normaliseUkPostcode, isInServiceArea, outOfAreaMessage, POSTCODE_MESSAGE } from "../../utils/validators";
 import locale from "../../config/locale";
+import { downloadReport } from "../../utils/reportDownload";
 import {
   Shell, PageHeader, SectionTitle, Stats, StatusPill, StageProgress, LoadingCards, EmptyState,
   ErrorState, Button, Field, Modal, Meta, Card, I,
@@ -115,9 +116,13 @@ export default function UserDashboard() {
   });
 
   const reportFor = (b) => reports.find((r) => r.booking?._id === b._id || r.booking?.bookingId === b.bookingId);
+  const getReport = async (rep) => {
+    try { await downloadReport(rep); }
+    catch (e) { toast.error(e?.response?.status === 404 ? "That report is not available." : "Could not download the report."); }
+  };
   const openReport = (b) => {
     const rep = reportFor(b);
-    if (rep?.fileUrl) window.open(rep.fileUrl, "_blank", "noopener,noreferrer");
+    if (rep) getReport(rep);
     else { toast("Your report isn't ready yet."); setTab("reports"); }
   };
 
@@ -401,7 +406,7 @@ export default function UserDashboard() {
                           {rep.labComments && <p className="db-note-box">{rep.labComments}</p>}
                         </div>
                         <div className="db-row-side">
-                          <Button size="sm" icon="download" onClick={() => (rep.fileUrl ? window.open(rep.fileUrl, "_blank", "noopener,noreferrer") : toast.error("No file available."))}>
+                          <Button size="sm" icon="download" onClick={() => getReport(rep)}>
                             Download report
                           </Button>
                         </div>

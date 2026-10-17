@@ -269,16 +269,26 @@ test("full booking lifecycle across patient, admin, phlebotomist and lab", { tim
     await nav(patient, "My reports");
     const rep = patient.locator(".db-card").filter({ hasText: `Booking ${bookingId}` });
     await rep.waitFor();
-    // Headless Chromium has no PDF viewer, so the new tab downloads the file
-    // and never navigates; watch the request the click makes instead.
-    const [req] = await Promise.all([
-      patientCtx.waitForEvent("request", (r) => /\/uploads\/reports\/.+\.pdf$/.test(r.url())),
+    // Reports are private: the button fetches the PDF with the patient's
+    // token and hands the browser a file to save.
+    const [download] = await Promise.all([
+      patient.waitForEvent("download"),
       rep.getByRole("button", { name: "Download report" }).click(),
     ]);
-    const res = await fetch(req.url());
-    assert.equal(res.status, 200);
-    assert.match(res.headers.get("content-type") || "", /application\/pdf/);
-    assert.match(Buffer.from(await res.arrayBuffer()).subarray(0, 5).toString(), /^%PDF-/);
+    assert.match(download.suggestedFilename(), /^Report_RPT[A-Z0-9]+\.pdf$/);
+    const bytes = fs.readFileSync(await download.path());
+    assert.equal(bytes.subarray(0, 5).toString(), "%PDF-");
+
+    // The file route refuses anyone not signed in, and the old public
+    // folder no longer serves anything.
+    const reportId = await patient.evaluate(async (api) => {
+      const r = await fetch(`${api}/reports`, { headers: { Authorization: `Bearer ${sessionStorage.getItem("token")}` } });
+      return (await r.json()).reports[0]._id;
+    }, API);
+    people.reportId = reportId;
+    assert.equal((await fetch(`${API}/reports/${reportId}/file`)).status, 401);
+    const origin = new URL(API).origin;
+    assert.equal((await fetch(`${origin}/uploads/reports/x.pdf`)).status, 404);
   });
 
 });

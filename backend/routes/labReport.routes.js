@@ -4,12 +4,14 @@
 // ============================================================================
 const express = require("express");
 const router  = express.Router();
-const { createReport, getReports, sendReport } = require("../controllers/labReport.controller");
+const { createReport, getReports, sendReport, downloadReport } = require("../controllers/labReport.controller");
 const { protect, authorize } = require("../middleware/rbac");
-const upload = require("../middleware/upload");
+const { singleReport } = require("../middleware/upload");
 
-router.post("/", protect, authorize("mlt"), upload.single("report"), createReport);
+router.post("/", protect, authorize("mlt"), singleReport, createReport);
 router.get("/", protect, authorize("mlt", "patient", "user", "admin"), getReports);
+// The only way to fetch a report PDF; checks the caller against the record.
+router.get("/:id/file", protect, authorize("mlt", "patient", "user", "admin"), downloadReport);
 router.patch("/:id/send", protect, authorize("mlt"), sendReport);
 
 module.exports = router;

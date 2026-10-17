@@ -8,6 +8,7 @@ import {
   Shell, PageHeader, Stats, StatusPill, LoadingCards, EmptyState, ErrorState, Button, Field, Modal, Meta, Card, I,
 } from "../../dashboard/kit";
 import { testNames } from "../../dashboard/status";
+import { downloadReport } from "../../utils/reportDownload";
 
 /**
  * Lab technician (MLT) dashboard. Same API calls and 10-second polling as
@@ -218,7 +219,7 @@ export default function MLTDashboard() {
                         <div className="db-metas">
                           <span className="db-code">Report {r.reportId}</span>
                           <span className="db-code">Booking {r.booking?.bookingId || "—"}</span>
-                          {r.fileUrl && <a className="db-meta" href={r.fileUrl} target="_blank" rel="noreferrer"><I.file size={15} />View PDF</a>}
+                          <Button size="sm" variant="ghost" icon="file" onClick={() => downloadReport(r).catch(() => toast.error("Could not download the report."))}>Download PDF</Button>
                         </div>
                         {r.labComments && <p className="db-note-box">{r.labComments}</p>}
                       </div>

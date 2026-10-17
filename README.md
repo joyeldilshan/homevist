@@ -295,7 +295,45 @@ frontend/src/
 Rate limiting on `/login` (10 failed attempts / 15 min), `/register` (5 / hour)
 and `/change-password` (5 / hour). `trust proxy` is set to 1 for Render.
 Helmet supplies CSP, HSTS (production), `nosniff` and frame protection.
-Uploads accept PDF only, 10 MB maximum.
+
+### Report files (patient PDFs)
+
+Report PDFs are patient health data and are **not public**.
+
+- They are stored in `backend/uploads/reports/` (gitignored), which is **not
+  served** as static files. The only way to fetch one is
+  `GET /api/reports/:id/file`, which needs a signed-in user and allows only the
+  patient the report belongs to (once it has been sent to them), the lab
+  technician who uploaded it or is handling its sample, or an admin. Anyone
+  else, or a malformed ID, gets `404 Report not found`.
+- Uploads (`POST /api/reports`, field `report`) are held in memory, checked by
+  content (the file must start with `%PDF-`, whatever its name or MIME type),
+  limited to 10 MB, and saved under a server-generated name: 32 hex characters
+  from `crypto.randomBytes`. Nothing the uploader sends reaches the path, and
+  every lookup is checked to stay inside the folder (`utils/reportFiles.js`).
+- `fileUrl` in API responses is now always `/api/reports/<id>/file` (relative
+  to the API's origin). The frontend downloads with the user's token; the
+  report email attaches the PDF and links to the sign-in page, never to a file.
+
+**Before this change** the folder was served publicly at `/uploads/...` and file
+names were a timestamp plus `Math.random()`. If you deployed that version:
+
+1. Deploy this version. Old reports keep working straight away: their record
+   holds the old URL and the server reads the file name from it. The old public
+   URLs stop working.
+2. Rename the old files to random names (dry run first; same database guard as
+   the server):
+   ```bash
+   cd backend
+   node utils/migrateReportFiles.js           # counts only, changes nothing
+   node utils/migrateReportFiles.js --apply   # copy -> verify -> record -> delete old
+   ```
+   It is safe to re-run, prints counts only, and leaves a record untouched if
+   any step fails. Run it where the files are (on Render: the service's shell).
+
+Files are on the server's local disk. On a host with an ephemeral filesystem
+(Render without a persistent disk), uploaded reports are lost on redeploy; add
+a persistent disk or object storage before real use.
 
 ---
 

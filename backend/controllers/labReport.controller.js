@@ -2,13 +2,29 @@ const LabReport = require("../models/LabReport");
 const Sample    = require("../models/Sample");
 const Booking   = require("../models/Booking");
 const { sendReportToPatient } = require("../utils/reportEmail");
-const path = require("path");
+const mongoose = require("mongoose");
 const fs   = require("fs");
 const logger = require("../utils/logger");
+const { saveReportPdf, removeReportFile, storedNameOf, pathFor, downloadPath } = require("../utils/reportFiles");
 
-// Build the disk path of a stored report file from its URL
-const diskPathFromUrl = (fileUrl) =>
-  path.join(__dirname, "..", "uploads", "reports", path.basename(fileUrl || ""));
+// One answer for "no such report" and "not yours": a caller cannot tell
+// which, so IDs cannot be probed for existence.
+const reportNotFound = (res) => res.status(404).json({ success: false, message: "Report not found." });
+
+/**
+ * Who may download a report file:
+ *   - the patient it belongs to, once it has been sent to them (the same
+ *     rule as GET /api/reports for patients);
+ *   - the lab technician who uploaded it or is handling its sample;
+ *   - an admin.
+ */
+function canDownload(user, report) {
+  const uid = String(user._id);
+  if (user.role === "admin") return true;
+  if (user.role === "user" || user.role === "patient") return String(report.patient) === uid && report.sentToPatient === true;
+  if (user.role === "mlt") return String(report.mlt) === uid || String(report.sample?.mlt) === uid;
+  return false;
+}
 
 /**
  * POST /api/reports
@@ -27,37 +43,35 @@ exports.createReport = async (req, res, next) => {
     }
 
     let report = await LabReport.findOne({ sample: sampleId });
-
-    // If a new file was uploaded, build its public URL and clean up the old one
-    let fileUrl = report?.fileUrl;
-    if (req.file) {
-      fileUrl = `${req.protocol}://${req.get("host")}/uploads/reports/${req.file.filename}`;
-      if (report?.fileUrl) {
-        const oldPath = diskPathFromUrl(report.fileUrl);
-        fs.existsSync(oldPath) && fs.unlink(oldPath, () => {});
-      }
-    }
-
-    if (!fileUrl) {
+    if (!req.file && !report) {
       return res.status(400).json({ success: false, message: "Please upload a PDF report file." });
     }
 
-    if (report) {
-      report.fileUrl     = fileUrl;
-      report.labComments = labComments || "";
-      report.mlt         = req.user._id;
-      await report.save();
-    } else {
-      report = await LabReport.create({
+    // Checked by content (it must start with %PDF-) and saved under a
+    // server-generated random name; nothing from the uploader reaches the path.
+    let fileName;
+    if (req.file) {
+      try { fileName = await saveReportPdf(req.file.buffer); }
+      catch (e) { return res.status(e.statusCode || 400).json({ success: false, message: e.message }); }
+    }
+    const replaced = fileName && report ? storedNameOf(report) : null;
+
+    if (!report) {
+      report = new LabReport({
         sample:      sample._id,
         booking:     sample.booking,
         patient:     sample.patient,
-        mlt:         req.user._id,
-        fileUrl,
-        labComments: labComments || "",
         status:      "draft",
       });
     }
+    if (fileName) report.fileName = fileName;
+    report.fileUrl     = downloadPath(report._id);
+    report.labComments = labComments || "";
+    report.mlt         = req.user._id;
+    await report.save();
+
+    // Only after the new file is safely recorded.
+    if (replaced && replaced !== fileName) await removeReportFile(replaced);
 
     res.status(201).json({ success: true, report });
   } catch (err) { next(err); }
@@ -104,7 +118,7 @@ exports.sendReport = async (req, res, next) => {
     }
 
     const tests    = report.sample?.testTypes?.map(t => t.name).join(", ") || "—";
-    const filePath = diskPathFromUrl(report.fileUrl);
+    const filePath = pathFor(storedNameOf(report));
 
     await sendReportToPatient({
       to:          report.patient.email,
@@ -115,7 +129,6 @@ exports.sendReport = async (req, res, next) => {
       tests,
       labComments: report.labComments,
       filePath,                 // attach the actual stored PDF
-      fileUrl:     report.fileUrl,
     });
 
     report.status        = "completed";
@@ -142,3 +155,30 @@ exports.sendReport = async (req, res, next) => {
     res.status(500).json({ success: false, message: "Failed to send report: " + err.message });
   }
 };
+
+/**
+ * GET /api/reports/:id/file
+ * Streams the report PDF to someone allowed to see it (canDownload).
+ * Replaces the public /uploads static route.
+ */
+exports.downloadReport = async (req, res, next) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) return reportNotFound(res);
+    const report = await LabReport.findById(req.params.id).populate("sample", "mlt");
+    if (!report || !canDownload(req.user, report)) return reportNotFound(res);
+
+    const full = pathFor(storedNameOf(report));
+    if (!full || !fs.existsSync(full)) {
+      return res.status(404).json({ success: false, message: "The report file is missing. Ask the laboratory to upload it again." });
+    }
+    res.set({
+      "Content-Type":           "application/pdf",
+      "Content-Disposition":    `attachment; filename="Report_${String(report.reportId).replace(/[^A-Za-z0-9_-]/g, "")}.pdf"`,
+      "Cache-Control":          "private, no-store",
+      "X-Content-Type-Options": "nosniff",
+    });
+    fs.createReadStream(full).on("error", next).pipe(res);
+  } catch (err) { next(err); }
+};
+
+exports._canDownload = canDownload;   // for tests

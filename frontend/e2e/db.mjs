@@ -31,6 +31,7 @@ const User      = requireBackend("./models/User");
 const Booking   = requireBackend("./models/Booking");
 const Sample    = requireBackend("./models/Sample");
 const LabReport = requireBackend("./models/LabReport");
+const { storedNameOf, pathFor } = requireBackend("./utils/reportFiles");
 
 export const RUN = `${Date.now().toString(36)}${crypto.randomBytes(2).toString("hex")}`;
 export const emailFor = (role) => `e2e-${RUN}-${role}@example.com`;
@@ -82,11 +83,11 @@ export async function cleanup() {
   const ids = users.map((u) => u._id);
   const bookings = await Booking.find({ $or: [{ user: { $in: ids } }, { phlebotomist: { $in: ids } }] }).select("_id");
   const bIds = bookings.map((b) => b._id);
-  const reports = await LabReport.find({ booking: { $in: bIds } }).select("fileUrl");
+  const reports = await LabReport.find({ booking: { $in: bIds } }).select("fileName fileUrl");
   let files = 0;
   for (const r of reports) {
-    const file = path.join(backendDir, "uploads", "reports", path.basename(r.fileUrl || ""));
-    if (r.fileUrl && fs.existsSync(file)) { fs.unlinkSync(file); files++; }
+    const file = pathFor(storedNameOf(r));   // the backend's own, traversal-checked lookup
+    if (file && fs.existsSync(file)) { fs.unlinkSync(file); files++; }
   }
   const removed = {
     reports:  (await LabReport.deleteMany({ booking: { $in: bIds } })).deletedCount,

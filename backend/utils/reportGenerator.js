@@ -7,8 +7,7 @@ const { formatDate, formatAppointment } = require("./format");
 const locale = require("../config/locale");
 const logger = require("../utils/logger");
 
-const UPLOAD_DIR = path.join(__dirname, "../uploads/reports");
-if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+const { newFileName, pathFor, ensureDir } = require("./reportFiles");
 
 // ── Colour palette ────────────────────────────────────────────────
 const RED   = "#C62828";
@@ -55,8 +54,10 @@ async function generateReport(booking, { results, remarks } = {}) {
     : (booking?.testType?.name || "this booking");
   validateResults(results, testLabel);
 
-  const fileName = `report_${booking.bookingId}_${Date.now()}.pdf`;
-  const filePath = path.join(UPLOAD_DIR, fileName);
+  // Same private folder and random naming as uploaded reports.
+  ensureDir();
+  const fileName = newFileName();
+  const filePath = pathFor(fileName);
 
   const doc = new PDFDocument({ size: "A4", margin: 50 });
   const stream = fs.createWriteStream(filePath);
@@ -303,7 +304,8 @@ async function generateReport(booking, { results, remarks } = {}) {
   doc.end();
 
   return new Promise((resolve, reject) => {
-    stream.on("finish", () => resolve(`/uploads/reports/${fileName}`));
+    // The stored name: set it as LabReport.fileName to serve it.
+    stream.on("finish", () => resolve(fileName));
     stream.on("error",  reject);
   });
 }

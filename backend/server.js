@@ -35,7 +35,6 @@ const { Server } = require("socket.io");
 const mongoose   = require("mongoose");
 const cors       = require("cors");
 const morgan     = require("morgan");
-const path       = require("path");
 
 const authRoutes         = require("./routes/auth.routes");
 const bookingRoutes      = require("./routes/booking.routes");
@@ -81,7 +80,8 @@ app.use(cors({ origin: process.env.CLIENT_URL || "http://localhost:5173", creden
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(morgan("dev"));
-app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+// No static /uploads: report PDFs are patient health data and are only
+// served by the authenticated GET /api/reports/:id/file.
 
 // Routes
 app.use("/api/auth",          authRoutes);
