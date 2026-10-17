@@ -309,8 +309,9 @@ any real patient result is reported.
 
 ### Known issues
 
-- **Bundle size.** Routes are split; the landing page's first chunk is 252 kB
-  (85 kB gzip), with its below-the-fold sections in a separate 17 kB chunk.
+- **Bundle size.** Routes are split. The shared first chunk is 238 kB (81 kB
+  gzip). The landing page adds its own 14 kB of JS and 33 kB of CSS (7 kB gzip),
+  which no other page downloads, plus a 17 kB below-the-fold chunk.
 - **Dependency advisories.** See the dedicated section below.
 - **Test coverage.** 52 backend tests (validators, formatters, rate limiting,
   the seed guard, the startup database guard) and 27 frontend tests (render
