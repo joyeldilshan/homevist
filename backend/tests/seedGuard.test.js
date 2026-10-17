@@ -62,3 +62,24 @@ test("REFUSES production-looking names — the whole point of the guard", () => 
       `"${bad}" must NOT pass the name check — seed deletes all users`);
   }
 });
+
+// ── Seed passwords follow the registration rule ──────────────────
+test("a seed password from the environment must meet the password rule", () => {
+  const { passwordFor } = require("../utils/seed");
+  const key = "SEED_TEST_ONLY_PASSWORD";
+  try {
+    for (const weak of ["abc123", "abcdefgh", "12345678", "short1"]) {
+      process.env[key] = weak;
+      assert.throws(() => passwordFor(key), /too weak/, `"${weak}" must be refused`);
+    }
+    process.env[key] = "Strong-enough-9";
+    assert.equal(passwordFor(key), "Strong-enough-9");
+  } finally { delete process.env[key]; }
+});
+
+test("a generated seed password meets the rule", () => {
+  const { passwordFor } = require("../utils/seed");
+  const { isValidPassword } = require("../utils/validators");
+  delete process.env.SEED_TEST_ONLY_PASSWORD;
+  for (let i = 0; i < 20; i++) assert.equal(isValidPassword(passwordFor("SEED_TEST_ONLY_PASSWORD")), true);
+});

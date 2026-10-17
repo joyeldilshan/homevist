@@ -2,7 +2,7 @@ const express  = require("express");
 const router   = express.Router();
 const User     = require("../models/User");
 const { protect, authorize } = require("../middleware/auth.middleware");
-const { isValidUkPhone, PHONE_MESSAGE } = require("../utils/validators");
+const { isValidUkPhone, PHONE_MESSAGE, isValidPassword, PASSWORD_MESSAGE } = require("../utils/validators");
 
 // GET /api/phlebotomists — admin gets all phlebotomists
 router.get("/", protect, authorize("admin"), async (req, res, next) => {
@@ -22,6 +22,11 @@ router.post("/", protect, authorize("admin"), async (req, res, next) => {
     }
     if (!isValidUkPhone(phone)) {
       return res.status(400).json({ success:false, message: PHONE_MESSAGE });
+    }
+    // Same rule as registration and password change (utils/validators).
+    // This route used to accept anything the schema allowed (6 characters).
+    if (!isValidPassword(password)) {
+      return res.status(400).json({ success:false, message: PASSWORD_MESSAGE });
     }
     const existing = await User.findOne({ email });
     if (existing) {

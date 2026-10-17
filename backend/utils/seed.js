@@ -24,13 +24,20 @@ const User     = require("../models/User");
 const TestType = require("../models/TestType");
 const locale   = require("../config/locale");
 const { databaseNameFrom, SAFE_NAME } = require("./dbGuard");
+const { isValidPassword, PASSWORD_MESSAGE } = require("./validators");
 
 // ── Password resolution ──────────────────────────────────────────
 const generated = [];
 
 function passwordFor(envKey) {
   const fromEnv = process.env[envKey];
-  if (fromEnv && fromEnv.length >= 6) return fromEnv;
+  // A password given in the environment must meet the same rule as
+  // registration. It used to accept 6 characters, and silently replace a
+  // shorter one with a random password instead of saying so.
+  if (fromEnv) {
+    if (isValidPassword(fromEnv)) return fromEnv;
+    throw new Error(`${envKey} is too weak. ${PASSWORD_MESSAGE}`);
+  }
 
   // 14 url-safe chars plus a guaranteed mixed-case/digit/symbol tail
   const random = crypto.randomBytes(12).toString("base64")
@@ -255,6 +262,16 @@ async function guard() {
 async function seed() {
   await guard();
 
+  // Resolve every password BEFORE anything is deleted: a weak one in the
+  // environment stops the seed here, with the database untouched.
+  let passwords;
+  try {
+    passwords = Object.fromEntries(USERS.map(({ passwordEnv }) => [passwordEnv, passwordFor(passwordEnv)]));
+  } catch (e) {
+    console.error(`Refusing to seed: ${e.message} Nothing was deleted.`);
+    process.exit(1);
+  }
+
   try {
     await mongoose.connect(process.env.MONGO_URI);
     console.log("Connected to MongoDB");
@@ -268,7 +285,7 @@ async function seed() {
 
     const created = [];
     for (const { passwordEnv, ...u } of USERS) {
-      const password = passwordFor(passwordEnv);
+      const password = passwords[passwordEnv];
       await User.create({ ...u, password });   // hashed by the pre-save hook
       created.push({ role: u.role, email: u.email });
       console.log(`Created ${u.role}: ${u.email}`);
@@ -308,4 +325,4 @@ async function seed() {
 // be unit tested without the script executing and touching a database.
 if (require.main === module) seed();
 
-module.exports = { databaseNameFrom, SAFE_NAME };
+module.exports = { databaseNameFrom, SAFE_NAME, passwordFor };
