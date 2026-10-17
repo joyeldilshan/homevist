@@ -157,6 +157,8 @@ exports.sendReport = async (req, res, next) => {
 
     res.json({ success: true, message: "Report sent to patient.", report });
   } catch (err) {
+    // A malformed report ID is a 404 like everywhere else (error handler).
+    if (err.name === "CastError") return next(err);
     // Logged in full; the client gets a plain message (mail errors can
     // carry server names, addresses and credentials hints).
     logger.error("📧 Report send error:", err.message);
