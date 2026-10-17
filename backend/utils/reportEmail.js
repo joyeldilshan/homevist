@@ -4,12 +4,18 @@ const { formatDate } = require("./format");
 const logger = require("../utils/logger");
 
 let transporter = null;
+// Mock mode when EMAIL_USER/EMAIL_PASS are unset (see emailService.js):
+// the message, attachment included, is built but not sent.
 const getTransporter = () => {
   if (!transporter) {
-    transporter = nodemailer.createTransport({
-      service: "gmail",
-      auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS },
-    });
+    const live = process.env.EMAIL_USER && process.env.EMAIL_PASS;
+    transporter = live
+      ? nodemailer.createTransport({
+          service: "gmail",
+          auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS },
+        })
+      : nodemailer.createTransport({ jsonTransport: true });
+    if (!live) logger.debug("EMAIL MOCK: no EMAIL_USER/EMAIL_PASS, report emails are built but not sent");
   }
   return transporter;
 };

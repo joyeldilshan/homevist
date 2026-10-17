@@ -6,15 +6,22 @@ const logger = require("../utils/logger");
 // Created once, reused for all emails
 let transporter = null;
 
+// Mock mode, as the README promises and utils/notify.js already does:
+// with no EMAIL_USER/EMAIL_PASS, nodemailer's jsonTransport builds the
+// message and sends nothing. Same code path and return value, no network.
 const getTransporter = () => {
   if (!transporter) {
-    transporter = nodemailer.createTransport({
-      service: "gmail",
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
-      },
-    });
+    const live = process.env.EMAIL_USER && process.env.EMAIL_PASS;
+    transporter = live
+      ? nodemailer.createTransport({
+          service: "gmail",
+          auth: {
+            user: process.env.EMAIL_USER,
+            pass: process.env.EMAIL_PASS,
+          },
+        })
+      : nodemailer.createTransport({ jsonTransport: true });
+    if (!live) logger.debug("EMAIL MOCK: no EMAIL_USER/EMAIL_PASS, emails are built but not sent");
   }
   return transporter;
 };
