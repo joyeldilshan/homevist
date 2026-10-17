@@ -87,6 +87,7 @@ the database name, never the URI or password. The check lives in
 | `VERIFY_BASE_URL` | no | Printed on PDF reports as the verification link |
 | `TWILIO_*` | no | Blank = SMS runs in mock mode (prints to console) |
 | `EMAIL_*` | no | Blank = email runs in mock mode. Gmail needs an App Password. |
+| `EMAIL_FROM` | no | Sender for outgoing email, `HemoVisit <noreply@yourdomain>` or a bare address. Unset falls back to the obviously fake `noreply@example.com`; set a real mailbox before sending to patients. |
 | `SEED_*_PASSWORD` | no | Fix a seed account's password; otherwise one is generated and printed once |
 
 ### `frontend/.env`
