@@ -25,15 +25,23 @@ import { Link } from "react-router-dom";
 
 const DISMISS_KEY = "hv-storage-notice-dismissed";
 
+/*
+ * Starts visible, so it is part of the pre-rendered landing HTML and a
+ * first-time visitor sees it at first paint instead of having it pop in
+ * once JavaScript runs (when it was also the page's LCP element, delayed
+ * by the whole bundle). For a returning visitor, an inline script in
+ * index.html sets html[data-notice-off] from the same localStorage flag
+ * before first paint, which hides it in CSS; the effect below then
+ * unmounts it. Server and first client render agree, so hydration holds.
+ */
 export default function StorageNotice() {
-  const [visible, setVisible] = useState(false);
+  const [visible, setVisible] = useState(true);
 
   useEffect(() => {
     try {
-      if (!localStorage.getItem(DISMISS_KEY)) setVisible(true);
+      if (localStorage.getItem(DISMISS_KEY)) setVisible(false);
     } catch {
-      // Private mode or blocked storage — show it, dismissal just won't persist.
-      setVisible(true);
+      // Private mode or blocked storage — keep showing it; dismissal just won't persist.
     }
   }, []);
 
@@ -48,6 +56,7 @@ export default function StorageNotice() {
     <div
       role="region"
       aria-label="Browser storage notice"
+      className="hv-storage-notice"
       style={{
         position: "fixed", left: 16, right: 16, bottom: 16, zIndex: 9999,
         maxWidth: 680, margin: "0 auto",

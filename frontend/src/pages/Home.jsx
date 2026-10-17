@@ -8,12 +8,18 @@ import "./landing/landing.css";
 /**
  * HemoVisit — landing page (v2: motion).
  *
- * LOADING. This file is the first chunk: nav, hero and footer. Everything
- * below the fold is ./landing/BelowFold, loaded lazily. At build time the
- * page is pre-rendered (scripts/prerender.mjs), so the hero headline and
- * photo are in the HTML and paint before any JavaScript runs. The client
- * then hydrates the same markup rather than replacing it, which is why
- * nothing here may read window, storage or the clock during render.
+ * LOADING. This file is the first chunk: nav, hero and footer. At build
+ * time it is pre-rendered (scripts/prerender.mjs), so the hero headline
+ * and photo are in the HTML and paint before any JavaScript runs. The
+ * client then hydrates the same markup rather than replacing it, which is
+ * why nothing here may read window, storage or the clock during render.
+ *
+ * Everything below the fold is ./landing/BelowFold: a lazy chunk mounted
+ * only after hydration. Pre-rendering it too was measured and rejected:
+ * it roughly quadrupled the markup the browser must lay out before first
+ * paint and the work hydration must do, which cost more mobile LCP than
+ * it saved. The trade-off: without JavaScript, only the hero and footer
+ * show.
  *
  * MOTION. CSS owns the hero intro (it runs from the HTML, no JS needed).
  * ../motion/lite owns scroll-linked effects. Everything animates transform
@@ -29,6 +35,7 @@ import "./landing/landing.css";
  *
  * PHOTOS live in frontend/public/images/.
  *   image1.jpg   phlebotomist with a patient at home  -> hero
+ *                (+ image1.avif / image1.webp, same image, re-encoded)
  *   image 2.jpg  laboratory technician                -> band
  *   image 4.jpg  gloved hand with a sample tube       -> about
  *   image 5.png  old logo, "HOME VISIT MOBILE LAB" baked in -> unused
@@ -48,18 +55,24 @@ export function jumpTo(e, id) {
 }
 
 /* ── The ECG line under the hero copy ──────────────────────────────
- * One beat, drawn once by stroke-dashoffset (the requested effect; a
- * deliberate exception to transform/opacity, confined to a small SVG),
- * then a short bright pulse runs along it on a loop. */
+ * One beat, drawn once by stroke-dashoffset: the requested effect, and a
+ * deliberate exception to transform/opacity, kept to a single 1.8 s run
+ * on a small SVG. A looping pulse along the line was tried and measured:
+ * animating stroke-dashoffset forever repaints on the main thread every
+ * frame (~0.9 s of work per 6 s on a throttled phone). The "live" signal
+ * is instead a dot at the end of the trace that beats with transform and
+ * opacity only, which the compositor handles off the main thread. */
 const BEAT =
   "M0 52 H150 l10 -6 l10 6 H210 l7 10 l12 -54 l12 72 l9 -28 H290 l14 -12 l16 12 H600";
 
 function Ecg() {
   return (
-    <svg className="lp-ecg" viewBox="0 0 600 80" preserveAspectRatio="none" aria-hidden="true">
-      <path className="lp-ecg-base" d={BEAT} pathLength="1" />
-      <path className="lp-ecg-pulse" d={BEAT} pathLength="1" />
-    </svg>
+    <div className="lp-ecg" aria-hidden="true">
+      <svg viewBox="0 0 600 80" preserveAspectRatio="none">
+        <path className="lp-ecg-base" d={BEAT} pathLength="1" />
+      </svg>
+      <span className="lp-ecg-dot" />
+    </div>
   );
 }
 
@@ -141,14 +154,21 @@ function Hero() {
 
         <div className="lp-hero-visual lp-intro-photo">
           <div className="lp-photo lp-photo-hero">
-            <img
-              ref={photo}
-              src="/images/image1.jpg"
-              alt="A phlebotomist taking a blood sample from a seated patient in her own living room"
-              width="954" height="764"
-              fetchpriority="high"
-              decoding="async"
-            />
+            {/* AVIF 65 kB / WebP 91 kB / JPEG 174 kB, same 1400px image. The
+                photo is cropped by object-fit: cover into a near-square box on
+                phones, so phones need the full width; the saving is the format. */}
+            <picture>
+              <source type="image/avif" srcSet="/images/image1.avif" />
+              <source type="image/webp" srcSet="/images/image1.webp" />
+              <img
+                ref={photo}
+                src="/images/image1.jpg"
+                alt="A phlebotomist taking a blood sample from a seated patient in her own living room"
+                width="1400" height="764"
+                fetchpriority="high"
+                decoding="async"
+              />
+            </picture>
           </div>
           <LiveCard />
         </div>
@@ -191,18 +211,22 @@ export default function Home() {
   const bar = useRef(null);
   useScrollProgress(bar);
 
+  // false on the server and in the hydration pass (so they match), true
+  // straight after: the lazy chunk then loads and renders.
+  const [rest, setRest] = useState(false);
+  useEffect(() => setRest(true), []);
+
   return (
     <div className="lp">
       <div className="lp-progress" ref={bar} aria-hidden="true" />
-      <div className="lp-grain" aria-hidden="true" />
       <Nav />
 
       {/* One <main> landmark: everything between the nav and the footer. */}
       <main>
         <Hero />
-        {/* min-height keeps the footer from jumping up while the chunk loads */}
+        {/* min-height keeps the footer below the fold until the chunk renders */}
         <Suspense fallback={<div className="lp-fold-wait" />}>
-          <BelowFold />
+          {rest ? <BelowFold /> : <div className="lp-fold-wait" />}
         </Suspense>
       </main>
 

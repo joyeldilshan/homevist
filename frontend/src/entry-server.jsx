@@ -8,9 +8,11 @@ import AppShell from "./AppShell";
  * Build-time render of one URL to an HTML string. Used only by
  * scripts/prerender.mjs; never shipped to the browser.
  *
- * onAllReady waits for lazy chunks (the landing's below-the-fold
- * sections), so the whole page is in the HTML, not a Suspense fallback.
- * Must render the same tree as main.jsx, or hydration fails.
+ * onAllReady waits for every Suspense boundary to settle, so the output
+ * is complete HTML with no streaming scripts. (The landing's
+ * below-the-fold chunk is mounted only after hydration, by design; see
+ * pages/Home.jsx.) Must render the same tree as main.jsx, or hydration
+ * fails.
  */
 export function render(url) {
   return new Promise((resolve, reject) => {

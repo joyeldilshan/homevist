@@ -23,6 +23,8 @@
         var keep = p === "/" || p === "/home";
         try { if (sessionStorage.getItem("token") && sessionStorage.getItem("user")) keep = false; } catch (e) {}
         if (!keep) document.documentElement.setAttribute("data-noshell", "");
+        // The storage notice is in the HTML; hide it now if already dismissed.
+        try { if (localStorage.getItem("hv-storage-notice-dismissed")) document.documentElement.setAttribute("data-notice-off", ""); } catch (e) {}
         if (p === "/login" || p === "/register") {
           var l = document.createElement("link");
           l.rel = "preload"; l.as = "image"; l.href = "/images/image%204.jpg";
@@ -31,7 +33,7 @@
         }
       })();
     </script>
-    <style>[data-noshell] #root { visibility: hidden; }</style>
+    <style>[data-noshell] #root { visibility: hidden; } [data-notice-off] .hv-storage-notice { display: none; }</style>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <!--

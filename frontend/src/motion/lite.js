@@ -133,11 +133,14 @@ export function useReveal(scopeRef) {
     const vh = window.innerHeight;
     const pending = new Set();
 
-    for (const el of scope.querySelectorAll("[data-reveal]")) {
-      if (el.getBoundingClientRect().top > vh * 0.92) {
-        el.classList.add("rv-wait");
-        pending.add(el);
-      }
+    // Read every position first, then write every class. Interleaving a
+    // read with a class change forced a full layout per element (~30 of
+    // them on the landing page) during hydration.
+    const all = [...scope.querySelectorAll("[data-reveal]")];
+    const below = all.filter((el) => el.getBoundingClientRect().top > vh * 0.92);
+    for (const el of below) {
+      el.classList.add("rv-wait");
+      pending.add(el);
     }
     if (!pending.size) return;
 

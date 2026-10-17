@@ -155,7 +155,20 @@ Add every backend variable above as an environment variable. Set
 | Output directory | `dist` |
 
 Set `VITE_API_URL` to `https://your-service.onrender.com/api`.
-`vercel.json` already rewrites all routes to `index.html` for client-side routing.
+`npm run build` also pre-renders the landing page: the hero is in
+`dist/index.html` and paints before the JavaScript runs, then hydrates.
+`vercel.json` serves that file for `/` and `/home`, and `dist/app.html` (the
+same shell, empty) for every other route, so other pages never download the
+landing markup. `vite preview` applies the same rule (see `vite.config.js`).
+
+Checks for the landing page, against `npm run build` + `npx vite preview`,
+never the dev server (all write to the gitignored `docs/`):
+
+| Script | What it checks |
+|---|---|
+| `node scripts/smoke-routes.mjs` | Every public route loads with no console errors (so no hydration mismatch); the landing hydrates instead of re-rendering; no other route shows landing markup; a signed-in visitor on `/` goes to their dashboard |
+| `node scripts/landing-capture.mjs [--video] [--reduced]` | Section and full-page screenshots at 1440 and 390 after scrolling, content stuck invisible, overflow, console errors; `--video` records a 25 s scroll |
+| `node scripts/lighthouse.mjs` | Lighthouse 13.5 on `/`, `/login`, `/register`; refuses to run against the dev server |
 
 **Deploy order:** backend first, so you have its URL for `VITE_API_URL`; then the
 frontend; then go back and set `CLIENT_URL` on Render to the Vercel URL.
@@ -296,12 +309,14 @@ any real patient result is reported.
 
 ### Known issues
 
-- **Bundle size.** The frontend builds to ~641 kB in one chunk, over Vite's
-  500 kB warning. Route-level code splitting is the fix and has not been done.
+- **Bundle size.** Routes are split; the landing page's first chunk is 252 kB
+  (85 kB gzip), with its below-the-fold sections in a separate 17 kB chunk.
 - **Dependency advisories.** See the dedicated section below.
-- **No automated frontend tests.** The 52 tests cover backend validators,
-  formatters, rate limiting, the seed guard and the startup database guard.
-- **Images.** 1.1 MB total; `image 5.png` is 660 kB for a logo shown at 54 px.
+- **Test coverage.** 52 backend tests (validators, formatters, rate limiting,
+  the seed guard, the startup database guard) and 27 frontend tests (render
+  smoke tests for every page, the landing's copy and numbers, the legal pages).
+- **Images.** The hero ships as AVIF/WebP with a JPEG fallback. `image 5.png`
+  (660 kB, an old logo with "HOME VISIT MOBILE LAB" baked in) is no longer used.
 
 ---
 

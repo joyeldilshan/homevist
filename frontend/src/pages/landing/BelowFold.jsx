@@ -461,9 +461,14 @@ function Faq() {
 
 /* ── Final call to action ──────────────────────────────────────── */
 function Cta() {
+  // The spinning border and floating shapes loop forever; run them only
+  // while the card is on screen. Off-screen they were measurable main-
+  // thread work on a throttled phone for something nobody could see.
+  const ref = useRef(null);
+  const onScreen = useInView(ref, "100px");
   return (
     <section id="contact" className="wrap lp-sec">
-      <div className="lp-cta" data-reveal="scale">
+      <div className={onScreen ? "lp-cta is-on" : "lp-cta"} ref={ref} data-reveal="scale">
         <div className="lp-cta-in">
           <div className="lp-shapes" aria-hidden="true">
             <span className="s1" /><span className="s2" /><span className="s3" /><span className="s4" />

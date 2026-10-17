@@ -16,7 +16,7 @@ const BASE    = (process.env.BASE_URL || "http://localhost:4173").replace(/\/$/,
 const VIDEO   = process.argv.includes("--video");
 const REDUCED = process.argv.includes("--reduced");
 const OUT     = path.resolve("../docs/screenshots", "landing-v2" + (REDUCED ? "-reduced" : ""));
-const SCROLL_MS = 27000;   // recording length target: 25-30 s
+const SCROLL_MS = 25000;   // recording: ~1.5 s settle + 25 s scroll + 1 s hold
 
 const SIZES = [
   { tag: "1440", width: 1440, height: 900, mobile: false },
@@ -28,17 +28,50 @@ await mkdir(OUT, { recursive: true });
 const browser = await chromium.launch();
 let problems = 0;
 
+/** Linear scroll top -> bottom over `ms`. */
+const scrollThrough = (page, ms) => page.evaluate(async (ms) => {
+  document.documentElement.style.scrollBehavior = "auto";
+  const start = performance.now();
+  await new Promise((done) => {
+    const tick = (now) => {
+      const t = Math.min((now - start) / ms, 1);
+      scrollTo(0, Math.round((document.documentElement.scrollHeight - innerHeight) * t));
+      t < 1 ? requestAnimationFrame(tick) : done();
+    };
+    requestAnimationFrame(tick);
+  });
+}, ms);
+
+const contextFor = (s, extra = {}) => browser.newContext({
+  viewport: { width: s.width, height: s.height },
+  deviceScaleFactor: 1,
+  isMobile: s.mobile, hasTouch: s.mobile,
+  reducedMotion: REDUCED ? "reduce" : "no-preference",
+  ...extra,
+});
+const dismissNotice = () => { try { localStorage.setItem("hv-storage-notice-dismissed", "1"); } catch {} };
+
+/* Recordings: their own context, so the file holds only load + scroll. */
+if (VIDEO) {
+  for (const s of SIZES) {
+    const ctx = await contextFor(s, { recordVideo: { dir: OUT, size: { width: s.width, height: s.height } } });
+    await ctx.addInitScript(dismissNotice);
+    const page = await ctx.newPage();
+    await page.goto(BASE + "/", { waitUntil: "domcontentloaded" });
+    await page.waitForTimeout(1500);           // the hero intro plays on camera
+    await scrollThrough(page, SCROLL_MS);
+    await page.waitForTimeout(1000);
+    const video = page.video();
+    await ctx.close();
+    await video.saveAs(path.join(OUT, `scroll-${s.tag}.webm`));
+    await rm(await video.path(), { force: true }).catch(() => {});   // drop the random-named copy
+    console.log(`recorded scroll-${s.tag}.webm`);
+  }
+}
+
 for (const s of SIZES) {
-  const ctx = await browser.newContext({
-    viewport: { width: s.width, height: s.height },
-    deviceScaleFactor: 1,
-    isMobile: s.mobile, hasTouch: s.mobile,
-    reducedMotion: REDUCED ? "reduce" : "no-preference",
-    ...(VIDEO ? { recordVideo: { dir: OUT, size: { width: s.width, height: s.height } } } : {}),
-  });
-  await ctx.addInitScript(() => {
-    try { localStorage.setItem("hv-storage-notice-dismissed", "1"); } catch {}
-  });
+  const ctx = await contextFor(s);
+  await ctx.addInitScript(dismissNotice);
   const page = await ctx.newPage();
   const errors = [];
   page.on("console", (m) => { if (m.type() === "error") errors.push(m.text().slice(0, 200)); });
@@ -47,20 +80,8 @@ for (const s of SIZES) {
   await page.goto(BASE + "/", { waitUntil: "networkidle" });
   await page.waitForTimeout(2200);   // let the hero intro finish
 
-  // Slow, linear scroll top -> bottom. Recorded when --video is set.
-  await page.evaluate(async (ms) => {
-    document.documentElement.style.scrollBehavior = "auto";
-    const start = performance.now();
-    await new Promise((done) => {
-      const tick = (now) => {
-        const t = Math.min((now - start) / ms, 1);
-        const max = document.documentElement.scrollHeight - innerHeight;
-        scrollTo(0, Math.round(max * t));
-        t < 1 ? requestAnimationFrame(tick) : done();
-      };
-      requestAnimationFrame(tick);
-    });
-  }, VIDEO ? SCROLL_MS : 6000);
+  // Scroll through once so every reveal fires before the checks.
+  await scrollThrough(page, 6000);
   await page.waitForTimeout(1200);
 
   // Anything still invisible after the scroll is a bug.
@@ -83,12 +104,7 @@ for (const s of SIZES) {
   }
 
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
-  const video = page.video();
   await ctx.close();
-  if (video) {
-    await video.saveAs(path.join(OUT, `scroll-${s.tag}.webm`));
-    await rm(await video.path(), { force: true }).catch(() => {});   // drop the random-named copy
-  }
 
   const bad = errors.length + hidden.length + (overflow ? 1 : 0);
   problems += bad;
