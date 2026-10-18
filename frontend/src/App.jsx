@@ -1,6 +1,7 @@
 import { lazy, Suspense } from "react";
-import { Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "./context/AuthContext";
+import { DASHBOARDS, dashboardFor } from "./utils/returnTo";
 import StorageNotice   from "./components/StorageNotice";
 import ServerWaking    from "./components/ServerWaking";
 
@@ -31,14 +32,6 @@ const Privacy         = lazy(() => import("./pages/Privacy"));
 const Terms           = lazy(() => import("./pages/Terms"));
 const NotFound        = lazy(() => import("./pages/NotFound"));
 
-// Maps each role to its dashboard path. Unknown roles → null (no redirect).
-const DASHBOARDS = {
-  user:         "/user",
-  phlebotomist: "/phlebotomist",
-  admin:        "/admin",
-  mlt:          "/mlt",
-};
-
 // Shown while a page's chunk loads. Same paper ground and brand dot as
 // the pages themselves (it used to be a near-black screen with an emoji).
 function Loading() {
@@ -53,17 +46,24 @@ function Loading() {
 
 function RoleRoute({ children, role }) {
   const { user, loading } = useAuth();
+  const location = useLocation();
   if (loading) return <Loading />;
-  if (!user)              return <Navigate to="/login" replace />;
+  // Remember where they were going (e.g. the report email's link to
+  // /user?tab=reports) so sign-in can return them there.
+  if (!user)              return <Navigate to="/login" replace state={{ from: location }} />;
   if (user.role !== role) return <Navigate to="/login" replace />;
   return children;
 }
 
 export default function App() {
   const { user, loading } = useAuth();
+  const location = useLocation();
   if (loading) return <Loading />;
 
+  // Maps each role to its dashboard path. Unknown roles → null (no redirect).
   const dash = user ? DASHBOARDS[user.role] : null;
+  // After signing in on /login: back to the dashboard link they opened.
+  const afterSignIn = user ? dashboardFor(user.role, location.state?.from) : null;
 
   return (
     <>
@@ -73,8 +73,8 @@ export default function App() {
         <Route path="/" element={ dash ? <Navigate to={dash} replace /> : <Home /> } />
 
         <Route path="/home"     element={<Home />} />
-        <Route path="/login"    element={ dash ? <Navigate to={dash} replace /> : <AuthPage /> } />
-        <Route path="/register" element={ dash ? <Navigate to={dash} replace /> : <AuthPage /> } />
+        <Route path="/login"    element={ dash ? <Navigate to={afterSignIn} replace /> : <AuthPage /> } />
+        <Route path="/register" element={ dash ? <Navigate to={afterSignIn} replace /> : <AuthPage /> } />
 
         {/* Public — reachable while signed out and while signed in */}
         <Route path="/privacy" element={<Privacy />} />

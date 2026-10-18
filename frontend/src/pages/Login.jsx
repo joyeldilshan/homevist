@@ -1,6 +1,7 @@
 import { useState, useRef } from "react";
 import { useNavigate, useLocation, Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { dashboardFor } from "../utils/returnTo";
 import toast from "react-hot-toast";
 import { isValidUkPhone, normaliseUkPhone, PHONE_MESSAGE, isValidPassword, PASSWORD_MESSAGE, PASSWORD_MIN } from "../utils/validators";
 import locale from "../config/locale";
@@ -22,7 +23,8 @@ import { DEMO_MODE, DEMO_PASSWORD, DEMO_ACCOUNTS } from "../config/demo";
  */
 export default function AuthPage() {
   const navigate = useNavigate();
-  const { pathname } = useLocation();
+  const location = useLocation();
+  const { pathname } = location;
   const { login, register } = useAuth();
   // /login and /register share this component. It used to hard-code true,
   // so /register opened on "Welcome back." with the sign-in form — the one
@@ -77,10 +79,7 @@ export default function AuthPage() {
     try {
       const user = await login(lForm.email, lForm.password);
       toast.success(`Welcome back, ${user.name.split(" ")[0]}!`);
-      if      (user.role==="admin")        navigate("/admin");
-      else if (user.role==="phlebotomist") navigate("/phlebotomist");
-      else if (user.role==="mlt")          navigate("/mlt");
-      else                                  navigate("/user");
+      navigate(dashboardFor(user.role, location.state?.from), { replace: true });
     } catch (err) { toast.error(err.response?.data?.message || "Invalid credentials."); }
     finally { setLoading(false); }
   };
@@ -107,10 +106,7 @@ export default function AuthPage() {
     try {
       const user = await login(account.email, DEMO_PASSWORD);
       toast.success(`Signed in as ${account.label}`);
-      if      (user.role==="admin")        navigate("/admin");
-      else if (user.role==="phlebotomist") navigate("/phlebotomist");
-      else if (user.role==="mlt")          navigate("/mlt");
-      else                                  navigate("/user");
+      navigate(dashboardFor(user.role, location.state?.from), { replace: true });
     } catch (err) {
       toast.error(
         err.response?.data?.message ||
@@ -136,7 +132,7 @@ export default function AuthPage() {
         privacyPolicyAccepted: true,
       });
       toast.success(`Welcome, ${user.name.split(" ")[0]}!`);
-      navigate("/user");
+      navigate(dashboardFor("user", location.state?.from), { replace: true });
     } catch (err) { toast.error(err.response?.data?.message || "Registration failed."); }
     finally { setLoading(false); }
   };

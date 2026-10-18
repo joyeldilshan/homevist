@@ -107,7 +107,8 @@ exports.getReports = async (req, res, next) => {
 
 /**
  * PATCH /api/reports/:id/send
- * Emails the stored PDF to the patient as an attachment.
+ * Emails the patient that their report is ready, with a link to the
+ * signed-in reports page. The PDF is not attached.
  */
 exports.sendReport = async (req, res, next) => {
   try {
@@ -123,18 +124,20 @@ exports.sendReport = async (req, res, next) => {
       return res.status(400).json({ success: false, message: "Patient has no email on file." });
     }
 
-    const tests    = report.sample?.testTypes?.map(t => t.name).join(", ") || "—";
+    // The email promises a download, so the file must be there (it can be
+    // lost, e.g. on a host whose disk is wiped on deploy).
     const filePath = pathFor(storedNameOf(report));
+    if (!filePath || !fs.existsSync(filePath)) {
+      return res.status(409).json({ success: false, message: "The report file is missing. Upload the PDF again, then send." });
+    }
 
+    // A notification with a link to the signed-in reports page; the PDF is
+    // not attached (it is downloaded through the authenticated route).
     await sendReportToPatient({
       to:          report.patient.email,
       patientName: report.patient.name,
       reportId:    report.reportId,
-      sampleId:    report.sample?.sampleId,
       bookingId:   report.booking?.bookingId,
-      tests,
-      labComments: report.labComments,
-      filePath,                 // attach the actual stored PDF
     });
 
     report.status        = "completed";

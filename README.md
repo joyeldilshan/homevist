@@ -354,8 +354,11 @@ Report PDFs are patient health data and are **not public**.
   from `crypto.randomBytes`. Nothing the uploader sends reaches the path, and
   every lookup is checked to stay inside the folder (`utils/reportFiles.js`).
 - `fileUrl` in API responses is now always `/api/reports/<id>/file` (relative
-  to the API's origin). The frontend downloads with the user's token; the
-  report email attaches the PDF and links to the sign-in page, never to a file.
+  to the API's origin). The frontend downloads with the user's token. The
+  report email is a notification only: no PDF attached and no results, tests
+  or lab comments in it, just a link to the signed-in reports page
+  (`/user?tab=reports`; a signed-out patient signs in first and returns
+  there). Sending is refused (409) if the report's file is missing.
 
 **Before this change** the folder was served publicly at `/uploads/...` and file
 names were a timestamp plus `Math.random()`. If you deployed that version:

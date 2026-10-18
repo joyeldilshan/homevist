@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { useBookingSocket } from "../../hooks/useSocket";
 import api from "../../utils/api";
+import { tabFromSearch } from "../../utils/returnTo";
 import toast from "react-hot-toast";
 import { formatMoney, formatDate, formatLongDate } from "../../utils/format";
 import { isValidUkPostcode, normaliseUkPostcode, isInServiceArea, outOfAreaMessage, POSTCODE_MESSAGE } from "../../utils/validators";
@@ -35,7 +36,9 @@ const today = () => new Date().toISOString().split("T")[0];
 export default function UserDashboard() {
   const { user, logout, updateUser } = useAuth();
   const navigate = useNavigate();
-  const [tab,        setTab]        = useState("home");
+  const { search } = useLocation();
+  // ?tab=reports opens that tab (the report email links there).
+  const [tab,        setTab]        = useState(() => tabFromSearch(search, NAV.map((n) => n.id), "home"));
   const [bookings,   setBookings]   = useState([]);
   const [reports,    setReports]    = useState([]);
   const [tests,      setTests]      = useState([]);

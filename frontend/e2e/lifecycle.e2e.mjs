@@ -291,6 +291,18 @@ test("full booking lifecycle across patient, admin, phlebotomist and lab", { tim
     assert.equal((await fetch(`${origin}/uploads/reports/x.pdf`)).status, 404);
   });
 
+  await t.test("the report email's link: signed out, sign in, land on My reports", async () => {
+    // The email carries no PDF, only a link to /user?tab=reports.
+    const page = await (await context()).newPage();
+    await page.goto(`${FRONT}/user?tab=reports`);
+    await page.waitForURL(`${FRONT}/login`);
+    await page.getByLabel("Email address").fill(people.patient.email);
+    await page.getByLabel("Password", { exact: true }).fill(people.patient.password);
+    await page.getByRole("button", { name: /^Sign in/ }).click();
+    await page.waitForURL(`${FRONT}/user?tab=reports`);
+    await page.locator(".db-card").filter({ hasText: `Booking ${bookingId}` }).getByRole("button", { name: "Download report" }).waitFor();
+  });
+
 });
 
 /* ── access and session checks ────────────────────────────────────── */
