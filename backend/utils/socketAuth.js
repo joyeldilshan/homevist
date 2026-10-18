@@ -13,8 +13,10 @@
  * A refused join is silently ignored, like a booking ID that does not
  * exist, so nothing is revealed about other people's bookings.
  *
- * Limit: a socket keeps the identity it connected with; an account
- * deactivated while connected stays in its rooms until it disconnects.
+ * Each socket also sits in a private room for its own user, so that when
+ * an admin deactivates an account every open socket of that user is
+ * dropped at once (disconnectUser). Reconnecting is then refused, because
+ * the account is inactive.
  */
 const jwt     = require("jsonwebtoken");
 const User    = require("../models/User");
@@ -22,6 +24,7 @@ const Booking = require("../models/Booking");
 const logger  = require("./logger");
 
 const refuse = () => new Error("Not authorised.");
+const userRoom = (id) => `user:${id}`;
 
 async function authenticateSocket(socket, next) {
   try {
@@ -52,6 +55,7 @@ function registerSocketHandlers(io) {
   io.on("connection", (socket) => {
     const user = socket.data.user;
     logger.debug("Socket connected:", socket.id);
+    socket.join(userRoom(user._id));
     socket.on("join_booking", async (bookingId) => {
       try { if (await canJoinBooking(user, bookingId)) socket.join(bookingId); }
       catch (e) { logger.error("Socket join error:", e.message); }
@@ -61,4 +65,9 @@ function registerSocketHandlers(io) {
   });
 }
 
-module.exports = { authenticateSocket, canJoinBooking, registerSocketHandlers };
+/** Drop every open socket of this user now (deactivated or removed). */
+function disconnectUser(io, userId) {
+  if (io && userId) io.in(userRoom(String(userId))).disconnectSockets(true);
+}
+
+module.exports = { authenticateSocket, canJoinBooking, registerSocketHandlers, disconnectUser };

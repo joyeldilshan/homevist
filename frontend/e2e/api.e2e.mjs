@@ -50,6 +50,8 @@ before(async () => {
   await make("patA",   "user",         "07700 900206");
   await make("patB",   "user",         "07700 900207");
   await make("legacy", "user",         "07700 900208", db.legacyPassword());
+  await make("phleb3", "phlebotomist", "07700 900209");   // deactivated by PATCH
+  await make("phleb4", "phlebotomist", "07700 900210");   // deactivated by DELETE
 });
 
 after(async () => {
@@ -348,4 +350,33 @@ test("sockets: the owner hears their booking, the admin hears new bookings", asy
   assert.equal((await ownerHears)?.status, "cancelled");
   assert.ok(await adminHears, "admin hears new bookings");
   owner.s.close(); admin.s.close();
+});
+
+test("sockets: deactivating an account drops its open sockets at once, and it cannot reconnect", async () => {
+  const dropped = (s) => new Promise((resolve) => {
+    const t = setTimeout(() => resolve(null), 5000);
+    s.once("disconnect", (reason) => { clearTimeout(t); resolve(reason); });
+  });
+  const bystander = await connect(U.phleb.token);
+  opened.push(bystander.s);
+  assert.ok(bystander.ok);
+
+  for (const [key, how] of [
+    ["phleb3", () => req("PATCH",  `/phlebotomists/${U.phleb3.id}`, { token: U.admin.token, body: { isActive: false } })],
+    ["phleb4", () => req("DELETE", `/phlebotomists/${U.phleb4.id}`, { token: U.admin.token })],
+  ]) {
+    // Two tabs: both must go.
+    const tabs = [await connect(U[key].token), await connect(U[key].token)];
+    tabs.forEach((t) => opened.push(t.s));
+    assert.ok(tabs.every((t) => t.ok), `${key} connects while active`);
+    const gone = tabs.map((t) => dropped(t.s));
+    assert.equal((await how()).status, 200);
+    // "io server disconnect" = the server ended it (not a timeout or the client).
+    for (const reason of await Promise.all(gone)) assert.equal(reason, "io server disconnect", `${key}'s socket was not dropped`);
+    const again = await connect(U[key].token);
+    opened.push(again.s);
+    assert.equal(again.ok, false, `${key} reconnected after deactivation`);
+  }
+  assert.ok(bystander.s.connected, "another user's socket was dropped too");
+  bystander.s.close();
 });

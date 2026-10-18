@@ -334,9 +334,10 @@ log only). Behaviour changes for API clients, all from the authorization audit:
 **Real-time (Socket.io).** A socket must send the same JWT as the API
 (`io(origin, { auth: { token } })`) for an active account, or it is refused.
 `join_booking` is honoured only for the booking's patient, its assigned
-phlebotomist or an admin; `join_admin` only for admins. A socket keeps the
-identity it connected with, so an account deactivated mid-session stays in its
-rooms until it disconnects.
+phlebotomist or an admin; `join_admin` only for admins. When an admin
+deactivates an account (`PATCH /api/phlebotomists/:id` with `isActive: false`,
+or `DELETE /api/phlebotomists/:id`), every open socket of that user is closed
+at once, and reconnecting is refused.
 
 ### Report files (patient PDFs)
 

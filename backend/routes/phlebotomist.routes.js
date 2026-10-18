@@ -3,6 +3,7 @@ const router   = express.Router();
 const User     = require("../models/User");
 const { protect, authorize } = require("../middleware/auth.middleware");
 const { isValidUkPhone, PHONE_MESSAGE, isValidPassword, PASSWORD_MESSAGE } = require("../utils/validators");
+const { disconnectUser } = require("../utils/socketAuth");
 
 // GET /api/phlebotomists — admin gets all phlebotomists
 router.get("/", protect, authorize("admin"), async (req, res, next) => {
@@ -55,6 +56,8 @@ router.patch("/:id", protect, authorize("admin"), async (req, res, next) => {
     // (a patient, another admin, the caller).
     const phlebo = await User.findOneAndUpdate({ _id:req.params.id, role:"phlebotomist" }, updates, { new:true, runValidators:true });
     if (!phlebo) return res.status(404).json({ success:false, message:"Phlebotomist not found." });
+    // Deactivated: end their real-time connections now, not at next reconnect.
+    if (phlebo.isActive === false) disconnectUser(req.io, phlebo._id);
     res.json({ success:true, phlebotomist: phlebo });
   } catch (err) { next(err); }
 });
@@ -65,6 +68,7 @@ router.delete("/:id", protect, authorize("admin"), async (req, res, next) => {
     // Same: phlebotomists only, and a missing ID is a 404, not a success.
     const phlebo = await User.findOneAndUpdate({ _id:req.params.id, role:"phlebotomist" }, { isActive:false });
     if (!phlebo) return res.status(404).json({ success:false, message:"Phlebotomist not found." });
+    disconnectUser(req.io, phlebo._id);
     res.json({ success:true, message:"Phlebotomist deactivated." });
   } catch (err) { next(err); }
 });
