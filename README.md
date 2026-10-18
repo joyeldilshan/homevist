@@ -67,6 +67,7 @@ the database name, never the URI or password. The check lives in
 | `npm start` | Start the backend |
 | `npm test` | Backend test suite (61 tests) |
 | `npm run seed` | Seed sample data — **guarded, see below** |
+| `npm run create-user` | Create one admin or lab technician account, safe in production — see below |
 | `npm run audit` | `npm audit` on both packages |
 
 ---
@@ -235,6 +236,32 @@ fictional accounts and six test types. Three gates run *before* it connects:
 
 Passwords are never stored in the repository. Set `SEED_*_PASSWORD` to choose
 them, or let the script generate and print them once.
+
+### Creating admin and lab technician accounts
+
+The admin dashboard creates phlebotomists, but not admins or lab technicians,
+and the seed must never run against a real database. Use:
+
+```bash
+cd backend
+npm run create-user
+```
+
+It prints the database name (never the URI) and you must type that name to
+continue. Then it asks for the role (`admin` or `mlt`), name, email, a UK phone
+number (required on every account) and the password twice, typed **with echo
+off** and checked with the same rule as registration. It:
+
+- applies the server's database guard: outside `NODE_ENV=production` the
+  database name must look like a development one; in production it runs
+  against the production database, which is how you create the first admin;
+- only creates: an email that already has an account is refused and that
+  account is left untouched;
+- never prints or logs the password (it is stored only as the bcrypt hash);
+- refuses to run without an interactive terminal.
+
+On Render, run it from the service's Shell; see
+[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md), step 6.
 
 ---
 

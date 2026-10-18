@@ -12,6 +12,7 @@
     "start": "npm --prefix backend start",
     "test": "npm --prefix backend test",
     "seed": "npm --prefix backend run seed",
+    "create-user": "npm --prefix backend run create-user",
     "audit": "npm --prefix backend audit && npm --prefix frontend audit"
   },
   "devDependencies": {

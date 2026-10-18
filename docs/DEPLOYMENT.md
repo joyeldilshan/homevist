@@ -194,18 +194,29 @@ node utils/migrateReportFiles.js --apply   # copy -> verify -> record -> delete 
 
 ## 6. Create the first accounts
 
-The seed is for development and refuses to run in production. The admin
-dashboard can create **test types, plans and phlebotomists**, but not admins
-or lab technicians, and there is no script for them yet. Until there is, the
-supported route is:
+The seed is for development: it refuses to run in production and deletes
+every user. The admin dashboard creates **test types, plans and
+phlebotomists**. **Admins and lab technicians** are created with
+`npm run create-user`, which is safe to run against production.
 
-- [ ] Register normally on the live site for the first admin (this creates a
-      patient account).
-- [ ] In Atlas → Browse Collections → `users`, change that account's `role`
-      from `user` to `admin`. Do the same for each lab technician with `mlt`.
+- [ ] In Render → the service → **Shell**:
+      ```bash
+      cd /opt/render/project/src/backend        # or wherever `pwd` showed in step 2b
+      npm run create-user
+      ```
+      It prints the database name (never the URI) and asks you to type that
+      name to continue. Then it asks for the role (`admin` or `mlt`), full
+      name, email, a UK phone number (the account record requires one) and
+      the password twice. The password is typed **with echo off**, must be at
+      least 8 characters with a letter and a number, and is never printed or
+      logged.
+- [ ] It only creates. An email that already has an account is refused and
+      that account is left as it was, so you cannot overwrite or demote
+      anyone with it. Run it once per admin or lab technician.
+- [ ] It needs an interactive terminal (the Render Shell is one). Piped or
+      scripted input is refused.
 - [ ] Sign in as the admin. Create the test catalogue (real, clinician-approved
-      parameters and prices), any plans, and the phlebotomist accounts. New
-      passwords must be at least 8 characters with a letter and a number.
+      parameters and prices), any plans, and the phlebotomist accounts.
 
 ---
 
@@ -241,6 +252,9 @@ persistent disk at `.../backend/uploads`.
 
 **Vercel (frontend):** `VITE_API_URL=https://<service>.onrender.com/api`;
 leave `VITE_DEMO_MODE` and `VITE_DEMO_PASSWORD` unset.
+
+**Once, for the first admin (and each lab technician):** `npm run create-user`
+in the Render Shell, from `backend/`.
 
 **Once, after the first deploy of this version on a server that already had
 reports:** `node utils/migrateReportFiles.js`, then
