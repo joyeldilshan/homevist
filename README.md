@@ -121,6 +121,9 @@ means editing those three places to accept an array.
 
 ## Deployment
 
+**Step-by-step checklist, with every environment variable explained:
+[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).** The sections below are a summary.
+
 ### Database — MongoDB Atlas
 
 1. Create a free M0 cluster.
