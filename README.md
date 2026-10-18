@@ -426,15 +426,47 @@ any real patient result is reported.
   gzip). The landing page adds its own 14 kB of JS and 33 kB of CSS (7 kB gzip),
   which no other page downloads, plus a 17 kB below-the-fold chunk.
 - **Dependency advisories.** See the dedicated section below.
-- **Test coverage.** 61 backend tests (validators, formatters, rate limiting,
-  the seed and startup database guards, email mock mode, the sender address),
-  29 frontend tests (render tests for every page, the landing's copy and
-  numbers, the legal pages, the socket URL), and a 20-step end-to-end suite
-  across all four roles (see above).
+- **Test coverage.** 79 backend tests (validators, formatters, rate limiting,
+  the seed and startup database guards, email mock mode and the report
+  notification, the sender address, the report generator and report files,
+  the error handler, socket disconnects), 33 frontend tests (render tests for
+  every page, the landing's copy and numbers, the legal pages, the socket URL,
+  sign-in return links), a 21-step browser end-to-end suite across all four
+  roles, and 23 API authorization tests (see above).
 - **Images.** The hero ships as AVIF/WebP with a JPEG fallback. `image 5.png`
   (660 kB, an old logo with "HOME VISIT MOBILE LAB" baked in) is no longer used.
 
 ---
+
+## Known limitations
+
+These are true of the code as it stands. Each needs a decision or work before
+real patients use the service.
+
+- **Report files need a persistent disk or object storage in production.**
+  Uploaded PDFs are written to `backend/uploads/reports` on the server's local
+  disk. Render's default disk is wiped on every deploy and restart, so without
+  a persistent disk mounted there (or a move to object storage) every uploaded
+  report is lost. A report whose file is gone cannot be sent (409) or
+  downloaded (404). Before it is sent the lab can upload it again; once it has
+  been sent the sample is completed and the app accepts no new upload, so the
+  file has to be restored to the disk from a backup. See
+  [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
+- **Seed reference ranges are unreviewed by a clinician.** The test catalogue
+  created by `npm run seed` (parameters, units, reference ranges, preparation
+  and turnaround) has not been checked by a qualified person; see
+  [CLINICAL_REVIEW.md](CLINICAL_REVIEW.md). Nothing in the app shows these
+  ranges to patients, and the PDF generator prints only results the lab enters.
+- **One shared laboratory is assumed.** Every lab technician account sees the
+  whole sample queue and every report, and any of them can send a report.
+  Downloading a report's file is limited to the technician on that report. If
+  you run more than one laboratory, samples and technicians need a lab field
+  and the queries need to filter by it.
+- **Dependency advisories are pending major upgrades.** Vite and Tailwind
+  (build tools, not shipped to users) need major-version upgrades to clear
+  their advisories. In what does ship, `nodemailer` (one **high**),
+  `node-cron`, `qs` (via Express 4) and `react-router` also need majors. Details
+  and the suggested order are in the next section.
 
 ---
 
