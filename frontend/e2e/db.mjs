@@ -82,6 +82,16 @@ export async function counts() {
   };
 }
 
+/** Delete a report's PDF as a wiped disk would (this run's reports only). */
+export async function deleteReportFile(reportId) {
+  const users = await User.find({ email: RUN_EMAIL }).select("_id");
+  const r = await LabReport.findOne({ _id: reportId, patient: { $in: users.map((u) => u._id) } }).select("fileName fileUrl");
+  const file = r && pathFor(storedNameOf(r));
+  if (!file || !fs.existsSync(file)) return false;
+  fs.unlinkSync(file);
+  return true;
+}
+
 export async function cleanup() {
   const users = await User.find({ email: RUN_EMAIL }).select("_id");
   const ids = users.map((u) => u._id);

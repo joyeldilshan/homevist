@@ -182,7 +182,10 @@ exports.downloadReport = async (req, res, next) => {
 
     const full = pathFor(storedNameOf(report));
     if (!full || !fs.existsSync(full)) {
-      return res.status(404).json({ success: false, message: "The report file is missing. Ask the laboratory to upload it again." });
+      // Not "ask the lab to upload it again": once a report has been sent
+      // the sample is completed and uploads are closed, so only an admin
+      // (restoring the file) can fix it.
+      return res.status(404).json({ success: false, message: "This report file is not available. Please contact the administrator." });
     }
     res.set({
       "Content-Type":           "application/pdf",

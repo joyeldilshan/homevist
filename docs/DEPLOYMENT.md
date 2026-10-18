@@ -238,7 +238,7 @@ phlebotomists**. **Admins and lab technicians** are created with
       `<CLIENT_URL>/user?tab=reports`. Following it signed out leads to
       sign-in, then to the patient's reports. Download the PDF.
 - [ ] Redeploy the backend, then download the same report again. If it now
-      says the file is missing, the persistent disk is not mounted at the
+      says the file is not available, the persistent disk is not mounted at the
       uploads folder (step 2b).
 - [ ] Remove the test patient's data afterwards, or keep a clearly named test
       account.

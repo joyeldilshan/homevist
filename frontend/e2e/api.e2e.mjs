@@ -380,3 +380,14 @@ test("sockets: deactivating an account drops its open sockets at once, and it ca
   assert.ok(bystander.s.connected, "another user's socket was dropped too");
   bystander.s.close();
 });
+
+test("a sent report whose file was lost: the patient is told to contact the administrator, and uploads stay closed", async () => {
+  assert.equal(await db.deleteReportFile(D.reportA._id), true, "the test report's file existed");
+  const r = await req("GET", `/reports/${D.reportA._id}/file`, { token: U.patA.token });
+  assert.equal(r.status, 404);
+  assert.equal(r.json.message, "This report file is not available. Please contact the administrator.");
+  // Why the message does not say "ask the laboratory to upload it again":
+  assert.equal((await upload(U.mlt.token, D.sampleA._id)).status, 409);
+  // And it cannot be sent again pointing at a missing file.
+  assert.equal((await req("PATCH", `/reports/${D.reportA._id}/send`, { token: U.mlt.token })).status, 409);
+});

@@ -121,7 +121,7 @@ export default function UserDashboard() {
   const reportFor = (b) => reports.find((r) => r.booking?._id === b._id || r.booking?.bookingId === b.bookingId);
   const getReport = async (rep) => {
     try { await downloadReport(rep); }
-    catch (e) { toast.error(e?.response?.status === 404 ? "That report is not available." : "Could not download the report."); }
+    catch (e) { toast.error(e?.response?.status === 404 ? "This report file is not available. Please contact the administrator." : "Could not download the report."); }
   };
   const openReport = (b) => {
     const rep = reportFor(b);
