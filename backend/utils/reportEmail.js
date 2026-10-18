@@ -5,6 +5,7 @@
  * (the download route checks it is theirs).
  */
 const nodemailer = require("nodemailer");
+const { mailFrom } = require("./mailFrom");
 const { formatDate } = require("./format");
 const logger = require("../utils/logger");
 
@@ -92,7 +93,7 @@ exports.sendReportToPatient = async (data) => {
   if (!data.to) throw new Error("No patient email address.");
 
   const mail = {
-    from:    `"HemoVisit Lab 🧬" <${process.env.EMAIL_USER}>`,
+    from:    mailFrom("HemoVisit Lab 🧬"),
     to:      data.to,
     subject: `🧬 Your lab report is ready — ${data.reportId} | HemoVisit`,
     html:    reportTemplate(data),

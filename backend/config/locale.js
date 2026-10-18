@@ -5,14 +5,6 @@
  * without hunting through controllers and components.
  */
 
-/** "HemoVisit <a@b.c>" -> "a@b.c"; "a@b.c" -> "a@b.c"; unset -> fake default. */
-function senderAddress(from) {
-  const v = (from || "").trim();
-  if (!v) return "noreply@example.com";
-  const m = /<([^>]+)>/.exec(v);
-  return m ? m[1].trim() : v;
-}
-
 module.exports = {
   // ── Region ────────────────────────────────────────────────────
   country:        "GB",
@@ -50,10 +42,6 @@ module.exports = {
     addressLine: "[PLACEHOLDER - add registered address]",
     phone:       "[PLACEHOLDER - add contact number]",
     website:     "[PLACEHOLDER - add website]",
-    // Sender address for outgoing email, from EMAIL_FROM ("Name <address>"
-    // or a bare address). The default is deliberately fake: nothing here
-    // should claim a real mailbox or domain the owner has not set up.
-    email:       senderAddress(process.env.EMAIL_FROM),
   },
 
   // ── Test prices ───────────────────────────────────────────────

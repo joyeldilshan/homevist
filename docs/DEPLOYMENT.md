@@ -21,8 +21,10 @@ Decide these first. Each one blocks a later step.
       disk** (a paid instance type) or a move to object storage (code change,
       not done). Without one, every uploaded report is lost at the next deploy.
 - [ ] **An email account to send from.** All patient and staff emails are sent
-      through **Gmail** using `EMAIL_USER` and a Gmail **App Password**
-      (`EMAIL_PASS`). The sender address patients see is that Gmail account.
+      through **Gmail**, signed in as `EMAIL_USER` with a Gmail **App Password**
+      (`EMAIL_PASS`). There is no other mail server setting. The sender
+      address patients see is always that Gmail account; `EMAIL_FROM` only
+      changes the display name next to it.
 - [ ] **The business facts** listed in the README under "Before you go live"
       (registered address, phone, website, real prices, service area). They
       are printed on every PDF report.
@@ -93,8 +95,10 @@ service does not work correctly without it.
 | `TWILIO_ACCOUNT_SID` | no | From Twilio | With `TWILIO_AUTH_TOKEN`, enables SMS status messages to patients and phlebotomists. Blank = SMS **mock mode** (nothing sent). |
 | `TWILIO_AUTH_TOKEN` | no | From Twilio | See above. |
 | `TWILIO_PHONE_NUMBER` | with Twilio | Your Twilio sender number (a UK number for UK recipients) | The SMS sender. |
-| `EMAIL_FROM` | no | `HemoVisit <noreply@yourdomain>` or a bare address | Read by the sender helper in `config/locale.js` and an older email helper, **but none of the emails sent today use it**: they all go out from `EMAIL_USER`. Setting it is harmless. Do not rely on it to change the sender. |
-| `EMAIL_HOST`, `EMAIL_PORT` | no | Leave unset | Used only by an older helper (`utils/notify.js` `sendEmail`) that nothing calls. Real email goes through Gmail regardless. |
+| `EMAIL_FROM` | no | A display name, e.g. `HemoVisit` | The **name** shown as the sender on every email. The address is always `EMAIL_USER`; you cannot send from another address with this. An older `Name <address>` value still works: only the name is used. If it is unset, each email uses its own default name ("HemoVisit 🩸", "HemoVisit Lab 🧬"). |
+
+There is no mail server setting (`EMAIL_HOST`, `EMAIL_PORT` and similar are
+not read by anything): email goes through Gmail.
 
 **Do not set these in production.** They exist for local development, tests
 and the seed:
@@ -104,7 +108,6 @@ and the seed:
 | `ALLOW_NON_DEV_DB` | Lets a **non-production** server connect to a production-looking database. With `NODE_ENV=production` it is not needed. |
 | `SEED_ALLOW_ANY_DB`, `SEED_SKIP_CONFIRM` | Bypass the seed's safety gates. The seed **deletes every user and test type**. |
 | `SEED_ADMIN_PASSWORD`, `SEED_PATIENT_PASSWORD`, `SEED_PHLEBOTOMIST1_PASSWORD`, `SEED_PHLEBOTOMIST2_PASSWORD`, `SEED_LAB_PASSWORD` | Passwords for the seed's fictional accounts. They are used by nothing else. |
-| `SEED_ALLOW_PRODUCTION` | Listed in `backend/.env.example` but **not read by any code**. The seed always refuses under `NODE_ENV=production`. |
 
 ### 2d. First deploy
 
@@ -246,7 +249,7 @@ phlebotomists**. **Admins and lab technicians** are created with
 
 **Render (backend):** `NODE_ENV=production`, `MONGO_URI`, `JWT_SECRET`,
 `CLIENT_URL`, `EMAIL_USER`, `EMAIL_PASS`, `ADMIN_EMAIL`; optional
-`JWT_EXPIRES_IN`, `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`,
+`EMAIL_FROM` (display name), `JWT_EXPIRES_IN`, `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`,
 `TWILIO_PHONE_NUMBER`, `VERIFY_BASE_URL` (only with a real verify page); a
 persistent disk at `.../backend/uploads`.
 

@@ -87,8 +87,9 @@ the database name, never the URI or password. The check lives in
 | `CLIENT_URL` | **in production** | Your frontend origin. Drives CORS **and** the Socket.io CSP — see below. |
 | `VERIFY_BASE_URL` | no | Printed on PDF reports as the verification link |
 | `TWILIO_*` | no | Blank = SMS runs in mock mode (prints to console) |
-| `EMAIL_*` | no | Blank = email runs in mock mode. Gmail needs an App Password. |
-| `EMAIL_FROM` | no | Sender for outgoing email, `HemoVisit <noreply@yourdomain>` or a bare address. Unset falls back to the obviously fake `noreply@example.com`; set a real mailbox before sending to patients. |
+| `EMAIL_USER`, `EMAIL_PASS` | for real email | **All email is sent through Gmail**, signed in as `EMAIL_USER` with a Gmail App Password (`EMAIL_PASS`). The sender address patients see is always `EMAIL_USER`. Blank = mock mode: emails are built but not sent. |
+| `EMAIL_FROM` | no | The sender's **display name only**, e.g. `HemoVisit`. The address is always `EMAIL_USER`. An older `Name <address>` value still works: the name is used, the address ignored. Unset = each email's own default name. |
+| `ADMIN_EMAIL` | recommended | Recipient of the "new booking" alert. Unset = that alert fails (logged); patients' emails are unaffected. |
 | `SEED_*_PASSWORD` | no | Fix a seed account's password; otherwise one is generated and printed once |
 
 ### `frontend/.env`

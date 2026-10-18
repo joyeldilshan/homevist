@@ -1,4 +1,5 @@
 const nodemailer = require("nodemailer");
+const { mailFrom } = require("./mailFrom");
 const { formatMoney, formatDate } = require("./format");
 const logger = require("../utils/logger");
 
@@ -231,7 +232,7 @@ const phlebotomistTemplate = (booking, patient, phlebotomist) => `
 
 const sendAdminBookingAlert = async (booking, patient) => {
   await getTransporter().sendMail({
-    from:    `"HemoVisit 🩸" <${process.env.EMAIL_USER}>`,
+    from:    mailFrom("HemoVisit 🩸"),
     to:      process.env.ADMIN_EMAIL,
     subject: `🩸 New Booking: ${booking.bookingId} — ${patient.name}`,
     html:    adminTemplate(booking, patient),
@@ -241,7 +242,7 @@ const sendAdminBookingAlert = async (booking, patient) => {
 
 const sendPatientConfirmation = async (booking, patient) => {
   await getTransporter().sendMail({
-    from:    `"HemoVisit 🩸" <${process.env.EMAIL_USER}>`,
+    from:    mailFrom("HemoVisit 🩸"),
     to:      patient.email,
     subject: `✅ Booking Confirmed — ${booking.bookingId} | HemoVisit`,
     html:    patientTemplate(booking, patient),
@@ -252,7 +253,7 @@ const sendPatientConfirmation = async (booking, patient) => {
 const sendPhlebotomistAssignment = async (booking, patient, phlebotomist) => {
   if (!phlebotomist?.email) return;
   await getTransporter().sendMail({
-    from:    `"HemoVisit 🩸" <${process.env.EMAIL_USER}>`,
+    from:    mailFrom("HemoVisit 🩸"),
     to:      phlebotomist.email,
     subject: `🧪 New Job Assigned — ${booking.bookingId} | HemoVisit`,
     html:    phlebotomistTemplate(booking, patient, phlebotomist),
