@@ -493,59 +493,53 @@ real patients use the service.
   Downloading a report's file is limited to the technician on that report. If
   you run more than one laboratory, samples and technicians need a lab field
   and the queries need to filter by it.
-- **Dependency advisories are pending major upgrades.** Vite and Tailwind
-  (build tools, not shipped to users) need major-version upgrades to clear
-  their advisories. In what does ship, `nodemailer` (one **high**),
-  `node-cron`, `qs` (via Express 4) and `react-router` also need majors. Details
-  and the suggested order are in the next section.
+- **Dependency advisories are pending major upgrades.** Vite, Vitest and
+  Tailwind (build and test tools, not shipped to users) need major-version
+  upgrades to clear their advisories. In what does ship, `nodemailer` (one
+  **high**), `node-cron` and `react-router` also need majors (`qs` was fixed
+  with an Express patch release). Details, exposure and the suggested order
+  are in the next section.
 
 ---
 
 ## Known dependency advisories
 
-Audited with `npm audit fix` only — **never `--force`**, which would bump
-majors and risk breaking real-time updates and routing.
+Measured with `npm audit` on 2026-10-18. Only non-breaking updates have been
+applied; **never run `npm audit fix --force`**, which bumps majors across the
+board. (Also avoid `npm audit fix --omit=dev`: it uninstalls the dev tools.)
 
-Totals after fixing: backend **7**, frontend **11**. Most of that is the build
-toolchain (chokidar, braces, micromatch, esbuild, postcss), which runs on your
-machine and never reaches a user.
+| | All dependencies | Shipped / run in production (`--omit=dev`) |
+|---|---|---|
+| Backend | 6 (2 moderate, 4 high) | **3** (2 moderate, 1 high) |
+| Frontend | 15 (7 moderate, 6 high, 2 critical) | **2** (2 moderate) |
 
-What actually ships is smaller. Production-only (`npm audit --omit=dev`):
-**backend 4, frontend 2.** Every one needs a major version bump, so each is a
-deliberate decision rather than an oversight.
+Fixed without a major: `qs` (via Express). Express 4.22.3, a patch release,
+moves it to 6.16.1, so the backend's production count went from 4 to 3.
 
-### Backend — 4 (1 high, 3 moderate)
+### Left in what ships, and why
 
-| Package | Severity | Why it is here | Non-breaking fix? |
+| Package | Severity | Why it is not fixed | Exposure here |
 |---|---|---|---|
-| `nodemailer` ^6.10.1 | **high** | Direct dependency. 15 open advisories, including SMTP command injection via `envelope.size`, CRLF header injection, and delivery to attacker-controlled domains through IDN/punycode allow-list bypass. | **No.** Needs 10.1.0 — four majors up. |
-| `node-cron` ^3.0.x | moderate | Direct dependency, used by the subscription scheduler. | **No.** Needs 4.6.0 (major). |
-| `uuid` <11.1.1 | moderate | Transitive, pulled in by `node-cron`. Missing buffer bounds check in v3/v5/v6. | **No.** Resolves only with `node-cron` 4.6.0. |
-| `qs` 6.14.2 | moderate | Transitive via `express` 4.22.1. DoS in `qs.stringify`, array-limit bypass. | **No**, despite what `npm audit` reports. Express pins `~6.14.0` (patch-only), and the fix needs ≥ 6.15.4 — unreachable without Express 5. |
+| `nodemailer` 6.10.1 (backend) | **high** | Every 6.x is affected; the fix is 10.1.7, four majors up. 6.10.1 is the last 6.x. | Advisories cover address parsing (mail to an unintended domain), CRLF header injection and SMTP envelope handling. Recipients here are addresses validated at registration; the sender name is sanitised (`utils/mailFrom.js`). Still the one to upgrade first: it needs a review of `utils/emailService.js` and `utils/reportEmail.js` against v10. |
+| `node-cron` 3.0.3 and its `uuid` 8.3.2 (backend) | moderate | The fix is node-cron 4.6.0 (major). | The `uuid` advisory is a missing bounds check in v3/v5/v6 when a buffer is passed; node-cron only calls `uuid.v4()` with no buffer, so it does not apply as used. |
+| `react-router` / `react-router-dom` 6.x (frontend) | moderate | Open redirect via a backslash in `<Link>` / `useNavigate`. Fixed only in 7.18.4 (major; v7 changes the router API). | Navigation targets in the app are fixed paths. The one built from a link, the return after sign-in (`utils/returnTo.js`), always uses the role's own dashboard path and only carries the query string over. |
 
-> **Read the nodemailer one before you launch.** Email is a core feature here
-> (booking confirmations, report delivery). The risk is mostly in handling
-> untrusted recipient addresses — worth assessing against how your deployment
-> actually uses it. Upgrading to v10 means an API review of
-> `utils/emailService.js`, `utils/notify.js` and `utils/reportEmail.js`.
+### Left in the development tools (never shipped)
 
-### Frontend — 2 (both moderate)
-
-| Package | Severity | Why it is here | Non-breaking fix? |
-|---|---|---|---|
-| `react-router-dom` ^6.24.0 | moderate | Direct. Open redirect via backslash in `<Link>`/`useNavigate`. | **No.** Needs 7.18.4 (major); v7 changes the data-router API. |
-| `react-router` | moderate | Transitive, same root cause and same fix. | **No.** |
-
-`nodemailer` was also listed in `frontend/package.json` — a backend package that
-was never imported by any frontend file. Removing it dropped the frontend from
-3 production advisories to 2, including one **high**.
+Vite 5, Vitest 2, Tailwind 3 and nodemon pull in the rest: esbuild and Vite's
+dev server, Vitest's UI server and worker pool (the two **critical** ones,
+`vitest` and `tinypool`), and chokidar / braces / micromatch / postcss
+selector parsing. They run only on a developer's machine or in CI, never on
+Render or in the browser. Each fix is a major upgrade (Vite 8, Vitest 5,
+Tailwind 4, nodemon), deliberately not done now. Until then: do not run the
+Vite dev server or the Vitest UI on a shared or public network.
 
 ### If you want them cleared
 
-`npm audit fix --force` resolves everything, but it bumps Express, Vite,
-Tailwind, PostCSS, React Router and nodemailer across majors at once. Do it on
-a branch, one package at a time, and re-test real-time booking updates,
-routing and email after each.
+Do it on a branch, one package at a time: nodemailer first, then React Router
+7, node-cron 4, then the build tools. After each, run every suite
+(`npm test` in backend, `npx vitest run`, `npm run test:api` and
+`npm run test:e2e` in frontend).
 
 ---
 
