@@ -65,7 +65,7 @@ the database name, never the URI or password. The check lives in
 | `npm run dev:api` / `npm run dev:web` | Run one side only |
 | `npm run build` | Production build of the frontend |
 | `npm start` | Start the backend |
-| `npm test` | Backend test suite (61 tests) |
+| `npm test` | Backend test suite (93 tests) |
 | `npm run seed` | Seed sample data — **guarded, see below** |
 | `npm run create-user` | Create one admin or lab technician account, safe in production — see below |
 | `npm run audit` | `npm audit` on both packages |
@@ -457,13 +457,14 @@ any real patient result is reported.
   gzip). The landing page adds its own 14 kB of JS and 33 kB of CSS (7 kB gzip),
   which no other page downloads, plus a 17 kB below-the-fold chunk.
 - **Dependency advisories.** See the dedicated section below.
-- **Test coverage.** 79 backend tests (validators, formatters, rate limiting,
-  the seed and startup database guards, email mock mode and the report
-  notification, the sender address, the report generator and report files,
-  the error handler, socket disconnects), 33 frontend tests (render tests for
+- **Test coverage** (all passing on 2026-10-18). 93 backend tests (validators,
+  formatters, rate limiting, the seed and startup database guards, email mock
+  mode and the report notification, the sender name, the report generator and
+  report files, the error handler, socket disconnects, `create-user`), 33
+  frontend tests (render tests for
   every page, the landing's copy and numbers, the legal pages, the socket URL,
   sign-in return links), a 21-step browser end-to-end suite across all four
-  roles, and 23 API authorization tests (see above).
+  roles, and 24 API tests for passwords and authorization (see above).
 - **Images.** The hero ships as AVIF/WebP with a JPEG fallback. `image 5.png`
   (660 kB, an old logo with "HOME VISIT MOBILE LAB" baked in) is no longer used.
 
