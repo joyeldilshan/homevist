@@ -6,3 +6,11 @@ frontend/.env
 .env
 *.log
 dist/
+dist-ssr/
+
+# Vite writes these while loading the config; never commit them
+vite.config.js.timestamp-*
+
+# Phase screenshots: review artefacts, large and regenerable. Keep them local.
+docs/screenshots/
+docs/lighthouse/

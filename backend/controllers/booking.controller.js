@@ -3,6 +3,11 @@ const TestType = require("../models/TestType");
 const User     = require("../models/User");
 const { sendSMS } = require("../utils/notify");
 const { sendBookingEmails, sendPhlebotomistAssignment } = require("../utils/emailService");
+const { isValidUkPostcode, POSTCODE_MESSAGE, isInServiceArea, outOfAreaMessage } = require("../utils/validators");
+const { formatDate } = require("../utils/format");
+const logger = require("../utils/logger");
+
+const BOOKING_STATUSES = Booking.schema.path("status").enumValues;
 
 // POST /api/bookings — Patient creates booking (supports multiple tests)
 exports.createBooking = async (req, res, next) => {
@@ -17,6 +22,22 @@ exports.createBooking = async (req, res, next) => {
     if (!ids.length)         return res.status(400).json({ success:false, message:"Select at least one test." });
     if (!appointmentDate || !address)
       return res.status(400).json({ success:false, message:"Date and address are required." });
+
+    // Postcode + service area.
+    // Only enforced when a structured postcode is supplied, so bookings
+    // made with the legacy free-text address alone still go through.
+    if (addressParts?.postcode) {
+      if (!isValidUkPostcode(addressParts.postcode)) {
+        return res.status(400).json({ success:false, message: POSTCODE_MESSAGE });
+      }
+      if (!isInServiceArea(addressParts.postcode)) {
+        return res.status(400).json({
+          success:   false,
+          outOfArea: true,
+          message:   outOfAreaMessage(addressParts.postcode),
+        });
+      }
+    }
 
     const testTypes = await TestType.find({ _id:{ $in:ids }, isActive:true });
     if (testTypes.length === 0)
@@ -55,10 +76,10 @@ exports.createBooking = async (req, res, next) => {
     if (req.user?.phone) {
       const testNames = testTypes.map(t => t.name).join(", ");
       await sendSMS(req.user.phone,
-        `Home Visit: Booking #${booking.bookingId} for ${testNames} on ${appointmentDate} at ${appointmentTime} received. Phlebotomist will be assigned shortly.`);
+        `HemoVisit: Booking #${booking.bookingId} for ${testNames} on ${formatDate(appointmentDate)} at ${appointmentTime} received. A phlebotomist will be assigned shortly.`);
     }
 
-    sendBookingEmails(booking, req.user).catch(err => console.error("📧 Email error:", err.message));
+    sendBookingEmails(booking, req.user).catch(err => logger.error("📧 Email error:", err.message));
 
     res.status(201).json({ success:true, booking });
   } catch (err) { next(err); }
@@ -69,13 +90,18 @@ exports.getBookings = async (req, res, next) => {
   try {
     let filter = {};
     if (req.user.role === "user") filter.user = req.user._id;
-    if (req.user.role === "phlebotomist") {
-      filter.$or = [
-        { phlebotomist: req.user._id },
-        { phlebotomist: null, status: "pending" },
-      ];
+    // A phlebotomist sees only the visits assigned to them. This used to
+    // add every unassigned pending booking (any patient's name, phone and
+    // address); jobs are assigned by an admin.
+    if (req.user.role === "phlebotomist") filter.phlebotomist = req.user._id;
+    if (req.query.status !== undefined) {
+      // A plain status name only: ?status[$ne]=x arrives as an object and
+      // would otherwise become a query operator.
+      if (typeof req.query.status !== "string" || !BOOKING_STATUSES.includes(req.query.status)) {
+        return res.status(400).json({ success:false, message:"Unknown status filter." });
+      }
+      filter.status = req.query.status;
     }
-    if (req.query.status) filter.status = req.query.status;
 
     const bookings = await Booking.find(filter)
       .populate("user",         "name phone email")
@@ -105,7 +131,11 @@ exports.verifyBooking = async (req, res, next) => {
       .populate("testType",     "name code price")
       .populate("testTypes",    "name code price");
 
-    if (!booking) return res.status(404).json({ success:false, message:"Booking not found." });
+    // A phlebotomist may look up only the visits assigned to them.
+    if (!booking || (req.user.role === "phlebotomist"
+        && String(booking.phlebotomist?._id || "") !== String(req.user._id))) {
+      return res.status(404).json({ success:false, message:"Booking not found." });
+    }
 
     const tests = booking.testTypes?.length ? booking.testTypes : [booking.testType].filter(Boolean);
 
@@ -131,13 +161,21 @@ exports.verifyBooking = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+// The states each non-admin change may start from.
+const FROM = {
+  user:         { cancelled: ["pending","confirmed"] },
+  phlebotomist: { confirmed: ["pending"], rejected: ["pending","confirmed"], sample_collected: ["confirmed"] },
+};
+
 // PATCH /api/bookings/:id/status
 exports.updateStatus = async (req, res, next) => {
   try {
     const { status, note } = req.body;
+    // Processing and completed follow the lab's sample and report steps, so
+    // a phlebotomist no longer sets them directly.
     const allowed = {
       admin:        ["confirmed","cancelled","rejected","processing","completed","sample_collected"],
-      phlebotomist: ["confirmed","sample_collected","processing","completed","rejected"],
+      phlebotomist: ["confirmed","sample_collected","rejected"],
       user:         ["cancelled"],
     };
     if (!allowed[req.user.role]?.includes(status)) {
@@ -149,7 +187,21 @@ exports.updateStatus = async (req, res, next) => {
       .populate("testType", "name")
       .populate("testTypes","name");
 
-    if (!booking) return res.status(404).json({ success:false, message:"Booking not found." });
+    // Object-level checks: the role allows the status, but only on the
+    // caller's own booking (patients) or a booking assigned to them
+    // (phlebotomists). Someone else's booking is "not found", so its
+    // existence is not revealed. These used to be missing: any patient
+    // could cancel, and any phlebotomist change, any booking by ID.
+    const mine = (ref) => ref && String(ref._id || ref) === String(req.user._id);
+    if (!booking
+      || (req.user.role === "user"         && !mine(booking.user))
+      || (req.user.role === "phlebotomist" && !mine(booking.phlebotomist))) {
+      return res.status(404).json({ success:false, message:"Booking not found." });
+    }
+    const from = FROM[req.user.role]?.[status];
+    if (from && !from.includes(booking.status)) {
+      return res.status(409).json({ success:false, message:`A ${booking.status.replace("_", " ")} booking cannot be changed to ${status.replace("_", " ")}.` });
+    }
 
     booking.status = status;
     booking.statusHistory.push({ status, updatedBy:req.user._id, note:note||"" });
@@ -158,7 +210,7 @@ exports.updateStatus = async (req, res, next) => {
     // SMS (guarded — booking.user may be null if the patient was deleted)
     if (booking.user?.phone) {
       await sendSMS(booking.user.phone,
-        `Home Visit: Booking #${booking.bookingId} status updated to ${status.toUpperCase()}.`);
+        `HemoVisit: Booking #${booking.bookingId} status updated to ${status.toUpperCase()}.`);
     }
 
     if (req.io) {
@@ -192,13 +244,13 @@ exports.assignPhlebotomist = async (req, res, next) => {
     // SMS to phlebotomist (guarded)
     if (phlebo.phone) {
       await sendSMS(phlebo.phone,
-        `Home Visit: New assignment #${booking.bookingId}. Patient: ${booking.user?.name || "Unknown"}. Address: ${booking.address}`);
+        `HemoVisit: New assignment #${booking.bookingId}. Patient: ${booking.user?.name || "Unknown"}. Address: ${booking.address}`);
     }
 
     // Email to phlebotomist — only if we still have a valid patient
     if (booking.user) {
       sendPhlebotomistAssignment(booking, booking.user, booking.phlebotomist)
-        .catch(err => console.error("📧 Assignment email error:", err.message));
+        .catch(err => logger.error("📧 Assignment email error:", err.message));
     }
 
     if (req.io) {

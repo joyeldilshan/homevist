@@ -13,7 +13,11 @@ const { protect, authorize } = require("../middleware/auth.middleware");
 
 // Public routes
 router.get("/test-types",          getTestTypes);
-router.get("/verify/:bookingId",   verifyBooking);
+
+// Barcode scan lookup. It returns the patient's name, phone and address,
+// and the booking ID is printed on the sample label, so it is staff only
+// (it used to be public).
+router.get("/verify/:bookingId",   protect, authorize("admin", "mlt", "phlebotomist"), verifyBooking);
 
 // Protected routes
 router.get("/",                    protect, getBookings);

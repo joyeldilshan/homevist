@@ -3,6 +3,8 @@ const Subscription = require("../models/Subscription");
 const Booking      = require("../models/Booking");
 const { sendSMS }  = require("../utils/notify");
 const { sendBookingEmails } = require("../utils/emailService");
+const { formatDate } = require("../utils/format");
+const logger = require("../utils/logger");
 
 // Generates the next Booking for every active subscription whose
 // nextVisitDate has arrived, then advances it (and rolls the cycle
@@ -60,13 +62,13 @@ async function generateDueVisits(io) {
       }
       if (sub.user?.phone) {
         await sendSMS(sub.user.phone,
-          `Home Visit: Your subscription visit #${booking.bookingId} is scheduled for ${booking.appointmentDate.toDateString()} at ${booking.appointmentTime}.`);
+          `HemoVisit: Your subscription visit #${booking.bookingId} is scheduled for ${formatDate(booking.appointmentDate)} at ${booking.appointmentTime}.`);
       }
       if (sub.user) {
-        sendBookingEmails(booking, sub.user).catch(err => console.error("📧 Subscription email error:", err.message));
+        sendBookingEmails(booking, sub.user).catch(err => logger.error("📧 Subscription email error:", err.message));
       }
     } catch (err) {
-      console.error(`Subscription scheduler failed for subscription ${sub._id}:`, err.message);
+      logger.error(`Subscription scheduler failed for subscription ${sub._id}:`, err.message);
     }
   }
 
@@ -78,12 +80,12 @@ function startSubscriptionScheduler(io) {
   cron.schedule("0 6 * * *", async () => {
     try {
       const count = await generateDueVisits(io);
-      if (count) console.log(`Subscription scheduler: generated ${count} visit(s).`);
+      if (count) logger.debug(`Subscription scheduler: generated ${count} visit(s).`);
     } catch (err) {
-      console.error("Subscription scheduler run failed:", err.message);
+      logger.error("Subscription scheduler run failed:", err.message);
     }
   });
-  console.log("Subscription scheduler registered (daily 06:00).");
+  logger.startup("Subscription scheduler registered (daily 06:00).");
 }
 
 module.exports = { startSubscriptionScheduler, generateDueVisits };

@@ -1,18 +1,28 @@
 const nodemailer = require("nodemailer");
+const { mailFrom } = require("./mailFrom");
+const { formatMoney, formatDate } = require("./format");
+const logger = require("../utils/logger");
 
 // ── Single shared transporter instance ────────────────────────
 // Created once, reused for all emails
 let transporter = null;
 
+// Mock mode, as the README promises and utils/notify.js already does:
+// with no EMAIL_USER/EMAIL_PASS, nodemailer's jsonTransport builds the
+// message and sends nothing. Same code path and return value, no network.
 const getTransporter = () => {
   if (!transporter) {
-    transporter = nodemailer.createTransport({
-      service: "gmail",
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
-      },
-    });
+    const live = process.env.EMAIL_USER && process.env.EMAIL_PASS;
+    transporter = live
+      ? nodemailer.createTransport({
+          service: "gmail",
+          auth: {
+            user: process.env.EMAIL_USER,
+            pass: process.env.EMAIL_PASS,
+          },
+        })
+      : nodemailer.createTransport({ jsonTransport: true });
+    if (!live) logger.debug("EMAIL MOCK: no EMAIL_USER/EMAIL_PASS, emails are built but not sent");
   }
   return transporter;
 };
@@ -55,7 +65,7 @@ const adminTemplate = (booking, patient) => `
   <tr><td style="background:#E53E3E;border-radius:14px 14px 0 0;padding:24px 32px;text-align:center;">
     <div style="font-size:28px;margin-bottom:6px;">🩸</div>
     <h1 style="color:#fff;margin:0;font-size:20px;font-weight:700;">New Booking Request</h1>
-    <p style="color:rgba(255,255,255,0.8);margin:5px 0 0;font-size:13px;">Home Visit · Home Blood Collection Service</p>
+    <p style="color:rgba(255,255,255,0.8);margin:5px 0 0;font-size:13px;">HemoVisit · Home Blood Collection Service</p>
   </td></tr>
 
   <!-- Alert -->
@@ -82,8 +92,8 @@ const adminTemplate = (booking, patient) => `
     <h3 style="font-size:11px;font-weight:700;color:#718096;text-transform:uppercase;letter-spacing:1px;margin:0 0 12px;">Booking Details</h3>
     <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
       ${infoRow("🧪", "Test",    booking.testType?.name || "—")}
-      ${infoRow("💰", "Amount",  "Rs. " + (booking.amount?.toLocaleString() || "—"))}
-      ${infoRow("📅", "Date",    new Date(booking.appointmentDate).toDateString())}
+      ${infoRow("💰", "Amount",  formatMoney(booking.amount))}
+      ${infoRow("📅", "Date",    formatDate(booking.appointmentDate))}
       ${infoRow("⏰", "Time",    booking.appointmentTime || "—")}
       ${infoRow("📍", "Address", booking.address || "—")}
       ${booking.notes ? infoRow("📝", "Notes", booking.notes) : ""}
@@ -99,7 +109,7 @@ const adminTemplate = (booking, patient) => `
   </td></tr>
 
   <tr><td style="padding:16px 0;text-align:center;">
-    <p style="font-size:11px;color:#A0AEC0;margin:0;">🩸 Home Visit · Jaffna, Sri Lanka · 2026</p>
+    <p style="font-size:11px;color:#A0AEC0;margin:0;">🩸 HemoVisit · Cardiff, Wales · ${new Date().getFullYear()}</p>
   </td></tr>
 </table>
 </td></tr>
@@ -129,19 +139,19 @@ const patientTemplate = (booking, patient) => `
       <table width="100%" cellpadding="0" cellspacing="0">
         ${infoRow("🔖", "Booking ID", booking.bookingId)}
         ${infoRow("🧪", "Test",       booking.testType?.name || "—")}
-        ${infoRow("📅", "Date",       new Date(booking.appointmentDate).toDateString())}
+        ${infoRow("📅", "Date",       formatDate(booking.appointmentDate))}
         ${infoRow("⏰", "Time",       booking.appointmentTime || "—")}
         ${infoRow("📍", "Address",    booking.address || "—")}
-        ${infoRow("💰", "Amount",     "Rs. " + (booking.amount?.toLocaleString() || "—"))}
+        ${infoRow("💰", "Amount",     formatMoney(booking.amount))}
       </table>
     </div>
 
     <h3 style="font-size:11px;font-weight:700;color:#718096;text-transform:uppercase;letter-spacing:1px;margin:0 0 14px;">What Happens Next?</h3>
     <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
-      ${stepRow("1", "Phlebotomist Assignment", "Our admin will assign a certified phlebotomist shortly.")}
+      ${stepRow("1", "Phlebotomist Assignment", "We will assign a phlebotomist to your booking shortly.")}
       ${stepRow("2", "Confirmation",            "You will receive phlebotomist details via email.")}
       ${stepRow("3", "Home Visit",              "Phlebotomist arrives at your scheduled date and time.")}
-      ${stepRow("4", "Report Ready",            "Download your verified PDF report within 24 hours.")}
+      ${stepRow("4", "Report Ready",            "Your PDF report will be available to download once the laboratory has processed your sample.")}
     </table>
 
     ${booking.testType?.preparation ? `
@@ -156,7 +166,7 @@ const patientTemplate = (booking, patient) => `
   </td></tr>
 
   <tr><td style="padding:16px 0;text-align:center;">
-    <p style="font-size:11px;color:#A0AEC0;margin:0;">🩸 Home Visit · Jaffna, Sri Lanka · 2026</p>
+    <p style="font-size:11px;color:#A0AEC0;margin:0;">🩸 HemoVisit · Cardiff, Wales · ${new Date().getFullYear()}</p>
   </td></tr>
 </table>
 </td></tr>
@@ -192,7 +202,7 @@ const phlebotomistTemplate = (booking, patient, phlebotomist) => `
     <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
       ${infoRow("🔖", "Booking ID", booking.bookingId)}
       ${infoRow("🧪", "Test",       booking.testType?.name || "—")}
-      ${infoRow("📅", "Date",       new Date(booking.appointmentDate).toDateString())}
+      ${infoRow("📅", "Date",       formatDate(booking.appointmentDate))}
       ${infoRow("⏰", "Time",       booking.appointmentTime || "—")}
       ${infoRow("📍", "Address",    booking.address || "—")}
       ${booking.notes ? infoRow("📝", "Notes", booking.notes) : ""}
@@ -211,7 +221,7 @@ const phlebotomistTemplate = (booking, patient, phlebotomist) => `
   </td></tr>
 
   <tr><td style="padding:16px 0;text-align:center;">
-    <p style="font-size:11px;color:#A0AEC0;margin:0;">🩸 Home Visit · Jaffna, Sri Lanka · 2026</p>
+    <p style="font-size:11px;color:#A0AEC0;margin:0;">🩸 HemoVisit · Cardiff, Wales · ${new Date().getFullYear()}</p>
   </td></tr>
 </table>
 </td></tr>
@@ -222,33 +232,33 @@ const phlebotomistTemplate = (booking, patient, phlebotomist) => `
 
 const sendAdminBookingAlert = async (booking, patient) => {
   await getTransporter().sendMail({
-    from:    `"Home Visit 🩸" <${process.env.EMAIL_USER}>`,
+    from:    mailFrom("HemoVisit 🩸"),
     to:      process.env.ADMIN_EMAIL,
     subject: `🩸 New Booking: ${booking.bookingId} — ${patient.name}`,
     html:    adminTemplate(booking, patient),
   });
-  console.log(`📧 Admin alert sent for ${booking.bookingId}`);
+  logger.debug(`📧 Admin alert sent for ${booking.bookingId}`);
 };
 
 const sendPatientConfirmation = async (booking, patient) => {
   await getTransporter().sendMail({
-    from:    `"Home Visit 🩸" <${process.env.EMAIL_USER}>`,
+    from:    mailFrom("HemoVisit 🩸"),
     to:      patient.email,
-    subject: `✅ Booking Confirmed — ${booking.bookingId} | Home Visit`,
+    subject: `✅ Booking Confirmed — ${booking.bookingId} | HemoVisit`,
     html:    patientTemplate(booking, patient),
   });
-  console.log(`📧 Patient confirmation sent to ${patient.email}`);
+  logger.debug(`📧 Patient confirmation sent to ${patient.email}`);
 };
 
 const sendPhlebotomistAssignment = async (booking, patient, phlebotomist) => {
   if (!phlebotomist?.email) return;
   await getTransporter().sendMail({
-    from:    `"Home Visit 🩸" <${process.env.EMAIL_USER}>`,
+    from:    mailFrom("HemoVisit 🩸"),
     to:      phlebotomist.email,
-    subject: `🧪 New Job Assigned — ${booking.bookingId} | Home Visit`,
+    subject: `🧪 New Job Assigned — ${booking.bookingId} | HemoVisit`,
     html:    phlebotomistTemplate(booking, patient, phlebotomist),
   });
-  console.log(`📧 Assignment email sent to ${phlebotomist.email}`);
+  logger.debug(`📧 Assignment email sent to ${phlebotomist.email}`);
 };
 
 // Send both admin + patient emails together
@@ -260,7 +270,7 @@ const sendBookingEmails = async (booking, patient) => {
   ]);
   results.forEach((r, i) => {
     if (r.status === "rejected") {
-      console.error(`📧 ${i === 0 ? "Admin" : "Patient"} email failed:`, r.reason?.message);
+      logger.error(`📧 ${i === 0 ? "Admin" : "Patient"} email failed:`, r.reason?.message);
     }
   });
 };

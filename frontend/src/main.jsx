@@ -1,29 +1,36 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
-import { Toaster } from "react-hot-toast";
-import App from "./App";
-import { AuthProvider } from "./context/AuthContext";
+import AppShell from "./AppShell";
 import "./index.css";
 
-ReactDOM.createRoot(document.getElementById("root")).render(
+/*
+ * Opt in to the two v7 behaviours React Router already warns about on
+ * every page load. Both are safe here: the only splat route
+ * ("*" -> NotFound) renders no nested relative links.
+ */
+const app = (
   <React.StrictMode>
-    <BrowserRouter>
-      <AuthProvider>
-        <App />
-        <Toaster
-          position="top-right"
-          toastOptions={{
-            style: {
-              background: "#1a2235",
-              color:      "#F1F5F9",
-              border:     "1px solid #1e2d45",
-            },
-            success: { iconTheme: { primary: "#10B981", secondary: "#fff" } },
-            error:   { iconTheme: { primary: "#C62828", secondary: "#fff" } },
-          }}
-        />
-      </AuthProvider>
+    <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+      <AppShell />
     </BrowserRouter>
   </React.StrictMode>
 );
+
+/*
+ * The production build pre-renders the landing page into #root
+ * (scripts/prerender.mjs). index.html empties #root again on any other
+ * route, and for a signed-in visitor (who is redirected away from "/"),
+ * so an element child here means "this is the landing page's own HTML":
+ * hydrate it in place instead of replacing it. Replacing would restart
+ * the hero's CSS intro and repaint the LCP element.
+ *
+ * firstElementChild, not hasChildNodes: the unbuilt index.html (Vite
+ * dev server) holds a comment marker there.
+ */
+const root = document.getElementById("root");
+if (root.firstElementChild) {
+  ReactDOM.hydrateRoot(root, app);
+} else {
+  ReactDOM.createRoot(root).render(app);
+}

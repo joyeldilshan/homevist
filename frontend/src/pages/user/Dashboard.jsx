@@ -1,1053 +1,517 @@
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect, useCallback } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { useBookingSocket } from "../../hooks/useSocket";
 import api from "../../utils/api";
+import { tabFromSearch } from "../../utils/returnTo";
 import toast from "react-hot-toast";
+import { formatMoney, formatDate, formatLongDate } from "../../utils/format";
+import { isValidUkPostcode, normaliseUkPostcode, isInServiceArea, outOfAreaMessage, POSTCODE_MESSAGE } from "../../utils/validators";
+import locale from "../../config/locale";
+import { downloadReport } from "../../utils/reportDownload";
+import {
+  Shell, PageHeader, SectionTitle, Stats, StatusPill, StageProgress, LoadingCards, EmptyState,
+  ErrorState, Button, Field, Modal, Meta, Card, I,
+} from "../../dashboard/kit";
+import { BOOKING_STAGES, ACTIVE_BOOKING, testNames } from "../../dashboard/status";
 
-/* ── Lab-label palette ─────────────────────────────────────── */
-const INK      = "#171310";
-const CRIMSON  = "#A4133C";
-const LAVENDER = "#7C6BAE";
-const GOLD     = "#B8892E";
-const TEAL     = "#1C7A6B";
-const BLUE     = "#3E6C9E";
-const GREEN    = "#2E7D57";
+/**
+ * Patient dashboard. Data, API calls and the live booking socket are
+ * unchanged from the previous version; the layout is the shared
+ * dashboard shell (src/dashboard/kit.jsx).
+ */
 
-const STATUS_CONFIG = {
-  pending:          { color:GOLD,     bg:"rgba(184,137,46,0.10)",  border:"rgba(184,137,46,0.35)",  label:"Pending"          },
-  confirmed:        { color:BLUE,     bg:"rgba(62,108,158,0.10)",  border:"rgba(62,108,158,0.35)",  label:"Confirmed"        },
-  sample_collected: { color:LAVENDER, bg:"rgba(124,107,174,0.10)", border:"rgba(124,107,174,0.35)", label:"Sample Collected" },
-  processing:       { color:CRIMSON,  bg:"rgba(164,19,60,0.08)",   border:"rgba(164,19,60,0.30)",   label:"Lab Processing"   },
-  completed:        { color:GREEN,    bg:"rgba(46,125,87,0.10)",   border:"rgba(46,125,87,0.35)",   label:"Report Ready"     },
-  cancelled:        { color:"#8A8378", bg:"rgba(138,131,120,0.10)", border:"rgba(138,131,120,0.3)", label:"Cancelled"        },
-  rejected:         { color:CRIMSON,  bg:"rgba(164,19,60,0.08)",   border:"rgba(164,19,60,0.30)",   label:"Rejected"         },
-};
-
-const STATUS_STEPS = [
-  { key:"pending",          icon:"📋", label:"Booking Received",      desc:"Your booking is received. Waiting for phlebotomist assignment." },
-  { key:"confirmed",        icon:"✅", label:"Phlebotomist Assigned", desc:"A phlebotomist has been assigned and will visit you on schedule." },
-  { key:"sample_collected", icon:"🩸", label:"Sample Collected",      desc:"Your blood sample has been collected and sent to the lab." },
-  { key:"processing",       icon:"🔬", label:"Lab Processing",        desc:"Your sample is being analysed in our certified laboratory." },
-  { key:"completed",        icon:"📄", label:"Report Ready",          desc:"Your results are ready! Download your verified PDF report." },
+const NAV = [
+  { id: "home",     label: "Home",          icon: "home"     },
+  { id: "book",     label: "Book a test",   short: "Book",     icon: "calendar" },
+  { id: "bookings", label: "My bookings",   short: "Bookings", icon: "list"     },
+  { id: "reports",  label: "My reports",    short: "Reports",  icon: "file"     },
+  { id: "plans",    label: "Subscriptions", icon: "repeat"   },
+  { id: "profile",  label: "Profile",       icon: "user"     },
 ];
 
-function StatusBadge({ status }) {
-  const c = STATUS_CONFIG[status] || STATUS_CONFIG.pending;
-  return (
-    <span style={{ display:"inline-flex", alignItems:"center", gap:6, padding:"4px 11px", borderRadius:20, fontSize:10.5, fontWeight:600, letterSpacing:"0.08em", textTransform:"uppercase", fontFamily:"var(--monof)", background:c.bg, color:c.color, border:`1px solid ${c.border}`, whiteSpace:"nowrap" }}>
-      <span style={{ width:6, height:6, borderRadius:"50%", background:c.color }} />
-      {c.label}
-    </span>
-  );
-}
-
-function StatusTracker({ status }) {
-  const idx = STATUS_STEPS.findIndex(s => s.key === status);
-  return (
-    <div style={{ padding:"4px 0" }}>
-      {STATUS_STEPS.map((s, i) => {
-        const done = i < idx, active = i === idx;
-        const c = STATUS_CONFIG[s.key];
-        return (
-          <div key={s.key}>
-            <div style={{ display:"flex", alignItems:"flex-start", gap:12, padding:"6px 0" }}>
-              <div style={{ width:32, height:32, borderRadius:"50%", flexShrink:0, display:"flex", alignItems:"center", justifyContent:"center", fontSize:13, fontWeight:700, transition:"all 0.3s", background:done||active?c.color:"rgba(23,19,16,0.06)", color:done||active?"#fff":"rgba(23,19,16,0.35)", border:active?`2px solid ${c.color}`:"2px solid transparent", boxShadow:active?`0 0 0 4px ${c.bg}`:"none" }}>
-                {done ? "✓" : s.icon}
-              </div>
-              <div style={{ paddingTop:6, flex:1 }}>
-                <div style={{ fontSize:13, fontWeight:700, color:done||active?INK:"rgba(23,19,16,0.4)" }}>
-                  {s.label}
-                  {active && <span style={{ marginLeft:8, fontSize:9.5, color:c.color, fontWeight:600, background:c.bg, padding:"2px 8px", borderRadius:20, fontFamily:"var(--monof)", letterSpacing:"0.08em", textTransform:"uppercase" }}>Current</span>}
-                </div>
-                {active && <div style={{ fontSize:12, color:"rgba(23,19,16,0.62)", marginTop:3, lineHeight:1.6 }}>{s.desc}</div>}
-              </div>
-            </div>
-            {i < STATUS_STEPS.length-1 && <div style={{ width:2, height:16, marginLeft:15, background:done?c.color:"rgba(23,19,16,0.12)", borderRadius:2 }} />}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-function FieldLabel({ children }) {
-  return <label className="lbl">{children}</label>;
-}
-
-function SpecimenLabel({ code, name, cap }) {
-  return (
-    <div className="sl">
-      <div className="sl-cap" style={{ background:cap }} />
-      <div className="sl-body">
-        <span className="sl-code">{code}</span>
-        <span className="sl-name">{name}</span>
-        <span className="sl-bar" />
-      </div>
-    </div>
-  );
-}
-
-function getTestNames(b) {
-  if (b.testTypes?.length) return b.testTypes.map(t => t.name).join(", ");
-  return b.testType?.name || "—";
-}
+const STEPS = ["Tests", "Date & time", "Address", "Confirm"];
+const today = () => new Date().toISOString().split("T")[0];
 
 export default function UserDashboard() {
-  const { user, logout } = useAuth();
+  const { user, logout, updateUser } = useAuth();
   const navigate = useNavigate();
-  const [tab,        setTab]        = useState("home");
+  const { search } = useLocation();
+  // ?tab=reports opens that tab (the report email links there).
+  const [tab,        setTab]        = useState(() => tabFromSearch(search, NAV.map((n) => n.id), "home"));
   const [bookings,   setBookings]   = useState([]);
   const [reports,    setReports]    = useState([]);
   const [tests,      setTests]      = useState([]);
-  const [loading,    setLoading]    = useState(false);
-  const [expandedId, setExpandedId] = useState(null);
+  const [status,     setStatus]     = useState("loading");   // loading | ready | error
+  const [loadError,  setLoadError]  = useState("");
+  const [booking,    setBooking]    = useState(false);
+  const [openTrack,  setOpenTrack]  = useState(null);
   const [flashIds,   setFlashIds]   = useState(new Set());
-  const [sideOpen,   setSideOpen]   = useState(false);
+  const [cancelId,   setCancelId]   = useState(null);
 
-  const [step,    setStep]    = useState(0);
-  const [picked,  setPicked]  = useState([]);
-  const [form,    setForm]    = useState({ date:"", time:"09:00", address:user?.address||"", notes:"" });
-  const setF = (k,v) => setForm(p=>({...p,[k]:v}));
+  const [step,   setStep]   = useState(0);
+  const [picked, setPicked] = useState([]);
+  const [form,   setForm]   = useState({
+    date: "", time: "09:00", notes: "",
+    // Structured UK address, prefilled from the profile, falling back to
+    // the legacy free-text address for older accounts.
+    line1:    user?.addressParts?.line1    || "",
+    line2:    user?.addressParts?.line2    || "",
+    city:     user?.addressParts?.city     || "",
+    county:   user?.addressParts?.county   || "",
+    postcode: user?.addressParts?.postcode || "",
+    legacyAddress: user?.address || "",
+  });
+  const setF = (k, v) => setForm((p) => ({ ...p, [k]: v }));
 
-  const [plans,        setPlans]        = useState([]);
-  const [mySubs,        setMySubs]      = useState([]);
+  // The API takes a single `address` string, so compose one from the parts.
+  const composedAddress = () =>
+    [form.line1, form.line2, form.city, form.county, form.postcode].filter(Boolean).join(", ") || form.legacyAddress;
+  const addressReady = () =>
+    !!form.line1 && !!form.city && isValidUkPostcode(form.postcode) && isInServiceArea(form.postcode);
+
+  const [plans,         setPlans]         = useState([]);
+  const [mySubs,        setMySubs]        = useState([]);
   const [subscribingId, setSubscribingId] = useState(null);
-  const [subForm,       setSubForm]     = useState({ address:user?.address||"", appointmentTime:"09:00" });
-  const [subLoading,    setSubLoading]  = useState(false);
+  const [subForm,       setSubForm]       = useState({ address: user?.address || "", postcode: user?.addressParts?.postcode || "", appointmentTime: "09:00" });
+  const [subLoading,    setSubLoading]    = useState(false);
 
-  const load = async () => {
+  const [profile, setProfile] = useState({ name: user?.name || "", phone: user?.phone || "", age: user?.age || "", address: user?.address || "" });
+  const [savingProfile, setSavingProfile] = useState(false);
+
+  const load = useCallback(async () => {
     try {
       const r = await api.get("/bookings");
       setBookings(r.data.bookings || []);
-    } catch(e) { console.error(e?.response?.data || e.message); }
+      setLoadError("");
+      setStatus("ready");
+    } catch (e) {
+      setLoadError(e?.response?.data?.message || "We could not load your bookings.");
+      setStatus("error");
+    }
     try {
       const rep = await api.get("/reports");
       setReports(rep.data.reports || []);
-    } catch(e) { console.error("reports:", e?.response?.data || e.message); }
-  };
+    } catch { /* bookings still show; reports tab shows its own empty state */ }
+  }, []);
 
   const loadSubs = async () => {
     try {
       const r = await api.get("/subscriptions/mine");
       setMySubs(r.data.subscriptions || []);
-    } catch(e) { console.error(e?.response?.data || e.message); }
+    } catch { /* shown as "no subscriptions" */ }
   };
 
-  useEffect(() => { load(); }, []);
   useEffect(() => {
     load();
-    if (tab === "book") {
-      api.get("/test-types").then(r => setTests(r.data.testTypes || [])).catch(()=>{});
-    }
-    if (tab === "plans") {
-      api.get("/plans").then(r => setPlans(r.data.plans || [])).catch(()=>{});
-      loadSubs();
-    }
-  }, [tab]);
+    if (tab === "book")  api.get("/test-types").then((r) => setTests(r.data.testTypes || [])).catch(() => {});
+    if (tab === "plans") { api.get("/plans").then((r) => setPlans(r.data.plans || [])).catch(() => {}); loadSubs(); }
+  }, [tab, load]);
 
-  const bookingIds = bookings.map(b => b.bookingId).filter(Boolean);
-  useBookingSocket(bookingIds, ({ bookingId, status }) => {
-    const info = STATUS_STEPS.find(s => s.key === status);
-    toast.success(`Booking ${bookingId}: ${info?.label || status}`);
-    setFlashIds(p => new Set([...p, bookingId]));
-    setTimeout(() => setFlashIds(p => { const n = new Set(p); n.delete(bookingId); return n; }), 4000);
+  // Live updates: the server emits "status_update" to each booking's room.
+  const bookingIds = bookings.map((b) => b.bookingId).filter(Boolean);
+  useBookingSocket(bookingIds, ({ bookingId, status: s }) => {
+    const info = BOOKING_STAGES.find((x) => x.key === s);
+    toast.success(`Booking ${bookingId}: ${info?.label || s}`);
+    setFlashIds((p) => new Set([...p, bookingId]));
+    setTimeout(() => setFlashIds((p) => { const n = new Set(p); n.delete(bookingId); return n; }), 4000);
     load();
   });
 
-  const reportForBooking = (b) =>
-    reports.find(r => r.booking?._id === b._id || r.booking?.bookingId === b.bookingId);
-
+  const reportFor = (b) => reports.find((r) => r.booking?._id === b._id || r.booking?.bookingId === b.bookingId);
+  const getReport = async (rep) => {
+    try { await downloadReport(rep); }
+    catch (e) { toast.error(e?.response?.status === 404 ? "This report file is not available. Please contact the administrator." : "Could not download the report."); }
+  };
   const openReport = (b) => {
-    const rep = reportForBooking(b);
-    if (rep?.fileUrl) {
-      window.open(rep.fileUrl, "_blank", "noopener,noreferrer");
-    } else {
-      toast("Report isn't ready yet — check the My Reports tab.", { icon:"📄" });
-      setTab("reports");
-    }
+    const rep = reportFor(b);
+    if (rep) getReport(rep);
+    else { toast("Your report isn't ready yet."); setTab("reports"); }
   };
 
-  const toggleTest = (t) => {
-    setPicked(p =>
-      p.find(x => x._id === t._id) ? p.filter(x => x._id !== t._id) : [...p, t]
-    );
-  };
-
+  const toggleTest = (t) => setPicked((p) => (p.find((x) => x._id === t._id) ? p.filter((x) => x._id !== t._id) : [...p, t]));
   const totalAmount = picked.reduce((s, t) => s + (t.price || 0), 0);
 
   const handleBook = async () => {
-    if (!picked.length || !form.date || !form.address) {
-      toast.error("Select at least one test and fill all fields."); return;
-    }
-    setLoading(true);
+    if (!picked.length || !form.date) { toast.error("Select at least one test and choose a date."); return; }
+    if (!addressReady()) { toast.error("Enter your address and a postcode we cover."); return; }
+    setBooking(true);
     try {
       await api.post("/bookings", {
-        testTypeIds:     picked.map(t => t._id),
+        testTypeIds: picked.map((t) => t._id),
         appointmentDate: form.date,
         appointmentTime: form.time,
-        address:         form.address,
-        notes:           form.notes,
+        address: composedAddress(),
+        addressParts: {
+          line1: form.line1, line2: form.line2, city: form.city, county: form.county,
+          postcode: normaliseUkPostcode(form.postcode) || form.postcode,
+        },
+        notes: form.notes,
       });
-      toast.success(`🩸 Booking confirmed! ${picked.length} test${picked.length>1?"s":""} scheduled.`);
+      toast.success(`Booking placed: ${picked.length} test${picked.length > 1 ? "s" : ""}.`);
       setStep(0); setPicked([]); setTab("bookings"); load();
-    } catch(e) { toast.error(e.response?.data?.message || "Booking failed."); }
-    finally { setLoading(false); }
+    } catch (e) { toast.error(e.response?.data?.message || "Booking failed."); }
+    finally { setBooking(false); }
   };
 
-  const handleCancel = async (id) => {
+  const confirmCancel = async () => {
     try {
-      await api.patch(`/bookings/${id}/status`, { status:"cancelled" });
+      await api.patch(`/bookings/${cancelId}/status`, { status: "cancelled" });
       toast.success("Booking cancelled."); load();
     } catch { toast.error("Could not cancel."); }
+    finally { setCancelId(null); }
   };
 
   const handleSubscribe = async (planId) => {
     if (!subForm.address) { toast.error("Enter your address."); return; }
+    if (!isValidUkPostcode(subForm.postcode)) { toast.error(POSTCODE_MESSAGE); return; }
+    if (!isInServiceArea(subForm.postcode)) { toast.error(outOfAreaMessage(subForm.postcode)); return; }
     setSubLoading(true);
     try {
-      await api.post("/subscriptions", { planId, address:subForm.address, appointmentTime:subForm.appointmentTime });
-      toast.success("🔁 Subscribed! Your first visit will be scheduled shortly.");
+      await api.post("/subscriptions", {
+        planId, address: subForm.address,
+        addressParts: { postcode: normaliseUkPostcode(subForm.postcode) || subForm.postcode },
+        appointmentTime: subForm.appointmentTime,
+      });
+      toast.success("Subscribed. Your first visit will be scheduled.");
       setSubscribingId(null); loadSubs();
-    } catch(e) { toast.error(e.response?.data?.message || "Subscription failed."); }
+    } catch (e) { toast.error(e.response?.data?.message || "Subscription failed."); }
     finally { setSubLoading(false); }
   };
 
-  const SUB_ACTION_LABEL = { pause:"paused", resume:"resumed", cancel:"cancelled" };
+  const SUB_DONE = { pause: "paused", resume: "resumed", cancel: "cancelled" };
   const handleSubAction = async (id, action) => {
-    try {
-      await api.patch(`/subscriptions/${id}/${action}`);
-      toast.success(`Subscription ${SUB_ACTION_LABEL[action]}.`); loadSubs();
-    } catch { toast.error("Could not update subscription."); }
+    try { await api.patch(`/subscriptions/${id}/${action}`); toast.success(`Subscription ${SUB_DONE[action]}.`); loadSubs(); }
+    catch { toast.error("Could not update subscription."); }
   };
 
-  const upcoming  = bookings.filter(b => ["pending","confirmed","sample_collected","processing"].includes(b.status));
-  const completed = bookings.filter(b => b.status === "completed");
+  // The profile form used to have no save handler at all.
+  const saveProfile = async (e) => {
+    e.preventDefault();
+    setSavingProfile(true);
+    try {
+      const body = { name: profile.name.trim(), phone: profile.phone.trim(), address: profile.address.trim() };
+      if (profile.age !== "") body.age = Number(profile.age);
+      const r = await api.put("/auth/update-profile", body);
+      updateUser(r.data.user || body);
+      toast.success("Profile saved.");
+    } catch (err) { toast.error(err.response?.data?.message || "Could not save your profile."); }
+    finally { setSavingProfile(false); }
+  };
 
-  const TABS = [
-    { id:"home",     icon:"🏠", label:"Home",        cap:CRIMSON  },
-    { id:"book",     icon:"📅", label:"Book a Test", cap:GOLD     },
-    { id:"bookings", icon:"📋", label:"My Bookings", cap:TEAL,     badge:upcoming.length },
-    { id:"reports",  icon:"📄", label:"My Reports",  cap:LAVENDER, badge:reports.length  },
-    { id:"plans",    icon:"🔁", label:"Subscriptions", cap:LAVENDER, badge:mySubs.filter(s=>s.status==="active").length },
-    { id:"profile",  icon:"👤", label:"Profile",     cap:BLUE     },
-  ];
+  const upcoming  = bookings.filter((b) => ACTIVE_BOOKING.includes(b.status));
+  const completed = bookings.filter((b) => b.status === "completed");
+  const nav = NAV.map((n) => ({
+    ...n,
+    badge: n.id === "bookings" ? upcoming.length : n.id === "reports" ? reports.length : 0,
+  }));
+  const go = (id) => { setTab(id); setStep(0); };
+  const signOut = () => { logout(); navigate("/login"); };
 
-  const Sidebar = () => (
-    <aside className="side">
-      <div className="brand"><span className="brand-dot" />Home Visit</div>
-      <div className="side-sep" />
-      {TABS.map(t => (
-        <button key={t.id} onClick={() => { setTab(t.id); setStep(0); setSideOpen(false); }}
-          className={`side-tab ${tab===t.id?"on":""}`}>
-          <span className="side-cap" style={{ background:t.cap }} />
-          <span style={{ fontSize:15 }}>{t.icon}</span>
-          <span style={{ flex:1, textAlign:"left" }}>{t.label}</span>
-          {t.badge > 0 && <span className="side-badge">{t.badge}</span>}
-        </button>
-      ))}
-      <div className="side-sep" />
-      <div className="live-chip">
-        <span className="live-dot" />
-        Live updates on
-      </div>
-      <div className="side-user">
-        <div className="side-avatar">👤</div>
-        <div style={{ minWidth:0 }}>
-          <div style={{ fontSize:13, fontWeight:700, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{user?.name||"Patient"}</div>
-          <div style={{ fontSize:10.5, color:"rgba(23,19,16,0.45)", fontFamily:"var(--monof)", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{user?.email}</div>
+  /* ── Booking card ── */
+  const BookingCard = (b, i) => {
+    const tracking = openTrack === b._id;
+    const tone = { pending: "amber", confirmed: "blue", sample_collected: "violet", processing: "terra", completed: "green", rejected: "red" }[b.status] || "grey";
+    return (
+      <Card key={b._id} i={i} tone={tone} className={flashIds.has(b.bookingId) ? "is-flash" : ""}>
+        <div className="db-row" data-booking={b.bookingId}>
+          <div className="db-row-main">
+            <h3 className="db-card-title">{testNames(b)}</h3>
+            <div className="db-metas">
+              <Meta icon="calendar">{formatDate(b.appointmentDate)}</Meta>
+              <Meta icon="clock">{b.appointmentTime || "—"}</Meta>
+              {b.phlebotomist && <Meta icon="user">{b.phlebotomist.name}</Meta>}
+              <Meta icon="pound">{formatMoney(b.amount)}</Meta>
+              <span className="db-code">#{b.bookingId || "—"}</span>
+            </div>
+            <StageProgress status={b.status} />
+          </div>
+          <div className="db-row-side">
+            <StatusPill status={b.status} />
+          </div>
         </div>
-      </div>
-      <button className="signout" onClick={() => { logout(); navigate("/login"); }}>
-        Sign out
-      </button>
-    </aside>
-  );
+        <div className="db-actions">
+          {b.status === "completed" && <Button size="sm" icon="download" onClick={() => openReport(b)}>Download report</Button>}
+          {!["cancelled", "rejected"].includes(b.status) && (
+            <Button size="sm" variant="ghost" icon="pulse" aria-expanded={tracking} onClick={() => setOpenTrack(tracking ? null : b._id)}>
+              {tracking ? "Hide progress" : "Track progress"}
+            </Button>
+          )}
+          {["pending", "confirmed"].includes(b.status) && <Button size="sm" variant="danger" onClick={() => setCancelId(b._id)}>Cancel booking</Button>}
+        </div>
+        {tracking && (
+          <>
+            <hr className="db-divider" />
+            <StageProgress status={b.status} full />
+          </>
+        )}
+      </Card>
+    );
+  };
+
+  const firstName = user?.name?.split(" ")[0] || "there";
+  const loadingOrError = status === "loading"
+    ? <LoadingCards count={3} label="Loading your bookings" />
+    : status === "error" ? <ErrorState message={loadError} onRetry={load} /> : null;
 
   return (
-    <div className="ud">
-      <style>{`
-        .ud {
-          --paper:   #F3F0EA;
-          --card:    #FBF9F5;
-          --ink:     #171310;
-          --ink-60:  rgba(23,19,16,0.62);
-          --ink-40:  rgba(23,19,16,0.42);
-          --rule:    rgba(23,19,16,0.13);
-          --crimson: #A4133C;
-          --display: "Playfair Display", Georgia, serif;
-          --sansf:   "DM Sans", system-ui, -apple-system, sans-serif;
-          --monof:   "DM Mono", ui-monospace, "SF Mono", monospace;
-
-          min-height: 100vh; min-height: 100dvh;
-          background: var(--paper); color: var(--ink);
-          font-family: var(--sansf);
-          display: flex; position: relative;
-        }
-        .ud *, .ud *::before, .ud *::after { box-sizing: border-box; }
-        .ud :focus-visible { outline: 2px solid var(--crimson); outline-offset: 2px; }
-
-        @keyframes fadeUp  { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
-        @keyframes slideIn { from{opacity:0;transform:translateX(14px)} to{opacity:1;transform:translateX(0)} }
-        @keyframes ping    { 0%{transform:scale(1);opacity:0.8} 100%{transform:scale(2.2);opacity:0} }
-        @keyframes flash   { 0%,100%{border-color:var(--rule)} 50%{border-color:var(--crimson);box-shadow:0 0 0 3px rgba(164,19,60,0.15)} }
-        .ud .fade-up   { animation: fadeUp 0.4s ease forwards; }
-        .ud .slide-in  { animation: slideIn 0.3s ease forwards; }
-        .ud .flash-brd { animation: flash 0.7s ease 3; }
-
-        /* ---------- headings ---------- */
-        .ud h1 {
-          font-family: var(--display); font-weight: 900;
-          font-size: clamp(26px, 3.4vw, 38px); letter-spacing: -0.015em;
-          margin: 0 0 4px;
-        }
-        .ud .sub { color: var(--ink-60); font-size: 14px; margin: 0; }
-        .ud .head { margin-bottom: 26px; }
-
-        /* ---------- specimen label ---------- */
-        .ud .sl {
-          display: inline-flex; align-items: stretch;
-          border: 1px solid var(--rule); border-radius: 3px;
-          background: var(--card); overflow: hidden; margin-bottom: 14px;
-        }
-        .ud .sl-cap  { width: 7px; }
-        .ud .sl-body { padding: 5px 10px; display: flex; align-items: center; gap: 10px; }
-        .ud .sl-code { font-family: var(--monof); font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; }
-        .ud .sl-name { font-family: var(--monof); font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-40); }
-        .ud .sl-bar {
-          width: 36px; align-self: stretch; min-height: 12px; opacity: .7;
-          background-image: repeating-linear-gradient(90deg,
-            var(--ink) 0 1px, transparent 1px 3px,
-            var(--ink) 3px 5px, transparent 5px 6px,
-            var(--ink) 6px 7px, transparent 7px 10px);
-        }
-
-        /* ---------- sidebar ---------- */
-        .ud .side {
-          width: 246px; flex-shrink: 0;
-          background: var(--card); border-right: 1px solid var(--rule);
-          padding: 22px 14px; display: flex; flex-direction: column; gap: 3px;
-          position: sticky; top: 0; height: 100vh; height: 100dvh; overflow-y: auto; z-index: 10;
-        }
-        .ud .brand {
-          display: flex; align-items: center; gap: 9px; padding: 4px 10px 2px;
-          font-family: var(--monof); font-size: 12.5px; font-weight: 500;
-          letter-spacing: 0.2em; text-transform: uppercase;
-        }
-        .ud .brand-dot {
-          width: 10px; height: 10px; border-radius: 50%;
-          background: radial-gradient(circle at 35% 35%, #d24a6e, var(--crimson));
-          animation: pulse 2.4s ease-in-out infinite;
-        }
-        @keyframes pulse {
-          0%,100% { box-shadow: 0 0 0 0 rgba(164,19,60,0.35); }
-          50%     { box-shadow: 0 0 0 6px rgba(164,19,60,0); }
-        }
-        .ud .side-sep { height: 1px; background: var(--rule); margin: 14px 4px; }
-        .ud .side-tab {
-          display: flex; align-items: center; gap: 10px;
-          padding: 11px 12px; border: none; border-radius: 8px;
-          background: transparent; cursor: pointer; width: 100%;
-          font-family: var(--sansf); font-size: 14px; font-weight: 500;
-          color: var(--ink-60); transition: background .15s, color .15s;
-          position: relative;
-        }
-        .ud .side-tab:hover { background: rgba(23,19,16,0.05); color: var(--ink); }
-        .ud .side-tab.on { background: var(--ink); color: var(--paper); font-weight: 600; }
-        .ud .side-cap {
-          width: 4px; height: 18px; border-radius: 2px; flex-shrink: 0;
-          opacity: .4; transition: opacity .15s;
-        }
-        .ud .side-tab.on .side-cap, .ud .side-tab:hover .side-cap { opacity: 1; }
-        .ud .side-badge {
-          background: var(--crimson); color: #fff; border-radius: 20px;
-          min-width: 19px; height: 19px; padding: 0 5px;
-          display: flex; align-items: center; justify-content: center;
-          font-size: 10px; font-weight: 700; font-family: var(--monof);
-        }
-        .ud .side-tab.on .side-badge { background: var(--paper); color: var(--ink); }
-
-        .ud .live-chip {
-          display: flex; align-items: center; gap: 8px;
-          margin: 0 4px; padding: 9px 12px; border-radius: 8px;
-          background: rgba(46,125,87,0.08); border: 1px solid rgba(46,125,87,0.25);
-          font-family: var(--monof); font-size: 10px; letter-spacing: 0.1em;
-          text-transform: uppercase; color: #2E7D57;
-        }
-        .ud .live-dot { position: relative; width: 7px; height: 7px; border-radius: 50%; background: #2E7D57; flex-shrink: 0; }
-        .ud .live-dot::after {
-          content: ""; position: absolute; inset: 0; border-radius: 50%;
-          background: #2E7D57; animation: ping 1.5s ease-out infinite;
-        }
-        .ud .side-user {
-          margin-top: auto; padding: 12px; border-radius: 10px;
-          background: var(--paper); border: 1px solid var(--rule);
-          display: flex; align-items: center; gap: 10px;
-        }
-        .ud .side-avatar {
-          width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0;
-          background: rgba(164,19,60,0.10); border: 1px solid rgba(164,19,60,0.25);
-          display: flex; align-items: center; justify-content: center; font-size: 15px;
-        }
-        .ud .signout {
-          margin-top: 8px; padding: 9px; border: 1px solid var(--rule); border-radius: 8px;
-          background: transparent; color: var(--ink-60); cursor: pointer;
-          font-family: var(--monof); font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase;
-          transition: all .15s;
-        }
-        .ud .signout:hover { border-color: var(--crimson); color: var(--crimson); }
-
-        /* ---------- cards & rows ---------- */
-        .ud .card {
-          background: var(--card); border: 1px solid var(--rule);
-          border-radius: 12px;
-        }
-        .ud .booking-row {
-          background: var(--card); border: 1px solid var(--rule);
-          border-radius: 12px; padding: 18px 20px; margin-bottom: 10px;
-          transition: all .2s; cursor: pointer;
-        }
-        .ud .booking-row:hover { box-shadow: 0 10px 26px rgba(23,19,16,0.09); transform: translateY(-1px); }
-
-        /* ---------- stats ---------- */
-        .ud .stat-row { display: grid; grid-template-columns: repeat(3,1fr); gap: 14px; margin-bottom: 24px; }
-        .ud .stat {
-          background: var(--card); border: 1px solid var(--rule);
-          border-radius: 12px; padding: 20px;
-          border-top: 3px solid var(--tint, var(--crimson));
-        }
-        .ud .stat-v { font-family: var(--display); font-weight: 900; font-size: 34px; line-height: 1; color: var(--tint, var(--ink)); }
-        .ud .stat-l {
-          font-family: var(--monof); font-size: 10px; letter-spacing: 0.13em;
-          text-transform: uppercase; color: var(--ink-40); margin-top: 8px;
-        }
-
-        /* ---------- CTA banner ---------- */
-        .ud .banner {
-          background: linear-gradient(120deg, var(--ink), #3d1020 65%, var(--crimson));
-          border-radius: 14px; padding: 24px 28px; margin-bottom: 28px;
-          display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;
-          box-shadow: 0 18px 40px rgba(23,19,16,0.22);
-        }
-        .ud .banner-title { font-family: var(--display); font-weight: 900; font-size: 20px; color: #fff; margin-bottom: 4px; }
-        .ud .banner-sub { font-size: 13.5px; color: rgba(255,255,255,0.65); }
-
-        /* ---------- buttons & inputs ---------- */
-        .ud .btn {
-          font-family: var(--sansf); font-size: 14px; font-weight: 700;
-          padding: 12px 22px; border-radius: 9px; cursor: pointer;
-          border: 1px solid transparent; transition: transform .15s, background .15s, box-shadow .15s;
-        }
-        .ud .btn:hover { transform: translateY(-1px); }
-        .ud .btn:disabled { opacity: .65; cursor: default; transform: none; }
-        .ud .btn-primary { background: var(--crimson); color: #fff; box-shadow: 0 6px 18px rgba(164,19,60,0.28); }
-        .ud .btn-primary:hover { background: #8B0F33; }
-        .ud .btn-ghost { background: transparent; color: var(--ink); border-color: var(--rule); }
-        .ud .btn-ghost:hover { border-color: var(--ink); }
-        .ud .btn-sm { padding: 7px 14px; font-size: 12.5px; border-radius: 7px; }
-        .ud .btn-white { background: #fff; color: var(--crimson); }
-
-        .ud .lbl {
-          display: block; margin-bottom: 6px;
-          font-family: var(--monof); font-size: 10px; font-weight: 500;
-          letter-spacing: 0.13em; text-transform: uppercase; color: var(--ink-60);
-        }
-        .ud .inp {
-          width: 100%; padding: 12px 14px;
-          background: #fff; color: var(--ink);
-          border: 1px solid var(--rule); border-radius: 8px;
-          font-family: var(--sansf); font-size: 14px;
-          transition: border-color .2s, box-shadow .2s;
-        }
-        .ud .inp::placeholder { color: var(--ink-40); }
-        .ud .inp:focus { outline: none; border-color: var(--crimson); box-shadow: 0 0 0 3px rgba(164,19,60,0.10); }
-
-        /* ---------- test picker ---------- */
-        .ud .test-opt {
-          border: 1px solid var(--rule); border-radius: 12px; padding: 18px;
-          cursor: pointer; transition: all .2s; background: var(--card); position: relative;
-        }
-        .ud .test-opt:hover { border-color: var(--crimson); box-shadow: 0 8px 22px rgba(23,19,16,0.08); }
-        .ud .test-opt.sel { border-color: var(--crimson); background: rgba(164,19,60,0.05); box-shadow: 0 0 0 3px rgba(164,19,60,0.12); }
-        .ud .test-opt .check {
-          position: absolute; top: 12px; right: 12px; width: 22px; height: 22px;
-          border-radius: 50%; background: var(--crimson); color: #fff; font-size: 12px;
-          display: flex; align-items: center; justify-content: center; font-weight: 700;
-          opacity: 0; transform: scale(0.7); transition: all .2s;
-        }
-        .ud .test-opt.sel .check { opacity: 1; transform: scale(1); }
-        .ud .cat-tag {
-          font-family: var(--monof); font-size: 9.5px; font-weight: 500;
-          letter-spacing: 0.1em; text-transform: uppercase;
-          color: var(--crimson); background: rgba(164,19,60,0.08);
-          padding: 3px 8px; border-radius: 20px;
-        }
-        .ud .selected-badge {
-          display: inline-flex; align-items: center; gap: 6px;
-          background: rgba(164,19,60,0.07); border: 1px solid rgba(164,19,60,0.3);
-          border-radius: 20px; padding: 4px 12px; font-size: 12px;
-          font-weight: 600; color: var(--crimson); cursor: pointer; transition: all .2s;
-        }
-        .ud .selected-badge:hover { background: rgba(164,19,60,0.14); }
-
-        /* ---------- step bar ---------- */
-        .ud .stepbar { display: flex; align-items: center; gap: 8px; margin-bottom: 30px; flex-wrap: wrap; }
-        .ud .step-dot {
-          width: 28px; height: 28px; border-radius: 50%;
-          display: flex; align-items: center; justify-content: center;
-          font-family: var(--monof); font-size: 11px; font-weight: 500;
-          transition: all .3s;
-        }
-
-        /* ---------- reports ---------- */
-        .ud .rep-card {
-          background: var(--card); border: 1px solid var(--rule);
-          border-left: 4px solid var(--tint, #1C7A6B);
-          border-radius: 12px; padding: 20px 22px; margin-bottom: 12px;
-          transition: transform .2s, box-shadow .2s;
-        }
-        .ud .rep-card:hover { transform: translateY(-2px); box-shadow: 0 12px 28px rgba(23,19,16,0.10); }
-
-        /* ---------- topbar / drawer (mobile) ---------- */
-        .ud .topbar {
-          display: none; position: fixed; top: 0; left: 0; right: 0; height: 56px;
-          background: rgba(251,249,245,0.92); backdrop-filter: blur(10px);
-          border-bottom: 1px solid var(--rule); z-index: 100;
-          align-items: center; justify-content: space-between; padding: 0 16px;
-        }
-        .ud .overlay { position: fixed; inset: 0; background: rgba(23,19,16,0.45); z-index: 200; }
-        .ud .drawer {
-          position: fixed; left: 0; top: 0; bottom: 0; width: 268px; z-index: 210;
-          background: var(--card); border-right: 1px solid var(--rule); overflow-y: auto;
-        }
-
-        .ud .main { flex: 1; padding: 32px 40px; overflow-y: auto; position: relative; z-index: 1; }
-        .ud .inner { max-width: 860px; margin: 0 auto; }
-
-        @media (max-width: 768px) {
-          .ud .desktop-side { display: none; }
-          .ud .topbar { display: flex; }
-          .ud .main { padding: 76px 16px 24px; }
-          .ud .stat-row { grid-template-columns: repeat(3,1fr); gap: 8px; }
-          .ud .stat { padding: 14px 12px; }
-          .ud .stat-v { font-size: 24px; }
-          .ud .tests-grid { grid-template-columns: 1fr 1fr !important; }
-        }
-        @media (max-width: 460px) {
-          .ud .tests-grid { grid-template-columns: 1fr !important; }
-          .ud .stepbar span.step-name { display: none; }
-        }
-        @media (prefers-reduced-motion: reduce) {
-          .ud * { animation: none !important; transition: none !important; }
-        }
-      `}</style>
-
-      {/* Desktop sidebar */}
-      <div className="desktop-side"><Sidebar /></div>
-
-      {/* Mobile topbar */}
-      <div className="topbar">
-        <div className="brand" style={{ padding:0 }}><span className="brand-dot" />Home Visit</div>
-        <button onClick={() => setSideOpen(true)} style={{ background:"none", border:"none", fontSize:20, cursor:"pointer", color:INK }}>☰</button>
-      </div>
-
-      {sideOpen && (
+    <Shell role="Patient" items={nav} active={tab} onNavigate={go} user={user} onSignOut={signOut} live={bookingIds.length > 0}>
+      {tab === "home" && (
         <>
-          <div className="overlay" onClick={() => setSideOpen(false)} />
-          <div className="drawer"><Sidebar /></div>
+          <PageHeader eyebrow={formatLongDate()} title={`Hello, ${firstName}.`} sub="Your bookings and reports, in one place."
+                      actions={<Button icon="plus" onClick={() => go("book")}>Book a test</Button>} />
+          {loadingOrError || (
+            <>
+              <Stats items={[
+                { label: "Total bookings", value: bookings.length,  icon: "list",  tone: "blue"  },
+                { label: "In progress",    value: upcoming.length,  icon: "pulse", tone: "amber" },
+                { label: "Reports ready",  value: completed.length, icon: "file",  tone: "green" },
+              ]} />
+              <SectionTitle>Upcoming</SectionTitle>
+              {upcoming.length
+                ? <div className="db-stack">{upcoming.map(BookingCard)}</div>
+                : <EmptyState icon="calendar" title={bookings.length ? "Nothing in progress" : "No bookings yet"}
+                              action={<Button icon="plus" onClick={() => go("book")}>Book your first test</Button>}>
+                    {bookings.length ? "Your completed bookings are under My bookings." : "Choose your tests and a time, and a phlebotomist comes to you."}
+                  </EmptyState>}
+            </>
+          )}
         </>
       )}
 
-      <main className="main">
-        <div className="inner">
+      {tab === "book" && (
+        <>
+          <PageHeader eyebrow="New booking" title="Book tests." sub="Choose one or more tests for a single home visit." />
+          <ol className="db-steps" aria-label="Booking steps">
+            {STEPS.map((s, i) => (
+              <li key={s} className={`db-step ${i < step ? "is-done" : i === step ? "is-current" : ""}`} aria-current={i === step ? "step" : undefined}>
+                <span className="db-step-n">{i < step ? <I.check size={14} /> : i + 1}</span>{s}
+              </li>
+            ))}
+          </ol>
 
-          {/* ══ HOME ══ */}
-          {tab === "home" && (
-            <div className="fade-up">
-              <div className="head">
-                <SpecimenLabel code="HV-20" name="Patient" cap={CRIMSON} />
-                <h1>Hello, {user?.name?.split(" ")[0]||"Patient"}.</h1>
-                <p className="sub">{new Date().toLocaleDateString("en-US",{weekday:"long",year:"numeric",month:"long",day:"numeric"})}</p>
+          {step === 0 && (
+            <>
+              {picked.length > 0 && (
+                <Card className="db-row" i={0}>
+                  <span className="db-meta"><strong>{picked.length} selected</strong>&nbsp;· {picked.map((t) => t.name).join(", ")}</span>
+                  <strong className="db-option-price">{formatMoney(totalAmount)}</strong>
+                </Card>
+              )}
+              <div className="db-options" style={{ margin: "14px 0 22px" }}>
+                {tests.length === 0
+                  ? <LoadingCards count={3} label="Loading tests" />
+                  : tests.map((t) => {
+                      const on = !!picked.find((x) => x._id === t._id);
+                      return (
+                        <button key={t._id} type="button" className="db-option" aria-pressed={on} onClick={() => toggleTest(t)}>
+                          <span className="db-option-check" aria-hidden="true">{on && <I.check size={14} />}</span>
+                          <span className="db-tag">{t.category}</span>
+                          <span className="db-option-name">{t.name}</span>
+                          <span className="db-meta"><I.clock size={15} />Results in {t.duration || "—"}</span>
+                          {t.preparation && <span className="db-meta"><I.alert size={15} />{t.preparation}</span>}
+                          <span className="db-option-price">{formatMoney(t.price)}</span>
+                        </button>
+                      );
+                    })}
               </div>
+              <Button size="lg" onClick={() => (picked.length ? setStep(1) : toast.error("Select at least one test."))}>
+                Continue{picked.length > 0 && ` · ${formatMoney(totalAmount)}`}
+              </Button>
+            </>
+          )}
 
-              <div className="stat-row">
-                {[
-                  { label:"Total bookings", value:bookings.length,  tint:BLUE  },
-                  { label:"Upcoming",       value:upcoming.length,  tint:GOLD  },
-                  { label:"Completed",      value:completed.length, tint:GREEN },
-                ].map(s => (
-                  <div key={s.label} className="stat" style={{ "--tint":s.tint }}>
-                    <div className="stat-v">{s.value}</div>
-                    <div className="stat-l">{s.label}</div>
-                  </div>
+          {step === 1 && (
+            <Card i={0} className="db-form-card" >
+              <div className="db-grid-2">
+                <Field label="Appointment date"><input type="date" value={form.date} min={today()} onChange={(e) => setF("date", e.target.value)} /></Field>
+                <Field label="Preferred time"><input type="time" value={form.time} onChange={(e) => setF("time", e.target.value)} /></Field>
+              </div>
+              <div className="db-actions">
+                <Button variant="ghost" onClick={() => setStep(0)}>Back</Button>
+                <Button onClick={() => (form.date ? setStep(2) : toast.error("Select a date."))}>Continue</Button>
+              </div>
+            </Card>
+          )}
+
+          {step === 2 && (
+            <Card i={0}>
+              <Field label="Address line 1"><input autoComplete="address-line1" placeholder="12 Example Street" value={form.line1} onChange={(e) => setF("line1", e.target.value)} /></Field>
+              <Field label="Address line 2 (optional)"><input autoComplete="address-line2" placeholder="Flat 3" value={form.line2} onChange={(e) => setF("line2", e.target.value)} /></Field>
+              <div className="db-grid-2">
+                <Field label="Town or city"><input autoComplete="address-level2" placeholder="Cardiff" value={form.city} onChange={(e) => setF("city", e.target.value)} /></Field>
+                <Field label="County (optional)"><input placeholder="South Glamorgan" value={form.county} onChange={(e) => setF("county", e.target.value)} /></Field>
+              </div>
+              <Field label="Postcode"
+                     error={form.postcode && !isValidUkPostcode(form.postcode) ? POSTCODE_MESSAGE
+                          : form.postcode && !isInServiceArea(form.postcode) ? outOfAreaMessage(form.postcode) : undefined}
+                     hint={form.postcode && isValidUkPostcode(form.postcode) && isInServiceArea(form.postcode) ? `We cover ${normaliseUkPostcode(form.postcode)}` : undefined}>
+                <input autoComplete="postal-code" placeholder={locale.examplePostcode} value={form.postcode}
+                       onChange={(e) => setF("postcode", e.target.value.toUpperCase())} style={{ textTransform: "uppercase" }} />
+              </Field>
+              <Field label="Notes for the phlebotomist (optional)"><input placeholder="Door code, floor number…" value={form.notes} onChange={(e) => setF("notes", e.target.value)} /></Field>
+              <div className="db-actions">
+                <Button variant="ghost" onClick={() => setStep(1)}>Back</Button>
+                <Button onClick={() => (addressReady() ? setStep(3) : toast.error("Enter your address and a postcode we cover."))}>Continue</Button>
+              </div>
+            </Card>
+          )}
+
+          {step === 3 && (
+            <Card i={0}>
+              <SectionTitle>Summary</SectionTitle>
+              <dl className="db-summary">
+                {picked.map((t) => (<div key={t._id}><dt>{t.name}</dt><dd>{formatMoney(t.price)}</dd></div>))}
+                <div className="is-total"><dt>Total</dt><dd>{formatMoney(totalAmount)}</dd></div>
+                <div><dt>Date</dt><dd>{formatDate(form.date)}</dd></div>
+                <div><dt>Time</dt><dd>{form.time}</dd></div>
+                <div><dt>Address</dt><dd>{composedAddress()}</dd></div>
+              </dl>
+              <div className="db-actions">
+                <Button variant="ghost" onClick={() => setStep(2)}>Back</Button>
+                <Button size="lg" busy={booking} onClick={handleBook}>
+                  {booking ? "Booking…" : `Confirm ${picked.length} test${picked.length > 1 ? "s" : ""}`}
+                </Button>
+              </div>
+            </Card>
+          )}
+        </>
+      )}
+
+      {tab === "bookings" && (
+        <>
+          <PageHeader eyebrow="Bookings" title="My bookings." sub={status === "ready" ? `${bookings.length} booking${bookings.length === 1 ? "" : "s"}` : undefined} />
+          {loadingOrError || (bookings.length
+            ? <div className="db-stack">{bookings.map(BookingCard)}</div>
+            : <EmptyState icon="list" title="No bookings yet" action={<Button icon="plus" onClick={() => go("book")}>Book your first test</Button>}>
+                When you book a test it appears here, and you can follow it stage by stage.
+              </EmptyState>)}
+        </>
+      )}
+
+      {tab === "reports" && (
+        <>
+          <PageHeader eyebrow="Reports" title="My reports." sub={`${reports.length} report${reports.length === 1 ? "" : "s"} available`} />
+          {status === "loading" ? <LoadingCards count={2} label="Loading your reports" />
+            : reports.length === 0
+              ? <EmptyState icon="file" title="No reports yet">Your report appears here once the laboratory has finished your tests.</EmptyState>
+              : <div className="db-stack">
+                  {reports.map((rep, i) => (
+                    <Card key={rep._id} i={i} tone="green">
+                      <div className="db-row">
+                        <div className="db-row-main">
+                          <h3 className="db-card-title">{testNames(rep.sample)}</h3>
+                          <div className="db-metas">
+                            <span className="db-code">Report {rep.reportId}</span>
+                            <span className="db-code">Booking {rep.booking?.bookingId || "—"}</span>
+                            <Meta icon="calendar">Issued {formatDate(rep.sentAt)}</Meta>
+                          </div>
+                          {rep.labComments && <p className="db-note-box">{rep.labComments}</p>}
+                        </div>
+                        <div className="db-row-side">
+                          <Button size="sm" icon="download" onClick={() => getReport(rep)}>
+                            Download report
+                          </Button>
+                        </div>
+                      </div>
+                      <p className="db-fineprint" style={{ marginTop: 14 }}>This report is confidential. Ask your GP or another clinician to interpret the results.</p>
+                    </Card>
+                  ))}
+                </div>}
+        </>
+      )}
+
+      {tab === "plans" && (
+        <>
+          <PageHeader eyebrow="Subscriptions" title="Subscriptions." sub="Recurring home visits, scheduled automatically." />
+          {mySubs.length > 0 && (
+            <>
+              <SectionTitle>My subscriptions</SectionTitle>
+              <div className="db-stack">
+                {mySubs.map((s, i) => (
+                  <Card key={s._id} i={i} tone={s.status === "active" ? "violet" : s.status === "paused" ? "amber" : "grey"}>
+                    <div className="db-row">
+                      <div className="db-row-main">
+                        <h3 className="db-card-title">{s.plan?.name || "Plan"}</h3>
+                        <div className="db-metas">
+                          <Meta icon="repeat">{s.cycleVisitsUsed}/{s.visitsPerCycle} visits this cycle</Meta>
+                          <Meta icon="calendar">Next visit {formatDate(s.nextVisitDate)}</Meta>
+                          <Meta icon="pin">{s.address}</Meta>
+                          <Meta icon="clock">{s.appointmentTime}</Meta>
+                          <Meta icon="pound">{formatMoney(s.price)} per cycle · {s.paymentStatus === "paid" ? "paid" : "payment pending"}</Meta>
+                        </div>
+                      </div>
+                      <div className="db-row-side"><span className={`db-pill tone-${s.status === "active" ? "violet" : s.status === "paused" ? "amber" : "grey"}`}><span className="db-pill-dot" />{s.status}</span></div>
+                    </div>
+                    <div className="db-actions">
+                      {s.status === "active" && <Button size="sm" variant="ghost" onClick={() => handleSubAction(s._id, "pause")}>Pause</Button>}
+                      {s.status === "paused" && <Button size="sm" variant="soft" onClick={() => handleSubAction(s._id, "resume")}>Resume</Button>}
+                      {["active", "paused"].includes(s.status) && <Button size="sm" variant="danger" onClick={() => handleSubAction(s._id, "cancel")}>Cancel</Button>}
+                    </div>
+                  </Card>
                 ))}
               </div>
-
-              <div className="banner">
-                <div>
-                  <div className="banner-title">Ready for your next test?</div>
-                  <div className="banner-sub">Select multiple tests — we handle them all in one visit.</div>
-                </div>
-                <button className="btn btn-white" onClick={() => setTab("book")}>Book now →</button>
-              </div>
-
-              {upcoming.length > 0 && (
-                <>
-                  <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:14 }}>
-                    <h3 style={{ fontSize:16, fontWeight:700, margin:0 }}>Upcoming appointments</h3>
-                    <span style={{ fontFamily:"var(--monof)", fontSize:9.5, letterSpacing:"0.1em", textTransform:"uppercase", color:GREEN, background:"rgba(46,125,87,0.08)", border:"1px solid rgba(46,125,87,0.25)", borderRadius:20, padding:"3px 9px" }}>● Live</span>
-                  </div>
-                  {upcoming.map(b => (
-                    <div key={b._id} className={`booking-row ${flashIds.has(b.bookingId)?"flash-brd":""}`}
-                      style={{ borderLeft:`4px solid ${STATUS_CONFIG[b.status]?.color||CRIMSON}` }}
-                      onClick={() => setExpandedId(expandedId===b._id?null:b._id)}>
-                      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", flexWrap:"wrap", gap:8 }}>
-                        <div>
-                          <div style={{ fontWeight:700, fontSize:15, marginBottom:4 }}>{getTestNames(b)}</div>
-                          <div style={{ fontSize:12, color:"var(--ink-60)", lineHeight:1.8 }}>
-                            📅 {b.appointmentDate?new Date(b.appointmentDate).toDateString():"—"} &nbsp; ⏰ {b.appointmentTime||"—"}
-                            {b.phlebotomist && <><br />🧪 {b.phlebotomist.name}</>}
-                          </div>
-                        </div>
-                        <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:6 }}>
-                          <StatusBadge status={b.status} />
-                          <span style={{ fontSize:11, color:"var(--ink-40)" }}>{expandedId===b._id?"▲ hide":"▼ track"}</span>
-                        </div>
-                      </div>
-                      {expandedId === b._id && (
-                        <div className="slide-in" style={{ marginTop:16, paddingTop:16, borderTop:"1px solid var(--rule)" }}>
-                          <StatusTracker status={b.status} />
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </>
-              )}
-
-              {bookings.length === 0 && (
-                <div style={{ textAlign:"center", padding:"60px 0" }}>
-                  <div style={{ fontSize:48, marginBottom:16 }}>🩸</div>
-                  <div style={{ fontSize:16, fontWeight:600, color:"var(--ink-60)", marginBottom:12 }}>No bookings yet</div>
-                  <button className="btn btn-primary" onClick={() => setTab("book")}>Book your first test</button>
-                </div>
-              )}
-            </div>
+            </>
           )}
-
-          {/* ══ BOOK ══ */}
-          {tab === "book" && (
-            <div className="fade-up">
-              <div className="head">
-                <SpecimenLabel code="HV-21" name="Booking" cap={GOLD} />
-                <h1>Book tests.</h1>
-                <p className="sub">Select one or more tests for a single home visit</p>
-              </div>
-
-              {/* Step bar */}
-              <div className="stepbar">
-                {["Select tests","Date & time","Address","Confirm"].map((s,i) => (
-                  <div key={i} style={{ display:"flex", alignItems:"center", gap:8 }}>
-                    <div style={{ display:"flex", alignItems:"center", gap:6 }}>
-                      <div className="step-dot" style={{
-                        background: i<=step ? CRIMSON : "rgba(23,19,16,0.06)",
-                        color: i<=step ? "#fff" : "rgba(23,19,16,0.4)",
-                        boxShadow: i===step ? "0 0 0 4px rgba(164,19,60,0.15)" : "none",
-                      }}>
-                        {i < step ? "✓" : i+1}
-                      </div>
-                      <span className="step-name" style={{ fontSize:12, fontFamily:"var(--monof)", letterSpacing:"0.06em", textTransform:"uppercase", color:i===step?"var(--ink)":"var(--ink-40)", fontWeight:i===step?500:400 }}>{s}</span>
+          <SectionTitle>Available plans</SectionTitle>
+          {plans.length === 0
+            ? <EmptyState icon="repeat" title="No plans available yet">Subscription plans set up by the clinic will appear here.</EmptyState>
+            : <div className="db-options">
+                {plans.map((p, i) => (
+                  <Card key={p._id} i={i}>
+                    <h3 className="db-card-title">{p.name}</h3>
+                    {p.description && <p className="db-sub" style={{ marginTop: 0 }}>{p.description}</p>}
+                    <div className="db-metas" style={{ margin: "10px 0 14px" }}>
+                      <Meta icon="tube">{p.testTypes?.map((t) => t.name).join(", ") || "—"}</Meta>
+                      <Meta icon="repeat">{p.visitsPerCycle} visits every {p.cycleLengthDays} days</Meta>
                     </div>
-                    {i < 3 && <div style={{ width:20, height:1.5, background:i<step?CRIMSON:"var(--rule)", borderRadius:2, flexShrink:0 }} />}
-                  </div>
+                    <p className="db-option-price" style={{ marginBottom: 14 }}>{formatMoney(p.price)} <span className="db-fineprint">per cycle</span></p>
+                    {subscribingId === p._id ? (
+                      <>
+                        <Field label="Home address"><textarea rows={2} value={subForm.address} onChange={(e) => setSubForm((f) => ({ ...f, address: e.target.value }))} /></Field>
+                        <Field label="Postcode" error={subForm.postcode && !isValidUkPostcode(subForm.postcode) ? POSTCODE_MESSAGE
+                                                   : subForm.postcode && !isInServiceArea(subForm.postcode) ? outOfAreaMessage(subForm.postcode) : undefined}>
+                          <input placeholder={locale.examplePostcode} value={subForm.postcode} style={{ textTransform: "uppercase" }}
+                                 onChange={(e) => setSubForm((f) => ({ ...f, postcode: e.target.value.toUpperCase() }))} />
+                        </Field>
+                        <Field label="Preferred time"><input type="time" value={subForm.appointmentTime} onChange={(e) => setSubForm((f) => ({ ...f, appointmentTime: e.target.value }))} /></Field>
+                        <div className="db-actions">
+                          <Button size="sm" variant="ghost" onClick={() => setSubscribingId(null)}>Cancel</Button>
+                          <Button size="sm" busy={subLoading} onClick={() => handleSubscribe(p._id)}>{subLoading ? "Subscribing…" : "Confirm subscription"}</Button>
+                        </div>
+                      </>
+                    ) : <Button className="db-btn-block" onClick={() => setSubscribingId(p._id)}>Subscribe</Button>}
+                  </Card>
                 ))}
+              </div>}
+        </>
+      )}
+
+      {tab === "profile" && (
+        <>
+          <PageHeader eyebrow="Account" title="My profile." sub="Your contact details, used for visits and reports." />
+          <Card i={0}>
+            <form onSubmit={saveProfile} noValidate>
+              <Field label="Full name"><input autoComplete="name" value={profile.name} onChange={(e) => setProfile((p) => ({ ...p, name: e.target.value }))} /></Field>
+              <Field label="Email" hint="Contact the clinic to change your sign-in email."><input type="email" value={user?.email || ""} readOnly /></Field>
+              <div className="db-grid-2">
+                <Field label="Phone number"><input type="tel" autoComplete="tel" placeholder={locale.examplePhone} value={profile.phone} onChange={(e) => setProfile((p) => ({ ...p, phone: e.target.value }))} /></Field>
+                <Field label="Age (optional)"><input type="number" min="0" max="120" value={profile.age} onChange={(e) => setProfile((p) => ({ ...p, age: e.target.value }))} /></Field>
               </div>
+              <Field label="Address"><input autoComplete="street-address" value={profile.address} onChange={(e) => setProfile((p) => ({ ...p, address: e.target.value }))} /></Field>
+              <Button type="submit" busy={savingProfile}>{savingProfile ? "Saving…" : "Save changes"}</Button>
+            </form>
+          </Card>
+        </>
+      )}
 
-              {/* Step 0 — pick tests */}
-              {step === 0 && (
-                <div>
-                  {picked.length > 0 && (
-                    <div className="card" style={{ padding:"14px 18px", marginBottom:20, display:"flex", alignItems:"center", gap:10, flexWrap:"wrap" }}>
-                      <span style={{ fontSize:13, fontWeight:700, marginRight:4 }}>Selected ({picked.length}):</span>
-                      {picked.map(t => (
-                        <span key={t._id} className="selected-badge" onClick={() => toggleTest(t)}>{t.name} ✕</span>
-                      ))}
-                      <span style={{ marginLeft:"auto", fontFamily:"var(--display)", fontSize:17, fontWeight:900, color:CRIMSON }}>
-                        Rs. {totalAmount.toLocaleString()}
-                      </span>
-                    </div>
-                  )}
-
-                  <div className="tests-grid" style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(220px,1fr))", gap:12, marginBottom:24 }}>
-                    {tests.map(t => (
-                      <div key={t._id} className={`test-opt ${picked.find(x=>x._id===t._id)?"sel":""}`} onClick={() => toggleTest(t)}>
-                        <div className="check">✓</div>
-                        <div style={{ display:"flex", justifyContent:"space-between", marginBottom:10 }}>
-                          <span className="cat-tag">{t.category}</span>
-                          <span style={{ fontFamily:"var(--monof)", fontSize:11, color:"var(--ink-40)" }}>{t.code}</span>
-                        </div>
-                        <div style={{ fontWeight:700, fontSize:14, marginBottom:4 }}>{t.name}</div>
-                        <div style={{ fontSize:12, color:"var(--ink-60)", marginBottom:8 }}>Results in {t.duration}</div>
-                        {t.preparation && <div style={{ fontSize:11, color:GOLD, marginBottom:8 }}>⚠ {t.preparation}</div>}
-                        <div style={{ fontFamily:"var(--display)", fontSize:18, fontWeight:900, color:CRIMSON }}>Rs. {t.price?.toLocaleString()}</div>
-                      </div>
-                    ))}
-                  </div>
-
-                  <button className="btn btn-primary" onClick={() => picked.length ? setStep(1) : toast.error("Select at least one test.")}>
-                    Next → {picked.length > 0 && `(${picked.length} test${picked.length>1?"s":""} · Rs. ${totalAmount.toLocaleString()})`}
-                  </button>
-                </div>
-              )}
-
-              {/* Step 1 — Date & Time */}
-              {step === 1 && (
-                <div style={{ maxWidth:440 }}>
-                  <div className="card" style={{ padding:24, marginBottom:20 }}>
-                    <div style={{ marginBottom:16 }}>
-                      <FieldLabel>Appointment date</FieldLabel>
-                      <input className="inp" type="date" value={form.date} min={new Date().toISOString().split("T")[0]} onChange={e=>setF("date",e.target.value)} />
-                    </div>
-                    <div>
-                      <FieldLabel>Preferred time</FieldLabel>
-                      <input className="inp" type="time" value={form.time} onChange={e=>setF("time",e.target.value)} />
-                    </div>
-                  </div>
-                  <div style={{ display:"flex", gap:10 }}>
-                    <button className="btn btn-ghost" onClick={() => setStep(0)}>← Back</button>
-                    <button className="btn btn-primary" onClick={() => form.date ? setStep(2) : toast.error("Select a date.")}>Next →</button>
-                  </div>
-                </div>
-              )}
-
-              {/* Step 2 — Address */}
-              {step === 2 && (
-                <div style={{ maxWidth:440 }}>
-                  <div className="card" style={{ padding:24, marginBottom:20 }}>
-                    <div style={{ marginBottom:16 }}>
-                      <FieldLabel>Home address</FieldLabel>
-                      <textarea className="inp" rows={3} placeholder="Full address for the phlebotomist visit..." value={form.address} onChange={e=>setF("address",e.target.value)} style={{ resize:"vertical" }} />
-                    </div>
-                    <div>
-                      <FieldLabel>Notes (optional)</FieldLabel>
-                      <input className="inp" placeholder="e.g. Gate code, floor number..." value={form.notes} onChange={e=>setF("notes",e.target.value)} />
-                    </div>
-                  </div>
-                  <div style={{ display:"flex", gap:10 }}>
-                    <button className="btn btn-ghost" onClick={() => setStep(1)}>← Back</button>
-                    <button className="btn btn-primary" onClick={() => form.address ? setStep(3) : toast.error("Enter your address.")}>Next →</button>
-                  </div>
-                </div>
-              )}
-
-              {/* Step 3 — Confirm */}
-              {step === 3 && (
-                <div style={{ maxWidth:500 }}>
-                  <div className="card" style={{ padding:24, marginBottom:20 }}>
-                    <div style={{ fontFamily:"var(--monof)", fontSize:10.5, letterSpacing:"0.14em", textTransform:"uppercase", color:"var(--ink-40)", marginBottom:16 }}>Booking summary</div>
-
-                    <div style={{ marginBottom:14 }}>
-                      <div style={{ fontFamily:"var(--monof)", fontSize:10, letterSpacing:"0.12em", textTransform:"uppercase", color:"var(--ink-40)", marginBottom:8 }}>Selected tests ({picked.length})</div>
-                      {picked.map((t) => (
-                        <div key={t._id} style={{ display:"flex", justifyContent:"space-between", padding:"8px 0", borderBottom:"1px solid var(--rule)", fontSize:13 }}>
-                          <span style={{ color:"var(--ink-60)", fontWeight:500 }}>🧪 {t.name}</span>
-                          <span style={{ fontWeight:700 }}>Rs. {t.price?.toLocaleString()}</span>
-                        </div>
-                      ))}
-                      <div style={{ display:"flex", justifyContent:"space-between", padding:"10px 0", fontSize:14 }}>
-                        <span style={{ fontWeight:700 }}>Total amount</span>
-                        <span style={{ fontFamily:"var(--display)", fontWeight:900, color:CRIMSON, fontSize:18 }}>Rs. {totalAmount.toLocaleString()}</span>
-                      </div>
-                    </div>
-
-                    {[
-                      ["📅 Date",    form.date ? new Date(form.date).toDateString() : "—"],
-                      ["⏰ Time",    form.time],
-                      ["📍 Address", form.address],
-                      ["🏠 Service", "Home visit"],
-                    ].map(([k,v]) => (
-                      <div key={k} style={{ display:"flex", justifyContent:"space-between", padding:"9px 0", borderBottom:"1px solid var(--rule)", fontSize:13 }}>
-                        <span style={{ color:"var(--ink-40)", fontWeight:500 }}>{k}</span>
-                        <span style={{ fontWeight:600, textAlign:"right", maxWidth:"60%" }}>{v}</span>
-                      </div>
-                    ))}
-                  </div>
-                  <div style={{ display:"flex", gap:10 }}>
-                    <button className="btn btn-ghost" onClick={() => setStep(2)}>← Back</button>
-                    <button className="btn btn-primary" onClick={handleBook} disabled={loading} style={{ flex:1 }}>
-                      {loading ? "Booking..." : `✅ Confirm ${picked.length} test${picked.length>1?"s":""}`}
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* ══ MY BOOKINGS ══ */}
-          {tab === "bookings" && (
-            <div className="fade-up">
-              <div className="head">
-                <SpecimenLabel code="HV-22" name="Bookings" cap={TEAL} />
-                <h1>My bookings.</h1>
-                <p className="sub">{bookings.length} total bookings</p>
-              </div>
-              {bookings.length === 0 ? (
-                <div style={{ textAlign:"center", padding:"60px 0" }}>
-                  <div style={{ fontSize:48, marginBottom:16 }}>📋</div>
-                  <div style={{ fontSize:16, fontWeight:600, color:"var(--ink-60)", marginBottom:12 }}>No bookings yet</div>
-                  <button className="btn btn-primary" onClick={() => setTab("book")}>Book your first test</button>
-                </div>
-              ) : bookings.map(b => (
-                <div key={b._id} className={`booking-row ${flashIds.has(b.bookingId)?"flash-brd":""}`}
-                  style={{ borderLeft:`4px solid ${STATUS_CONFIG[b.status]?.color||"var(--rule)"}` }}
-                  onClick={() => setExpandedId(expandedId===b._id?null:b._id)}>
-                  <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", flexWrap:"wrap", gap:10 }}>
-                    <div style={{ flex:1 }}>
-                      <div style={{ fontWeight:700, fontSize:15, marginBottom:4 }}>{getTestNames(b)}</div>
-                      {b.testTypes?.length > 1 && (
-                        <span style={{ fontFamily:"var(--monof)", fontSize:9.5, background:"rgba(164,19,60,0.07)", color:CRIMSON, border:"1px solid rgba(164,19,60,0.3)", borderRadius:20, padding:"2px 8px", letterSpacing:"0.06em", marginBottom:6, display:"inline-block" }}>
-                          {b.testTypes.length} tests
-                        </span>
-                      )}
-                      <div style={{ fontSize:12, color:"var(--ink-60)", lineHeight:1.9, marginTop:4 }}>
-                        📅 {b.appointmentDate?new Date(b.appointmentDate).toDateString():"—"} &nbsp; ⏰ {b.appointmentTime||"—"}<br />
-                        📍 {b.address||"—"}<br />
-                        {b.phlebotomist && <>🧪 {b.phlebotomist.name}<br /></>}
-                        💰 Rs. {b.amount?.toLocaleString()||"—"} &nbsp;
-                        <span style={{ fontFamily:"var(--monof)", color:"var(--ink-40)", fontSize:10.5 }}>#{b.bookingId||"—"}</span>
-                      </div>
-                    </div>
-                    <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:8 }}>
-                      <StatusBadge status={b.status} />
-                      {flashIds.has(b.bookingId) && <span style={{ fontSize:10, fontWeight:700, color:GREEN }}>🟢 Updated</span>}
-                      <div style={{ display:"flex", gap:6 }}>
-                        {b.status === "completed" && (
-                          <button className="btn btn-primary btn-sm"
-                            onClick={e=>{ e.stopPropagation(); openReport(b); }}
-                            style={{ whiteSpace:"nowrap" }}>
-                            ⬇ Report
-                          </button>
-                        )}
-                        {["pending","confirmed"].includes(b.status) && (
-                          <button className="btn btn-sm" onClick={e=>{ e.stopPropagation(); handleCancel(b._id); }}
-                            style={{ background:"rgba(164,19,60,0.06)", color:CRIMSON, border:"1px solid rgba(164,19,60,0.3)" }}>
-                            Cancel
-                          </button>
-                        )}
-                      </div>
-                      <span style={{ fontSize:11, color:"var(--ink-40)" }}>{expandedId===b._id?"▲ hide":"▼ track"}</span>
-                    </div>
-                  </div>
-                  {expandedId === b._id && !["cancelled","rejected"].includes(b.status) && (
-                    <div className="slide-in" style={{ marginTop:16, paddingTop:16, borderTop:"1px solid var(--rule)" }}>
-                      <div style={{ fontFamily:"var(--monof)", fontSize:10, letterSpacing:"0.14em", textTransform:"uppercase", color:"var(--ink-40)", marginBottom:8 }}>Status tracker</div>
-                      <StatusTracker status={b.status} />
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* ══ MY REPORTS ══ */}
-          {tab === "reports" && (
-            <div className="fade-up">
-              <div className="head">
-                <SpecimenLabel code="HV-23" name="Reports" cap={LAVENDER} />
-                <h1>My reports.</h1>
-                <p className="sub">{reports.length} verified report{reports.length!==1?"s":""} available</p>
-              </div>
-
-              {reports.length === 0 ? (
-                <div className="card" style={{ padding:"60px 24px", textAlign:"center" }}>
-                  <div style={{ fontSize:48, marginBottom:16 }}>📄</div>
-                  <div style={{ fontSize:16, fontWeight:600, color:"var(--ink-60)", marginBottom:6 }}>No reports yet</div>
-                  <div style={{ fontSize:14, color:"var(--ink-40)" }}>
-                    Your lab reports will appear here once the laboratory completes your tests.
-                  </div>
-                </div>
-              ) : (
-                reports.map(rep => {
-                  const testNames = rep.sample?.testTypes?.map(t => t.name).join(", ") || "—";
-                  return (
-                    <div key={rep._id} className="rep-card" style={{ "--tint": TEAL }}>
-                      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", flexWrap:"wrap", gap:14 }}>
-                        <div style={{ flex:1, minWidth:200 }}>
-                          <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:8 }}>
-                            <div style={{ width:38, height:38, borderRadius:10, background:"rgba(28,122,107,0.10)", border:"1px solid rgba(28,122,107,0.25)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:17, flexShrink:0 }}>🧬</div>
-                            <div>
-                              <div style={{ fontWeight:700, fontSize:15 }}>{testNames}</div>
-                              <div style={{ fontFamily:"var(--monof)", fontSize:10, letterSpacing:"0.1em", textTransform:"uppercase", color:"var(--ink-40)" }}>Verified lab report</div>
-                            </div>
-                          </div>
-                          <div style={{ fontSize:12, color:"var(--ink-60)", lineHeight:1.9, marginTop:6 }}>
-                            📄 Report: <span style={{ fontFamily:"var(--monof)" }}>{rep.reportId}</span> &nbsp;·&nbsp; 🔖 Booking: <span style={{ fontFamily:"var(--monof)" }}>{rep.booking?.bookingId || "—"}</span><br />
-                            📅 Issued: {rep.sentAt ? new Date(rep.sentAt).toDateString() : "—"}
-                            {rep.labComments && (
-                              <>
-                                <br />
-                                <span style={{ display:"inline-block", marginTop:6, background:"rgba(184,137,46,0.08)", border:"1px solid rgba(184,137,46,0.3)", borderRadius:8, padding:"6px 10px", color:"#7A5C12" }}>
-                                  💬 {rep.labComments}
-                                </span>
-                              </>
-                            )}
-                          </div>
-                        </div>
-                        <div style={{ display:"flex", flexDirection:"column", gap:8, alignItems:"flex-end" }}>
-                          <span style={{ display:"inline-flex", alignItems:"center", gap:5, padding:"4px 10px", borderRadius:20, fontFamily:"var(--monof)", fontSize:9.5, letterSpacing:"0.1em", textTransform:"uppercase", background:"rgba(46,125,87,0.08)", color:GREEN, border:"1px solid rgba(46,125,87,0.3)" }}>
-                            <span style={{ width:6, height:6, borderRadius:"50%", background:GREEN }} />
-                            Ready
-                          </span>
-                          <button
-                            onClick={() => rep.fileUrl ? window.open(rep.fileUrl, "_blank", "noopener,noreferrer") : toast.error("No file available.")}
-                            className="btn btn-sm"
-                            style={{ background:TEAL, color:"#fff", whiteSpace:"nowrap", boxShadow:"0 6px 16px rgba(28,122,107,0.3)" }}>
-                            ⬇ Download report
-                          </button>
-                        </div>
-                      </div>
-                      <div style={{ marginTop:14, paddingTop:14, borderTop:"1px solid var(--rule)", fontSize:11, color:"var(--ink-40)" }}>
-                        ⚠️ This report is confidential. Please consult your physician to interpret these results.
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          )}
-
-          {/* ══ SUBSCRIPTIONS ══ */}
-          {tab === "plans" && (
-            <div className="fade-up">
-              <div className="head">
-                <SpecimenLabel code="HV-25" name="Plans" cap={LAVENDER} />
-                <h1>Subscriptions.</h1>
-                <p className="sub">Recurring home visits, scheduled automatically</p>
-              </div>
-
-              {mySubs.length > 0 && (
-                <div style={{ marginBottom:36 }}>
-                  <div style={{ fontFamily:"var(--monof)", fontSize:10.5, letterSpacing:"0.14em", textTransform:"uppercase", color:"var(--ink-40)", marginBottom:12 }}>My subscriptions</div>
-                  {mySubs.map(s => (
-                    <div key={s._id} className="booking-row" style={{ borderLeft:`4px solid ${s.status==="active"?LAVENDER:s.status==="paused"?GOLD:"var(--rule)"}` }}>
-                      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", flexWrap:"wrap", gap:10 }}>
-                        <div style={{ flex:1 }}>
-                          <div style={{ fontWeight:700, fontSize:15, marginBottom:4 }}>{s.plan?.name || "Plan"}</div>
-                          <div style={{ fontSize:12, color:"var(--ink-60)", lineHeight:1.9, marginTop:4 }}>
-                            🔁 {s.cycleVisitsUsed}/{s.visitsPerCycle} visits this cycle &nbsp;
-                            📅 Next visit: {s.nextVisitDate ? new Date(s.nextVisitDate).toDateString() : "—"}<br />
-                            📍 {s.address} &nbsp; ⏰ {s.appointmentTime}<br />
-                            💰 Rs. {s.price?.toLocaleString()}/cycle &nbsp;
-                            <span style={{ fontFamily:"var(--monof)", fontSize:10.5, color: s.paymentStatus==="paid"?GREEN:GOLD }}>
-                              {s.paymentStatus==="paid" ? "PAID" : "PAYMENT PENDING"}
-                            </span>
-                          </div>
-                        </div>
-                        <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:8 }}>
-                          <span style={{ display:"inline-flex", alignItems:"center", gap:6, padding:"4px 11px", borderRadius:20, fontSize:10.5, fontWeight:600, letterSpacing:"0.08em", textTransform:"uppercase", fontFamily:"var(--monof)", color: s.status==="active"?LAVENDER:s.status==="paused"?GOLD:"var(--ink-40)" }}>
-                            {s.status}
-                          </span>
-                          <div style={{ display:"flex", gap:6 }}>
-                            {s.status === "active" && (
-                              <button className="btn btn-sm" onClick={()=>handleSubAction(s._id,"pause")} style={{ background:"rgba(184,137,46,0.08)", color:GOLD, border:"1px solid rgba(184,137,46,0.3)" }}>Pause</button>
-                            )}
-                            {s.status === "paused" && (
-                              <button className="btn btn-sm" onClick={()=>handleSubAction(s._id,"resume")} style={{ background:"rgba(124,107,174,0.08)", color:LAVENDER, border:"1px solid rgba(124,107,174,0.3)" }}>Resume</button>
-                            )}
-                            {["active","paused"].includes(s.status) && (
-                              <button className="btn btn-sm" onClick={()=>handleSubAction(s._id,"cancel")} style={{ background:"rgba(164,19,60,0.06)", color:CRIMSON, border:"1px solid rgba(164,19,60,0.3)" }}>Cancel</button>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              <div style={{ fontFamily:"var(--monof)", fontSize:10.5, letterSpacing:"0.14em", textTransform:"uppercase", color:"var(--ink-40)", marginBottom:12 }}>Available plans</div>
-              {plans.length === 0 ? (
-                <div className="card" style={{ padding:"60px 24px", textAlign:"center" }}>
-                  <div style={{ fontSize:48, marginBottom:16 }}>🔁</div>
-                  <div style={{ fontSize:16, fontWeight:600, color:"var(--ink-60)" }}>No subscription plans available yet</div>
-                </div>
-              ) : (
-                <div className="tests-grid" style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(260px,1fr))", gap:12 }}>
-                  {plans.map(p => (
-                    <div key={p._id} className="card" style={{ padding:20 }}>
-                      <div style={{ fontWeight:700, fontSize:16, marginBottom:4 }}>{p.name}</div>
-                      {p.description && <div style={{ fontSize:12, color:"var(--ink-60)", marginBottom:10 }}>{p.description}</div>}
-                      <div style={{ fontSize:12, color:"var(--ink-60)", lineHeight:1.9, marginBottom:12 }}>
-                        🧪 {p.testTypes?.map(t=>t.name).join(", ") || "—"}<br />
-                        🔁 {p.visitsPerCycle} visits every {p.cycleLengthDays} days
-                      </div>
-                      <div style={{ fontFamily:"var(--display)", fontSize:20, fontWeight:900, color:LAVENDER, marginBottom:14 }}>
-                        Rs. {p.price?.toLocaleString()}<span style={{ fontSize:12, fontWeight:500, color:"var(--ink-40)" }}> /cycle</span>
-                      </div>
-
-                      {subscribingId === p._id ? (
-                        <div>
-                          <div style={{ marginBottom:10 }}>
-                            <FieldLabel>Home address</FieldLabel>
-                            <textarea className="inp" rows={2} value={subForm.address} onChange={e=>setSubForm(f=>({...f,address:e.target.value}))} style={{ resize:"vertical" }} />
-                          </div>
-                          <div style={{ marginBottom:14 }}>
-                            <FieldLabel>Preferred time</FieldLabel>
-                            <input className="inp" type="time" value={subForm.appointmentTime} onChange={e=>setSubForm(f=>({...f,appointmentTime:e.target.value}))} />
-                          </div>
-                          <div style={{ display:"flex", gap:8 }}>
-                            <button className="btn btn-ghost btn-sm" onClick={()=>setSubscribingId(null)}>Cancel</button>
-                            <button className="btn btn-primary btn-sm" disabled={subLoading} onClick={()=>handleSubscribe(p._id)} style={{ flex:1 }}>
-                              {subLoading ? "Subscribing..." : "Confirm subscription"}
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
-                        <button className="btn btn-primary" style={{ width:"100%" }} onClick={()=>setSubscribingId(p._id)}>Subscribe</button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* ══ PROFILE ══ */}
-          {tab === "profile" && (
-            <div className="fade-up">
-              <div className="head">
-                <SpecimenLabel code="HV-24" name="Profile" cap={BLUE} />
-                <h1>My profile.</h1>
-                <p className="sub">Manage your account details</p>
-              </div>
-              <div style={{ maxWidth:500 }}>
-                <div className="card" style={{ padding:24, marginBottom:20, display:"flex", alignItems:"center", gap:16 }}>
-                  <div style={{ width:64, height:64, borderRadius:"50%", background:"rgba(164,19,60,0.08)", border:"1px solid rgba(164,19,60,0.25)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:26, flexShrink:0 }}>👤</div>
-                  <div>
-                    <div style={{ fontFamily:"var(--display)", fontWeight:900, fontSize:20, marginBottom:2 }}>{user?.name||"Patient"}</div>
-                    <div style={{ fontSize:13, color:"var(--ink-60)", marginBottom:8 }}>{user?.email}</div>
-                    <span style={{ fontFamily:"var(--monof)", fontSize:9.5, letterSpacing:"0.12em", textTransform:"uppercase", background:"rgba(164,19,60,0.07)", color:CRIMSON, border:"1px solid rgba(164,19,60,0.3)", borderRadius:20, padding:"3px 10px" }}>Patient</span>
-                  </div>
-                </div>
-                <div className="card" style={{ padding:24 }}>
-                  {[
-                    { label:"Full name",    type:"text",   val:user?.name    },
-                    { label:"Email",        type:"email",  val:user?.email   },
-                    { label:"Phone number", type:"tel",    val:user?.phone   },
-                    { label:"Age",          type:"number", val:user?.age     },
-                    { label:"Address",      type:"text",   val:user?.address },
-                  ].map(f => (
-                    <div key={f.label} style={{ marginBottom:16 }}>
-                      <FieldLabel>{f.label}</FieldLabel>
-                      <input className="inp" type={f.type} defaultValue={f.val||""} placeholder={f.label} />
-                    </div>
-                  ))}
-                  <button className="btn btn-primary">Save changes</button>
-                </div>
-              </div>
-            </div>
-          )}
+      <Modal open={!!cancelId} onClose={() => setCancelId(null)} title="Cancel this booking?">
+        <p className="db-sub" style={{ marginTop: 0 }}>The visit will be cancelled. You can book again at any time.</p>
+        <div className="db-actions">
+          <Button variant="ghost" onClick={() => setCancelId(null)}>Keep booking</Button>
+          <Button variant="danger" onClick={confirmCancel}>Cancel booking</Button>
         </div>
-      </main>
-    </div>
+      </Modal>
+    </Shell>
   );
 }

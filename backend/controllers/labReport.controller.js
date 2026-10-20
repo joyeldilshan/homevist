@@ -2,12 +2,29 @@ const LabReport = require("../models/LabReport");
 const Sample    = require("../models/Sample");
 const Booking   = require("../models/Booking");
 const { sendReportToPatient } = require("../utils/reportEmail");
-const path = require("path");
+const mongoose = require("mongoose");
 const fs   = require("fs");
+const logger = require("../utils/logger");
+const { saveReportPdf, removeReportFile, storedNameOf, pathFor, downloadPath } = require("../utils/reportFiles");
 
-// Build the disk path of a stored report file from its URL
-const diskPathFromUrl = (fileUrl) =>
-  path.join(__dirname, "..", "uploads", "reports", path.basename(fileUrl || ""));
+// One answer for "no such report" and "not yours": a caller cannot tell
+// which, so IDs cannot be probed for existence.
+const reportNotFound = (res) => res.status(404).json({ success: false, message: "Report not found." });
+
+/**
+ * Who may download a report file:
+ *   - the patient it belongs to, once it has been sent to them (the same
+ *     rule as GET /api/reports for patients);
+ *   - the lab technician who uploaded it or is handling its sample;
+ *   - an admin.
+ */
+function canDownload(user, report) {
+  const uid = String(user._id);
+  if (user.role === "admin") return true;
+  if (user.role === "user" || user.role === "patient") return String(report.patient) === uid && report.sentToPatient === true;
+  if (user.role === "mlt") return String(report.mlt) === uid || String(report.sample?.mlt) === uid;
+  return false;
+}
 
 /**
  * POST /api/reports
@@ -24,39 +41,43 @@ exports.createReport = async (req, res, next) => {
     if (!sample) {
       return res.status(404).json({ success: false, message: "Sample not found." });
     }
-
-    let report = await LabReport.findOne({ sample: sampleId });
-
-    // If a new file was uploaded, build its public URL and clean up the old one
-    let fileUrl = report?.fileUrl;
-    if (req.file) {
-      fileUrl = `${req.protocol}://${req.get("host")}/uploads/reports/${req.file.filename}`;
-      if (report?.fileUrl) {
-        const oldPath = diskPathFromUrl(report.fileUrl);
-        fs.existsSync(oldPath) && fs.unlink(oldPath, () => {});
-      }
+    // Only while the lab is processing it. A report could be uploaded at
+    // any stage (before the sample reached the lab, or replacing one the
+    // patient had already been sent).
+    if (sample.status !== "processing") {
+      return res.status(409).json({ success: false, message: "A report can be uploaded only while the sample is processing." });
     }
 
-    if (!fileUrl) {
+    let report = await LabReport.findOne({ sample: sampleId });
+    if (!req.file && !report) {
       return res.status(400).json({ success: false, message: "Please upload a PDF report file." });
     }
 
-    if (report) {
-      report.fileUrl     = fileUrl;
-      report.labComments = labComments || "";
-      report.mlt         = req.user._id;
-      await report.save();
-    } else {
-      report = await LabReport.create({
+    // Checked by content (it must start with %PDF-) and saved under a
+    // server-generated random name; nothing from the uploader reaches the path.
+    let fileName;
+    if (req.file) {
+      try { fileName = await saveReportPdf(req.file.buffer); }
+      catch (e) { return res.status(e.statusCode || 400).json({ success: false, message: e.message }); }
+    }
+    const replaced = fileName && report ? storedNameOf(report) : null;
+
+    if (!report) {
+      report = new LabReport({
         sample:      sample._id,
         booking:     sample.booking,
         patient:     sample.patient,
-        mlt:         req.user._id,
-        fileUrl,
-        labComments: labComments || "",
         status:      "draft",
       });
     }
+    if (fileName) report.fileName = fileName;
+    report.fileUrl     = downloadPath(report._id);
+    report.labComments = labComments || "";
+    report.mlt         = req.user._id;
+    await report.save();
+
+    // Only after the new file is safely recorded.
+    if (replaced && replaced !== fileName) await removeReportFile(replaced);
 
     res.status(201).json({ success: true, report });
   } catch (err) { next(err); }
@@ -86,7 +107,8 @@ exports.getReports = async (req, res, next) => {
 
 /**
  * PATCH /api/reports/:id/send
- * Emails the stored PDF to the patient as an attachment.
+ * Emails the patient that their report is ready, with a link to the
+ * signed-in reports page. The PDF is not attached.
  */
 exports.sendReport = async (req, res, next) => {
   try {
@@ -102,19 +124,20 @@ exports.sendReport = async (req, res, next) => {
       return res.status(400).json({ success: false, message: "Patient has no email on file." });
     }
 
-    const tests    = report.sample?.testTypes?.map(t => t.name).join(", ") || "—";
-    const filePath = diskPathFromUrl(report.fileUrl);
+    // The email promises a download, so the file must be there (it can be
+    // lost, e.g. on a host whose disk is wiped on deploy).
+    const filePath = pathFor(storedNameOf(report));
+    if (!filePath || !fs.existsSync(filePath)) {
+      return res.status(409).json({ success: false, message: "The report file is missing. Upload the PDF again, then send." });
+    }
 
+    // A notification with a link to the signed-in reports page; the PDF is
+    // not attached (it is downloaded through the authenticated route).
     await sendReportToPatient({
       to:          report.patient.email,
       patientName: report.patient.name,
       reportId:    report.reportId,
-      sampleId:    report.sample?.sampleId,
       bookingId:   report.booking?.bookingId,
-      tests,
-      labComments: report.labComments,
-      filePath,                 // attach the actual stored PDF
-      fileUrl:     report.fileUrl,
     });
 
     report.status        = "completed";
@@ -127,11 +150,51 @@ exports.sendReport = async (req, res, next) => {
 
     if (req.io && report.booking) {
       req.io.to(String(report.booking._id)).emit("report_ready", { reportId: report.reportId });
+      // The patient's page listens on the bookingId room (see
+      // sample.controller.js emitBookingStatus); without this it never
+      // learned that the report was ready.
+      if (report.booking.bookingId) {
+        req.io.to(report.booking.bookingId).emit("status_update", { bookingId: report.booking.bookingId, status: "completed" });
+      }
     }
 
     res.json({ success: true, message: "Report sent to patient.", report });
   } catch (err) {
-    console.error("📧 Report send error:", err.message);
-    res.status(500).json({ success: false, message: "Failed to send report: " + err.message });
+    // A malformed report ID is a 404 like everywhere else (error handler).
+    if (err.name === "CastError") return next(err);
+    // Logged in full; the client gets a plain message (mail errors can
+    // carry server names, addresses and credentials hints).
+    logger.error("📧 Report send error:", err.message);
+    res.status(500).json({ success: false, message: "The report could not be sent. Please try again." });
   }
 };
+
+/**
+ * GET /api/reports/:id/file
+ * Streams the report PDF to someone allowed to see it (canDownload).
+ * Replaces the public /uploads static route.
+ */
+exports.downloadReport = async (req, res, next) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) return reportNotFound(res);
+    const report = await LabReport.findById(req.params.id).populate("sample", "mlt");
+    if (!report || !canDownload(req.user, report)) return reportNotFound(res);
+
+    const full = pathFor(storedNameOf(report));
+    if (!full || !fs.existsSync(full)) {
+      // Not "ask the lab to upload it again": once a report has been sent
+      // the sample is completed and uploads are closed, so only an admin
+      // (restoring the file) can fix it.
+      return res.status(404).json({ success: false, message: "This report file is not available. Please contact the administrator." });
+    }
+    res.set({
+      "Content-Type":           "application/pdf",
+      "Content-Disposition":    `attachment; filename="Report_${String(report.reportId).replace(/[^A-Za-z0-9_-]/g, "")}.pdf"`,
+      "Cache-Control":          "private, no-store",
+      "X-Content-Type-Options": "nosniff",
+    });
+    fs.createReadStream(full).on("error", next).pipe(res);
+  } catch (err) { next(err); }
+};
+
+exports._canDownload = canDownload;   // for tests

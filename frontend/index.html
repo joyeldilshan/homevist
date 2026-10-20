@@ -1,16 +1,58 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en-GB">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <title>Home Visit — Mobile Blood Testing</title>
+    <title>HemoVisit — Mobile Blood Testing</title>
+    <meta name="description" content="HemoVisit: book a blood test at home in Cardiff and South Wales. A phlebotomist visits your address, a laboratory analyses the sample, and you follow each stage and get your report online." />
+    <script>
+      /*
+       * The production build pre-renders the landing page into #root
+       * (scripts/prerender.mjs), and every route is served this same file.
+       * Keep that markup only where it is the right page: "/" or "/home",
+       * for a visitor who is not signed in (a signed-in visitor is sent to
+       * their dashboard). Everywhere else, hide #root now, before first
+       * paint; the script after it empties it so React starts clean.
+       *
+       * The auth photo only exists after the bundle runs, so preload it
+       * here. The hero photo needs no help: it is in the HTML.
+       */
+      (function () {
+        var p = location.pathname;
+        var keep = p === "/" || p === "/home";
+        try { if (sessionStorage.getItem("token") && sessionStorage.getItem("user")) keep = false; } catch (e) {}
+        if (!keep) document.documentElement.setAttribute("data-noshell", "");
+        // The storage notice is in the HTML; hide it now if already dismissed.
+        try { if (localStorage.getItem("hv-storage-notice-dismissed")) document.documentElement.setAttribute("data-notice-off", ""); } catch (e) {}
+        if (p === "/login" || p === "/register") {
+          var l = document.createElement("link");
+          l.rel = "preload"; l.as = "image"; l.href = "/images/image%204.jpg";
+          l.setAttribute("fetchpriority", "high");
+          document.head.appendChild(l);
+        }
+      })();
+    </script>
+    <style>[data-noshell] #root { visibility: hidden; } [data-notice-off] .hv-storage-notice { display: none; }</style>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Playfair+Display:wght@700;900&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <!--
+      Fonts load without blocking first paint: the stylesheet is fetched as
+      media="print" (non-blocking) and switched to "all" once it arrives.
+      display=swap already meant fallback text first, so nothing new is
+      visible; this only stops the fonts CSS from holding up the page.
+    -->
+    <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800;900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" media="print" onload="this.media='all'" />
+    <noscript><link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800;900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" /></noscript>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root"><!--app-html--></div>
+    <script>
+      if (document.documentElement.hasAttribute("data-noshell")) {
+        document.getElementById("root").textContent = "";
+        document.documentElement.removeAttribute("data-noshell");
+      }
+    </script>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

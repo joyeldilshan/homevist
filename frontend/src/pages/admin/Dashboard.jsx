@@ -1,82 +1,44 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
+import { useAdminSocket } from "../../hooks/useSocket";
 import api from "../../utils/api";
 import toast from "react-hot-toast";
 import EmailAuditLog from "./EmailAuditLog";
+import { formatMoney, formatMoneyCompact, formatDate, formatLongDate, formatRating, formatRatingSummary } from "../../utils/format";
+import { isValidPassword, PASSWORD_MESSAGE, PASSWORD_MIN } from "../../utils/validators";
+import locale from "../../config/locale";
+import {
+  Shell, PageHeader, SectionTitle, Stats, StatusPill, LoadingCards, EmptyState, ErrorState,
+  Button, Field, Modal, Meta, Card, DataTable,
+} from "../../dashboard/kit";
+import { BOOKING_STATUS, testNames } from "../../dashboard/status";
 
-/* ── Lab-label palette ─────────────────────────────────────── */
-const INK      = "#171310";
-const CRIMSON  = "#A4133C";
-const LAVENDER = "#7C6BAE";
-const GOLD     = "#B8892E";
-const TEAL     = "#1C7A6B";
-const BLUE     = "#3E6C9E";
-const GREEN    = "#2E7D57";
+/**
+ * Admin dashboard. Every API call is unchanged from the previous
+ * version; the layout is the shared dashboard shell. New: live
+ * "new booking" updates (useAdminSocket existed but was never used),
+ * real tables, accessible modals instead of window.confirm.
+ */
 
-const sUser   = b => b?.user?.name || "Unknown Patient";
-const sTest   = b => b?.testTypes?.length
-  ? b.testTypes.map(t => t?.name).filter(Boolean).join(", ")
-  : (b?.testType?.name || "Unknown Test");
-const sAmount = b => b?.amount ? `Rs. ${Number(b.amount).toLocaleString()}` : "—";
-const sDate   = d => d ? new Date(d).toDateString() : "—";
-const sId     = b => b?.bookingId || "—";
+const NAV = [
+  { id: "overview",      label: "Overview",       icon: "grid"     },
+  { id: "bookings",      label: "All bookings",   short: "Bookings", icon: "list" },
+  { id: "assign",        label: "Assign jobs",    short: "Assign",   icon: "target" },
+  { id: "tests",         label: "Test catalogue", short: "Tests",    icon: "tube" },
+  { id: "plans",         label: "Plans",          icon: "repeat"   },
+  { id: "subscriptions", label: "Subscriptions",  icon: "calendar" },
+  { id: "phlebotomists", label: "Phlebotomists",  icon: "users"    },
+  { id: "analytics",     label: "Analytics",      icon: "chart"    },
+  { id: "audit",         label: "Email & audit",  icon: "mail"     },
+];
 
-const STATUS_CONFIG = {
-  pending:          { color:GOLD,      bg:"rgba(184,137,46,0.10)",  border:"rgba(184,137,46,0.35)",  label:"Pending"          },
-  confirmed:        { color:BLUE,      bg:"rgba(62,108,158,0.10)",  border:"rgba(62,108,158,0.35)",  label:"Confirmed"        },
-  sample_collected: { color:LAVENDER,  bg:"rgba(124,107,174,0.10)", border:"rgba(124,107,174,0.35)", label:"Sample Collected" },
-  processing:       { color:CRIMSON,   bg:"rgba(164,19,60,0.08)",   border:"rgba(164,19,60,0.30)",   label:"Lab Processing"   },
-  completed:        { color:GREEN,     bg:"rgba(46,125,87,0.10)",   border:"rgba(46,125,87,0.35)",   label:"Completed"        },
-  cancelled:        { color:"#8A8378", bg:"rgba(138,131,120,0.10)", border:"rgba(138,131,120,0.3)",  label:"Cancelled"        },
-  rejected:         { color:CRIMSON,   bg:"rgba(164,19,60,0.08)",   border:"rgba(164,19,60,0.30)",   label:"Rejected"         },
-};
+const CATS = ["haematology", "biochemistry", "microbiology", "immunology", "urine", "other"];
+const patient = (b) => b?.user?.name || "Unknown patient";
 
-const StatusBadge = ({ status }) => {
-  const c = STATUS_CONFIG[status] || STATUS_CONFIG.pending;
-  return (
-    <span style={{ display:"inline-flex", alignItems:"center", gap:6, padding:"3px 10px", borderRadius:20, fontFamily:"var(--monof)", fontSize:9.5, fontWeight:500, letterSpacing:"0.08em", textTransform:"uppercase", background:c.bg, color:c.color, border:`1px solid ${c.border}`, whiteSpace:"nowrap", width:"fit-content" }}>
-      <span style={{ width:5, height:5, borderRadius:"50%", background:c.color }} />
-      {c.label}
-    </span>
-  );
-};
-
-const Lbl = ({ c }) => <label className="lbl">{c}</label>;
-
-const FI = ({ label, fkey, type="text", placeholder, val, setter }) => (
-  <div style={{ marginBottom:12 }}>
-    <Lbl c={label} />
-    <input className="inp" type={type} placeholder={placeholder} value={val} onChange={e=>setter(p=>({...p,[fkey]:e.target.value}))} />
-  </div>
-);
-
-const Modal = ({ title, onClose, children }) => (
-  <div style={{ position:"fixed", inset:0, background:"rgba(23,19,16,0.5)", backdropFilter:"blur(4px)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:300, padding:20 }}>
-    <div style={{ background:"#FBF9F5", border:"1px solid rgba(23,19,16,0.13)", borderRadius:14, padding:28, width:"100%", maxWidth:480, maxHeight:"85vh", overflowY:"auto", boxShadow:"0 30px 70px rgba(23,19,16,0.3)" }}>
-    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:20 }}>
-        <h2 style={{ fontFamily:"var(--display)", fontSize:22, fontWeight:900, letterSpacing:"-0.01em", margin:0 }}>{title}</h2>
-        <button onClick={onClose} style={{ width:30, height:30, borderRadius:"50%", background:"rgba(23,19,16,0.06)", border:"none", cursor:"pointer", fontSize:14, color:"rgba(23,19,16,0.6)" }}>✕</button>
-      </div>
-      {children}
-    </div>
-  </div>
-);
-
-const CATS = ["haematology","biochemistry","microbiology","immunology","urine","other"];
-
-function SpecimenLabel({ code, name, cap }) {
-  return (
-    <div className="sl">
-      <div className="sl-cap" style={{ background:cap }} />
-      <div className="sl-body">
-        <span className="sl-code">{code}</span>
-        <span className="sl-name">{name}</span>
-        <span className="sl-bar" />
-      </div>
-    </div>
-  );
-}
+const EMPTY_TEST = { name: "", code: "", price: "", duration: "24h", category: "haematology", preparation: "", description: "" };
+const EMPTY_PHLE = { name: "", email: "", phone: "", password: "", serviceArea: "", licenseNumber: "" };
+const EMPTY_PLAN = { name: "", description: "", testTypeIds: [], visitsPerCycle: "4", cycleLengthDays: "30", price: "" };
 
 export default function AdminDashboard() {
   const { user, logout } = useAuth();
@@ -87,899 +49,450 @@ export default function AdminDashboard() {
   const [testTypes,     setTestTypes]     = useState([]);
   const [plans,         setPlans]         = useState([]);
   const [subscriptions, setSubscriptions] = useState([]);
-  const [sideOpen,      setSideOpen]      = useState(false);
+  const [status,        setStatus]        = useState("loading");
+  const [loadError,     setLoadError]     = useState("");
 
-  const [assignModal,   setAssignModal]   = useState(null);
+  const [assignFor,     setAssignFor]     = useState(null);
   const [testModal,     setTestModal]     = useState(false);
   const [editTestModal, setEditTestModal] = useState(null);
   const [phleModal,     setPhleModal]     = useState(false);
   const [editPhleModal, setEditPhleModal] = useState(null);
   const [planModal,     setPlanModal]     = useState(false);
   const [editPlanModal, setEditPlanModal] = useState(null);
+  const [confirm,       setConfirm]       = useState(null);   // { title, body, action, label }
 
-  const [newTest,  setNewTest]  = useState({ name:"", code:"", price:"", duration:"24h", category:"haematology", preparation:"", description:"" });
+  const [newTest,  setNewTest]  = useState(EMPTY_TEST);
   const [editTest, setEditTest] = useState({});
-  const [newPhle,  setNewPhle]  = useState({ name:"", email:"", phone:"", password:"", serviceArea:"", licenseNumber:"" });
+  const [newPhle,  setNewPhle]  = useState(EMPTY_PHLE);
   const [editPhle, setEditPhle] = useState({});
-  const [newPlan,  setNewPlan]  = useState({ name:"", description:"", testTypeIds:[], visitsPerCycle:"4", cycleLengthDays:"30", price:"" });
+  const [newPlan,  setNewPlan]  = useState(EMPTY_PLAN);
   const [editPlan, setEditPlan] = useState({});
 
-  useEffect(() => { fetchAll(); }, [tab]);
-
-  const fetchAll = async () => {
+  const fetchAll = useCallback(async () => {
     try {
       const [bRes, tRes, pRes, plRes, subRes] = await Promise.all([
         api.get("/bookings"), api.get("/test-types"), api.get("/phlebotomists"),
         api.get("/plans/all"), api.get("/subscriptions"),
       ]);
-      setBookings(bRes.data.bookings||[]);
-      setTestTypes(tRes.data.testTypes||[]);
-      setPhlebotomists(pRes.data.phlebotomists||[]);
-      setPlans(plRes.data.plans||[]);
-      setSubscriptions(subRes.data.subscriptions||[]);
-    } catch(err) { console.error(err?.response?.data||err.message); }
+      setBookings(bRes.data.bookings || []);
+      setTestTypes(tRes.data.testTypes || []);
+      setPhlebotomists(pRes.data.phlebotomists || []);
+      setPlans(plRes.data.plans || []);
+      setSubscriptions(subRes.data.subscriptions || []);
+      setLoadError(""); setStatus("ready");
+    } catch (err) {
+      setLoadError(err?.response?.data?.message || "Could not load dashboard data.");
+      setStatus((s) => (s === "ready" ? s : "error"));
+    }
+  }, []);
+
+  useEffect(() => { fetchAll(); }, [tab, fetchAll]);
+
+  // Live: the server emits "new_booking" to the admin room.
+  useAdminSocket((data) => {
+    // Longer than the 2 s default: this one arrives unprompted.
+    toast.success(`New booking${data?.bookingId ? ` ${data.bookingId}` : ""}${data?.patient ? ` from ${data.patient}` : ""}.`, { duration: 6000 });
+    fetchAll();
+  });
+
+  const call = async (fn, ok, after) => {
+    try { await fn(); toast.success(ok); after?.(); fetchAll(); }
+    catch (err) { toast.error(err?.response?.data?.message || "That did not work."); }
   };
 
   const toggleTestId = (setter, id) =>
-    setter(p => ({ ...p, testTypeIds: p.testTypeIds?.includes(id) ? p.testTypeIds.filter(x=>x!==id) : [...(p.testTypeIds||[]), id] }));
+    setter((p) => ({ ...p, testTypeIds: p.testTypeIds?.includes(id) ? p.testTypeIds.filter((x) => x !== id) : [...(p.testTypeIds || []), id] }));
 
-  const createPlan = async () => {
+  const createPlan = () => {
     if (!newPlan.name || !newPlan.testTypeIds.length || !newPlan.visitsPerCycle || !newPlan.cycleLengthDays || !newPlan.price) {
-      toast.error("Name, tests, visits/cycle, cycle length and price required."); return;
+      toast.error("Name, tests, visits per cycle, cycle length and price are required."); return;
     }
-    try {
-      await api.post("/plans", { ...newPlan, visitsPerCycle:Number(newPlan.visitsPerCycle), cycleLengthDays:Number(newPlan.cycleLengthDays), price:Number(newPlan.price) });
-      toast.success("Plan added! ✅"); setPlanModal(false);
-      setNewPlan({ name:"", description:"", testTypeIds:[], visitsPerCycle:"4", cycleLengthDays:"30", price:"" });
-      fetchAll();
-    } catch(err) { toast.error(err?.response?.data?.message||"Failed."); }
+    call(() => api.post("/plans", { ...newPlan, visitsPerCycle: Number(newPlan.visitsPerCycle), cycleLengthDays: Number(newPlan.cycleLengthDays), price: Number(newPlan.price) }),
+      "Plan added.", () => { setPlanModal(false); setNewPlan(EMPTY_PLAN); });
   };
-
-  const saveEditPlan = async () => {
-    try {
-      await api.put(`/plans/${editPlanModal._id}`, { ...editPlan, visitsPerCycle:Number(editPlan.visitsPerCycle), cycleLengthDays:Number(editPlan.cycleLengthDays), price:Number(editPlan.price) });
-      toast.success("Plan updated! ✅"); setEditPlanModal(null); fetchAll();
-    } catch(err) { toast.error(err?.response?.data?.message||"Failed."); }
+  const saveEditPlan = () => call(
+    () => api.put(`/plans/${editPlanModal._id}`, { ...editPlan, visitsPerCycle: Number(editPlan.visitsPerCycle), cycleLengthDays: Number(editPlan.cycleLengthDays), price: Number(editPlan.price) }),
+    "Plan updated.", () => setEditPlanModal(null));
+  const createTest = () => {
+    if (!newTest.name || !newTest.code || !newTest.price) { toast.error("Name, code and price are required."); return; }
+    call(() => api.post("/test-types", { ...newTest, code: newTest.code.toUpperCase(), price: Number(newTest.price) }),
+      "Test added.", () => { setTestModal(false); setNewTest(EMPTY_TEST); });
   };
-
-  const deactivatePlan = async (id) => {
-    if (!window.confirm("Deactivate this plan?")) return;
-    try { await api.delete(`/plans/${id}`); toast.success("Deactivated."); fetchAll(); }
-    catch { toast.error("Failed."); }
+  const saveEditTest = () => call(() => api.put(`/test-types/${editTestModal._id}`, { ...editTest, price: Number(editTest.price) }),
+    "Test updated.", () => setEditTestModal(null));
+  const createPhle = () => {
+    if (!newPhle.name || !newPhle.email || !newPhle.phone || !newPhle.password) { toast.error("Name, email, phone and password are required."); return; }
+    // The create-phlebotomist route does not check password strength, so
+    // the form applies the same rule as registration.
+    if (!isValidPassword(newPhle.password)) { toast.error(PASSWORD_MESSAGE); return; }
+    call(() => api.post("/phlebotomists", newPhle), "Phlebotomist account created.", () => { setPhleModal(false); setNewPhle(EMPTY_PHLE); });
   };
-
-  const markSubPaid = async (id) => {
-    try { await api.patch(`/subscriptions/${id}/mark-paid`); toast.success("Marked as paid."); fetchAll(); }
-    catch { toast.error("Failed."); }
-  };
-
-  const createTest = async () => {
-    if (!newTest.name||!newTest.code||!newTest.price) { toast.error("Name, code and price required."); return; }
-    try {
-      await api.post("/test-types", { ...newTest, code:newTest.code.toUpperCase(), price:Number(newTest.price) });
-      toast.success("Test added! ✅"); setTestModal(false);
-      setNewTest({ name:"", code:"", price:"", duration:"24h", category:"haematology", preparation:"", description:"" });
-      fetchAll();
-    } catch(err) { toast.error(err?.response?.data?.message||"Failed."); }
-  };
-
-  const saveEditTest = async () => {
-    try {
-      await api.put(`/test-types/${editTestModal._id}`, { ...editTest, price:Number(editTest.price) });
-      toast.success("Test updated! ✅"); setEditTestModal(null); fetchAll();
-    } catch(err) { toast.error(err?.response?.data?.message||"Failed."); }
-  };
-
-  const deactivateTest = async (id) => {
-    if (!window.confirm("Deactivate this test type?")) return;
-    try { await api.delete(`/test-types/${id}`); toast.success("Deactivated."); fetchAll(); }
-    catch { toast.error("Failed."); }
-  };
-
-  const createPhle = async () => {
-    if (!newPhle.name||!newPhle.email||!newPhle.phone||!newPhle.password) { toast.error("Name, email, phone and password required."); return; }
-    try {
-      await api.post("/phlebotomists", newPhle);
-      toast.success("Phlebotomist created! ✅"); setPhleModal(false);
-      setNewPhle({ name:"", email:"", phone:"", password:"", serviceArea:"", licenseNumber:"" });
-      fetchAll();
-    } catch(err) { toast.error(err?.response?.data?.message||"Failed."); }
-  };
-
-  const saveEditPhle = async () => {
-    try {
-      await api.patch(`/phlebotomists/${editPhleModal._id}`, editPhle);
-      toast.success("Updated! ✅"); setEditPhleModal(null); fetchAll();
-    } catch(err) { toast.error(err?.response?.data?.message||"Failed."); }
-  };
-
-  const assignPhlebotomist = async (bookingId, phlebotomistId) => {
-    try {
-      await api.patch(`/bookings/${bookingId}/assign`, { phlebotomistId });
-      toast.success("Assigned! ✅"); setAssignModal(null); fetchAll();
-    } catch(err) { toast.error(err?.response?.data?.message||"Failed."); }
-  };
-
-  const updateStatus = async (id, status) => {
-    try { await api.patch(`/bookings/${id}/status`, { status }); toast.success("Updated!"); fetchAll(); }
-    catch(err) { toast.error(err?.response?.data?.message||"Failed."); }
-  };
+  const saveEditPhle = () => call(() => api.patch(`/phlebotomists/${editPhleModal._id}`, editPhle), "Phlebotomist updated.", () => setEditPhleModal(null));
+  const assign = (bookingId, phlebotomistId) => call(() => api.patch(`/bookings/${bookingId}/assign`, { phlebotomistId }), "Phlebotomist assigned.", () => setAssignFor(null));
+  const updateStatus = (id, s) => call(() => api.patch(`/bookings/${id}/status`, { status: s }), "Booking updated.");
+  const markSubPaid = (id) => call(() => api.patch(`/subscriptions/${id}/mark-paid`), "Marked as paid.");
+  const ask = (title, body, label, action) => setConfirm({ title, body, label, action });
 
   const safeB      = bookings.filter(Boolean);
-  const revenue    = safeB.filter(b=>b.status==="completed").reduce((s,b)=>s+(b.amount||0),0);
-  const pending    = safeB.filter(b=>b.status==="pending");
-  const completed  = safeB.filter(b=>b.status==="completed");
-  const unassigned = safeB.filter(b=>!b.phlebotomist&&b.status==="pending");
-  const testCounts = testTypes.map(t=>({ name:t?.name||"—", count:safeB.filter(b=>sTest(b).includes(t?.name)).length })).sort((a,b)=>b.count-a.count);
+  const revenue    = safeB.filter((b) => b.status === "completed").reduce((s, b) => s + (b.amount || 0), 0);
+  const pending    = safeB.filter((b) => b.status === "pending");
+  const completed  = safeB.filter((b) => b.status === "completed");
+  const unassigned = safeB.filter((b) => !b.phlebotomist && b.status === "pending");
+  const testCounts = testTypes.map((t) => ({ name: t?.name || "—", count: safeB.filter((b) => testNames(b).includes(t?.name)).length }))
+    .filter((t) => t.count > 0).sort((a, b) => b.count - a.count);
+  const statusCounts = Object.entries(BOOKING_STATUS).map(([k, c]) => ({ name: c.label, tone: c.tone, count: safeB.filter((b) => b.status === k).length }))
+    .filter((x) => x.count > 0);
 
-  const TABS = [
-    { id:"overview",      icon:"📊", label:"Overview",      cap:CRIMSON  },
-    { id:"bookings",      icon:"📋", label:"All Bookings",  cap:TEAL     },
-    { id:"assign",        icon:"🎯", label:"Assign Jobs",   cap:GOLD,    badge:unassigned.length },
-    { id:"tests",         icon:"🔬", label:"Test Catalog",  cap:LAVENDER },
-    { id:"plans",         icon:"🔁", label:"Plans",         cap:LAVENDER },
-    { id:"subscriptions", icon:"📋", label:"Subscriptions", cap:GOLD     },
-    { id:"phlebotomists", icon:"🧪", label:"Phlebotomists", cap:BLUE     },
-    { id:"analytics",     icon:"📈", label:"Analytics",     cap:GREEN    },
-    { id:"audit",         icon:"🗂", label:"Email & Audit", cap:GOLD     },
+  const nav = NAV.map((n) => ({ ...n, badge: n.id === "assign" ? unassigned.length : 0 }));
+  const signOut = () => { logout(); navigate("/login"); };
+  const assignBooking = safeB.find((b) => b._id === assignFor);
+
+  const bookingCols = [
+    { key: "id", header: "Booking", render: (b) => <span className="db-code">{b.bookingId || "—"}</span> },
+    { key: "patient", header: "Patient", render: (b) => <><span className="db-cell-strong">{patient(b)}</span><span className="db-cell-sub">{b.user?.phone || "—"}</span></> },
+    { key: "tests", header: "Tests", render: (b) => testNames(b) },
+    { key: "date", header: "Date", render: (b) => formatDate(b.appointmentDate) },
+    { key: "amount", header: "Amount", render: (b) => formatMoney(b.amount) },
+    { key: "status", header: "Status", render: (b) => <StatusPill status={b.status} /> },
+    { key: "act", header: "Actions", render: (b) => (
+      <span className="db-cell-actions">
+        {b.status === "pending" && !b.phlebotomist && <Button size="sm" onClick={() => setAssignFor(b._id)}>Assign</Button>}
+        {b.status === "pending" && <Button size="sm" variant="soft" onClick={() => updateStatus(b._id, "confirmed")}>Confirm</Button>}
+        {b.status === "processing" && <Button size="sm" variant="soft" onClick={() => updateStatus(b._id, "completed")}>Complete</Button>}
+        {!["pending", "processing"].includes(b.status) && <span className="db-fineprint">—</span>}
+      </span>
+    ) },
   ];
 
-  const Sidebar = () => (
-    <aside className="side">
-      <div className="brand"><span className="brand-dot" />Home Visit</div>
-      <div className="console-chip">
-        <div className="console-chip-t">Admin console</div>
-        <div className="console-chip-s">Full access</div>
+  const loadingOrError = status === "loading" ? <LoadingCards count={4} label="Loading the dashboard" />
+    : status === "error" ? <ErrorState message={loadError} onRetry={fetchAll} /> : null;
+
+  const testForm = (val, set, withCode) => (
+    <>
+      <Field label="Test name"><input placeholder="e.g. Full blood count" value={val.name || ""} onChange={(e) => set((p) => ({ ...p, name: e.target.value }))} /></Field>
+      <div className="db-grid-2">
+        {withCode && <Field label="Code"><input placeholder="e.g. CBC" value={val.code || ""} onChange={(e) => set((p) => ({ ...p, code: e.target.value }))} /></Field>}
+        <Field label="Price (£)"><input type="number" min="0" step="0.01" placeholder="e.g. 25.00" value={val.price ?? ""} onChange={(e) => set((p) => ({ ...p, price: e.target.value }))} /></Field>
+        <Field label="Turnaround"><input placeholder="e.g. 24h" value={val.duration || ""} onChange={(e) => set((p) => ({ ...p, duration: e.target.value }))} /></Field>
+        <Field label="Category">
+          <select value={val.category || "haematology"} onChange={(e) => set((p) => ({ ...p, category: e.target.value }))}>
+            {CATS.map((c) => <option key={c} value={c}>{c}</option>)}
+          </select>
+        </Field>
       </div>
-      {TABS.map(t=>(
-        <button key={t.id} onClick={()=>{ setTab(t.id); setSideOpen(false); }}
-          className={`side-tab ${tab===t.id?"on":""}`}>
-          <span className="side-cap" style={{ background:t.cap }} />
-          <span style={{ fontSize:15 }}>{t.icon}</span>
-          <span style={{ flex:1, textAlign:"left" }}>{t.label}</span>
-          {t.badge>0 && <span className="side-badge">{t.badge}</span>}
-        </button>
-      ))}
-      <div className="side-user">
-        <div style={{ fontWeight:700, fontSize:13, marginBottom:1 }}>{user?.name||"Admin"}</div>
-        <div style={{ fontFamily:"var(--monof)", fontSize:10, letterSpacing:"0.1em", textTransform:"uppercase", color:"rgba(23,19,16,0.45)" }}>Administrator</div>
-      </div>
-      <button className="signout" onClick={()=>{ logout(); navigate("/login"); }}>Sign out</button>
-    </aside>
+      <Field label="Preparation"><input placeholder="e.g. Fast for 8 hours" value={val.preparation || ""} onChange={(e) => set((p) => ({ ...p, preparation: e.target.value }))} /></Field>
+    </>
   );
 
-  const TH = ({ cols, heads }) => (
-    <div style={{ display:"grid", gridTemplateColumns:cols, padding:"11px 18px", background:"rgba(23,19,16,0.03)", borderBottom:"1px solid var(--rule)" }}>
-      {heads.map(h=>(
-        <div key={h} className="th">{h}</div>
-      ))}
-    </div>
+  const planForm = (val, set) => (
+    <>
+      <Field label="Plan name"><input placeholder="e.g. Monthly care plan" value={val.name || ""} onChange={(e) => set((p) => ({ ...p, name: e.target.value }))} /></Field>
+      <Field label="Description (optional)"><input value={val.description || ""} onChange={(e) => set((p) => ({ ...p, description: e.target.value }))} /></Field>
+      <div className="db-grid-2">
+        <Field label="Visits per cycle"><input type="number" min="1" value={val.visitsPerCycle ?? ""} onChange={(e) => set((p) => ({ ...p, visitsPerCycle: e.target.value }))} /></Field>
+        <Field label="Cycle length (days)"><input type="number" min="1" value={val.cycleLengthDays ?? ""} onChange={(e) => set((p) => ({ ...p, cycleLengthDays: e.target.value }))} /></Field>
+      </div>
+      <Field label="Price per cycle (£)"><input type="number" min="0" step="0.01" value={val.price ?? ""} onChange={(e) => set((p) => ({ ...p, price: e.target.value }))} /></Field>
+      <fieldset className="db-field" style={{ border: 0, padding: 0, margin: "0 0 18px" }}>
+        <legend className="db-label" style={{ marginBottom: 8 }}>Tests included in every visit</legend>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+          {testTypes.map((t) => (
+            <label key={t._id} className="db-check">
+              <input type="checkbox" checked={val.testTypeIds?.includes(t._id) || false} onChange={() => toggleTestId(set, t._id)} />
+              {t.name}
+            </label>
+          ))}
+        </div>
+      </fieldset>
+    </>
   );
 
   return (
-    <div className="ad">
-      <style>{`
-        .ad {
-          --paper:   #F3F0EA;
-          --card:    #FBF9F5;
-          --ink:     #171310;
-          --ink-60:  rgba(23,19,16,0.62);
-          --ink-40:  rgba(23,19,16,0.42);
-          --rule:    rgba(23,19,16,0.13);
-          --crimson: #A4133C;
-          --display: "Playfair Display", Georgia, serif;
-          --sansf:   "DM Sans", system-ui, -apple-system, sans-serif;
-          --monof:   "DM Mono", ui-monospace, "SF Mono", monospace;
-
-          min-height: 100vh; min-height: 100dvh;
-          background: var(--paper); color: var(--ink);
-          font-family: var(--sansf); display: flex; position: relative;
-        }
-        .ad *, .ad *::before, .ad *::after { box-sizing: border-box; }
-        .ad :focus-visible { outline: 2px solid var(--crimson); outline-offset: 2px; }
-
-        @keyframes fadeUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
-        .ad .fade-up { animation: fadeUp .4s ease forwards; }
-
-        .ad h1 {
-          font-family: var(--display); font-weight: 900;
-          font-size: clamp(26px, 3.2vw, 36px); letter-spacing: -0.015em; margin: 0 0 4px;
-        }
-        .ad .sub { color: var(--ink-60); font-size: 14px; margin: 0; }
-        .ad .head { margin-bottom: 26px; }
-
-        .ad .sl {
-          display: inline-flex; align-items: stretch;
-          border: 1px solid var(--rule); border-radius: 3px;
-          background: var(--card); overflow: hidden; margin-bottom: 14px;
-        }
-        .ad .sl-cap  { width: 7px; }
-        .ad .sl-body { padding: 5px 10px; display: flex; align-items: center; gap: 10px; }
-        .ad .sl-code { font-family: var(--monof); font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; }
-        .ad .sl-name { font-family: var(--monof); font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-40); }
-        .ad .sl-bar {
-          width: 36px; align-self: stretch; min-height: 12px; opacity: .7;
-          background-image: repeating-linear-gradient(90deg,
-            var(--ink) 0 1px, transparent 1px 3px,
-            var(--ink) 3px 5px, transparent 5px 6px,
-            var(--ink) 6px 7px, transparent 7px 10px);
-        }
-
-        /* sidebar */
-        .ad .side {
-          width: 246px; flex-shrink: 0;
-          background: var(--card); border-right: 1px solid var(--rule);
-          padding: 22px 14px; display: flex; flex-direction: column; gap: 3px;
-          position: sticky; top: 0; height: 100vh; height: 100dvh; overflow-y: auto; z-index: 10;
-        }
-        .ad .brand {
-          display: flex; align-items: center; gap: 9px; padding: 4px 10px 2px; margin-bottom: 12px;
-          font-family: var(--monof); font-size: 12.5px; font-weight: 500;
-          letter-spacing: 0.2em; text-transform: uppercase;
-        }
-        .ad .brand-dot {
-          width: 10px; height: 10px; border-radius: 50%;
-          background: radial-gradient(circle at 35% 35%, #d24a6e, var(--crimson));
-          animation: pulse 2.4s ease-in-out infinite;
-        }
-        @keyframes pulse {
-          0%,100% { box-shadow: 0 0 0 0 rgba(164,19,60,0.35); }
-          50%     { box-shadow: 0 0 0 6px rgba(164,19,60,0); }
-        }
-        .ad .console-chip {
-          margin: 0 4px 14px; padding: 10px 12px; border-radius: 8px;
-          background: linear-gradient(120deg, var(--ink), #3d1020 80%);
-        }
-        .ad .console-chip-t { font-family: var(--monof); font-size: 9.5px; letter-spacing: 0.14em; text-transform: uppercase; color: #fff; margin-bottom: 2px; }
-        .ad .console-chip-s { font-size: 11.5px; color: rgba(255,255,255,0.55); }
-
-        .ad .side-tab {
-          display: flex; align-items: center; gap: 10px;
-          padding: 10px 12px; border: none; border-radius: 8px;
-          background: transparent; cursor: pointer; width: 100%;
-          font-family: var(--sansf); font-size: 13.5px; font-weight: 500;
-          color: var(--ink-60); transition: background .15s, color .15s;
-        }
-        .ad .side-tab:hover { background: rgba(23,19,16,0.05); color: var(--ink); }
-        .ad .side-tab.on { background: var(--ink); color: var(--paper); font-weight: 600; }
-        .ad .side-cap { width: 4px; height: 17px; border-radius: 2px; flex-shrink: 0; opacity: .4; transition: opacity .15s; }
-        .ad .side-tab.on .side-cap, .ad .side-tab:hover .side-cap { opacity: 1; }
-        .ad .side-badge {
-          background: var(--crimson); color: #fff; border-radius: 20px;
-          min-width: 19px; height: 19px; padding: 0 5px;
-          display: flex; align-items: center; justify-content: center;
-          font-size: 10px; font-weight: 700; font-family: var(--monof);
-        }
-        .ad .side-tab.on .side-badge { background: var(--paper); color: var(--ink); }
-        .ad .side-user {
-          margin-top: auto; padding: 12px; border-radius: 10px;
-          background: var(--paper); border: 1px solid var(--rule);
-        }
-        .ad .signout {
-          margin-top: 8px; padding: 9px; border: 1px solid var(--rule); border-radius: 8px;
-          background: transparent; color: var(--ink-60); cursor: pointer;
-          font-family: var(--monof); font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase;
-          transition: all .15s;
-        }
-        .ad .signout:hover { border-color: var(--crimson); color: var(--crimson); }
-
-        /* cards, tables */
-        .ad .card { background: var(--card); border: 1px solid var(--rule); border-radius: 12px; }
-        .ad .table { background: var(--card); border: 1px solid var(--rule); border-radius: 12px; overflow: hidden; }
-        .ad .th {
-          font-family: var(--monof); font-size: 9px; font-weight: 500;
-          color: var(--ink-40); text-transform: uppercase; letter-spacing: 0.12em;
-        }
-        .ad .trow { padding: 13px 18px; border-bottom: 1px solid var(--rule); transition: background .15s; align-items: center; }
-        .ad .trow:last-child { border-bottom: none; }
-        .ad .trow:hover { background: rgba(164,19,60,0.035); }
-
-        .ad .stat {
-          background: var(--card); border: 1px solid var(--rule);
-          border-radius: 12px; padding: 18px;
-          border-top: 3px solid var(--tint, var(--crimson));
-        }
-        .ad .stat-v { font-family: var(--display); font-weight: 900; font-size: clamp(20px,2.4vw,28px); line-height: 1; color: var(--tint, var(--ink)); }
-        .ad .stat-l {
-          font-family: var(--monof); font-size: 9.5px; letter-spacing: 0.12em;
-          text-transform: uppercase; color: var(--ink-40); margin-top: 8px;
-        }
-
-        .ad .alert {
-          background: rgba(164,19,60,0.06); border: 1px solid rgba(164,19,60,0.3);
-          border-left: 4px solid var(--crimson);
-          border-radius: 12px; padding: 16px 20px; margin-bottom: 20px;
-          display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;
-        }
-
-        /* buttons & inputs */
-        .ad .btn {
-          font-family: var(--sansf); font-size: 13.5px; font-weight: 700;
-          padding: 11px 20px; border-radius: 9px; cursor: pointer;
-          border: 1px solid transparent; transition: transform .15s, background .15s, box-shadow .15s;
-        }
-        .ad .btn:hover { transform: translateY(-1px); }
-        .ad .btn-primary { background: var(--crimson); color: #fff; box-shadow: 0 6px 18px rgba(164,19,60,0.28); }
-        .ad .btn-primary:hover { background: #8B0F33; }
-        .ad .btn-ghost { background: transparent; color: var(--ink); border-color: var(--rule); }
-        .ad .btn-ghost:hover { border-color: var(--ink); }
-        .ad .btn-sm { padding: 7px 14px; font-size: 12.5px; border-radius: 7px; }
-        .ad .btn-full { width: 100%; }
-
-        .ad .act {
-          padding: 5px 12px; border-radius: 7px; font-family: var(--sansf);
-          font-weight: 700; font-size: 12px; cursor: pointer; transition: all .15s; white-space: nowrap;
-          background: transparent;
-        }
-        .ad .act:hover { transform: translateY(-1px); }
-        .ad .act-blue  { color: #3E6C9E; border: 1px solid rgba(62,108,158,0.35); }
-        .ad .act-green { color: #2E7D57; border: 1px solid rgba(46,125,87,0.35); }
-        .ad .act-red   { color: var(--crimson); border: 1px solid rgba(164,19,60,0.35); }
-
-        .ad .lbl {
-          display: block; margin-bottom: 6px;
-          font-family: var(--monof); font-size: 10px; font-weight: 500;
-          letter-spacing: 0.13em; text-transform: uppercase; color: var(--ink-60);
-        }
-        .ad .inp {
-          width: 100%; padding: 11px 13px;
-          background: #fff; color: var(--ink);
-          border: 1px solid var(--rule); border-radius: 8px;
-          font-family: var(--sansf); font-size: 14px;
-          transition: border-color .2s, box-shadow .2s;
-        }
-        .ad .inp::placeholder { color: var(--ink-40); }
-        .ad .inp:focus { outline: none; border-color: var(--crimson); box-shadow: 0 0 0 3px rgba(164,19,60,0.10); }
-
-        .ad .cat-tag {
-          font-family: var(--monof); font-size: 9px; letter-spacing: 0.08em; text-transform: uppercase;
-          color: #3E6C9E; background: rgba(62,108,158,0.08); border: 1px solid rgba(62,108,158,0.3);
-          padding: 3px 8px; border-radius: 20px; width: fit-content;
-        }
-
-        .ad .prow {
-          background: var(--card); border: 1px solid var(--rule);
-          border-radius: 12px; padding: 16px 18px; margin-bottom: 10px; transition: all .2s;
-        }
-        .ad .prow:hover { box-shadow: 0 10px 24px rgba(23,19,16,0.08); transform: translateY(-1px); }
-
-        /* mobile */
-        .ad .topbar {
-          display: none; position: fixed; top: 0; left: 0; right: 0; height: 56px;
-          background: rgba(251,249,245,0.92); backdrop-filter: blur(10px);
-          border-bottom: 1px solid var(--rule); z-index: 100;
-          align-items: center; justify-content: space-between; padding: 0 16px;
-        }
-        .ad .overlay { position: fixed; inset: 0; background: rgba(23,19,16,0.45); z-index: 200; }
-        .ad .drawer {
-          position: fixed; left: 0; top: 0; bottom: 0; width: 268px; z-index: 210;
-          background: var(--card); border-right: 1px solid var(--rule); overflow-y: auto;
-        }
-        .ad .main { flex: 1; padding: 32px 40px; overflow-y: auto; position: relative; z-index: 1; }
-        .ad .inner { max-width: 1100px; margin: 0 auto; }
-
-        @media (max-width: 768px) {
-          .ad .desktop-side { display: none; }
-          .ad .topbar { display: flex; }
-          .ad .main { padding: 76px 14px 24px; }
-          .ad .stats5 { grid-template-columns: repeat(2,1fr) !important; }
-          .ad .stats4 { grid-template-columns: repeat(2,1fr) !important; }
-          .ad .cols2 { grid-template-columns: 1fr !important; }
-          .ad .scrollx { overflow-x: auto; }
-          .ad .scrollx > div { min-width: 640px; }
-        }
-        @media (prefers-reduced-motion: reduce) {
-          .ad * { animation: none !important; transition: none !important; }
-        }
-      `}</style>
-
-      <div className="desktop-side"><Sidebar /></div>
-
-      <div className="topbar">
-        <div className="brand" style={{ padding:0, marginBottom:0 }}><span className="brand-dot" />Home Visit · Admin</div>
-        <button onClick={()=>setSideOpen(true)} style={{ background:"none", border:"none", fontSize:20, cursor:"pointer", color:INK }}>☰</button>
-      </div>
-
-      {sideOpen && (
+    <Shell role="Admin" items={nav} active={tab} onNavigate={setTab} user={user} onSignOut={signOut} live>
+      {tab === "overview" && (
         <>
-          <div className="overlay" onClick={()=>setSideOpen(false)} />
-          <div className="drawer"><Sidebar /></div>
+          <PageHeader eyebrow={formatLongDate()} title="Overview." sub="Bookings, assignments and the catalogue at a glance." />
+          {loadingOrError || (
+            <>
+              <Stats items={[
+                { label: "Bookings",   value: safeB.length,       icon: "list",   tone: "blue"   },
+                { label: "Pending",    value: pending.length,     icon: "clock",  tone: "amber"  },
+                { label: "Completed",  value: completed.length,   icon: "check",  tone: "green"  },
+                { label: "Unassigned", value: unassigned.length,  icon: "target", tone: "terra"  },
+                { label: "Revenue (completed)", value: formatMoneyCompact(revenue), icon: "pound", tone: "teal" },
+              ]} />
+              {unassigned.length > 0 && (
+                <Card i={1} tone="terra" className="db-row" >
+                  <div className="db-row-main">
+                    <h2 className="db-card-title">{unassigned.length} booking{unassigned.length > 1 ? "s" : ""} waiting for a phlebotomist</h2>
+                    <p className="db-sub" style={{ marginTop: 0 }}>Patients see "Pending" until someone is assigned.</p>
+                  </div>
+                  <Button icon="target" onClick={() => setTab("assign")}>Assign now</Button>
+                </Card>
+              )}
+              <SectionTitle>Recent bookings</SectionTitle>
+              <DataTable caption="Most recent bookings" columns={bookingCols.filter((c) => c.key !== "act")} rows={safeB.slice(0, 8)}
+                         empty={<EmptyState icon="list" title="No bookings yet">Bookings appear here as soon as patients make them.</EmptyState>} />
+            </>
+          )}
         </>
       )}
 
-      <main className="main">
-        <div className="inner">
+      {tab === "bookings" && (
+        <>
+          <PageHeader eyebrow="Bookings" title="All bookings." sub={status === "ready" ? `${safeB.length} booking${safeB.length === 1 ? "" : "s"}` : undefined} />
+          {loadingOrError || <DataTable caption="All bookings" columns={bookingCols} rows={safeB}
+                                        empty={<EmptyState icon="list" title="No bookings yet">Bookings appear here as soon as patients make them.</EmptyState>} />}
+        </>
+      )}
 
-          {/* OVERVIEW */}
-          {tab==="overview" && (
-            <div className="fade-up">
-              <div className="head">
-                <SpecimenLabel code="HV-30" name="Admin" cap={CRIMSON} />
-                <h1>Overview.</h1>
-                <p className="sub">{new Date().toLocaleDateString("en-US",{weekday:"long",year:"numeric",month:"long",day:"numeric"})}</p>
-              </div>
-
-              <div className="stats5" style={{ display:"grid", gridTemplateColumns:"repeat(5,1fr)", gap:12, marginBottom:22 }}>
-                {[
-                  { label:"Total",      value:safeB.length,                          tint:BLUE    },
-                  { label:"Pending",    value:pending.length,                        tint:GOLD    },
-                  { label:"Completed",  value:completed.length,                      tint:GREEN   },
-                  { label:"Unassigned", value:unassigned.length,                     tint:CRIMSON },
-                  { label:"Revenue",    value:"Rs."+(revenue/1000).toFixed(1)+"K",   tint:TEAL    },
-                ].map(s=>(
-                  <div key={s.label} className="stat" style={{ "--tint":s.tint }}>
-                    <div className="stat-v">{s.value}</div>
-                    <div className="stat-l">{s.label}</div>
-                  </div>
+      {tab === "assign" && (
+        <>
+          <PageHeader eyebrow="Assign" title="Assign jobs." sub={status === "ready" ? `${unassigned.length} waiting` : undefined} />
+          {loadingOrError || (unassigned.length === 0
+            ? <EmptyState icon="check" title="Everything is assigned">New bookings that need a phlebotomist will appear here.</EmptyState>
+            : <div className="db-stack">
+                {unassigned.map((b, i) => (
+                  <Card key={b._id} i={i} tone="amber">
+                    <div className="db-row" data-booking={b.bookingId}>
+                      <div className="db-row-main">
+                        <h3 className="db-card-title">{patient(b)}</h3>
+                        <div className="db-metas">
+                          <Meta icon="tube">{testNames(b)}</Meta>
+                          <Meta icon="calendar">{formatDate(b.appointmentDate)}</Meta>
+                          <Meta icon="clock">{b.appointmentTime || "—"}</Meta>
+                          <Meta icon="pin">{b.address || "—"}</Meta>
+                          <Meta icon="phone">{b.user?.phone || "—"}</Meta>
+                          <span className="db-code">#{b.bookingId || "—"}</span>
+                        </div>
+                      </div>
+                      <div className="db-row-side"><Button icon="target" onClick={() => setAssignFor(b._id)}>Assign phlebotomist</Button></div>
+                    </div>
+                  </Card>
                 ))}
-              </div>
+              </div>)}
+        </>
+      )}
 
-              {unassigned.length>0 && (
-                <div className="alert">
-                  <div>
-                    <div style={{ fontWeight:700, fontSize:14.5, color:CRIMSON, marginBottom:2 }}>⚠️ {unassigned.length} booking{unassigned.length>1?"s":""} need phlebotomist assignment</div>
-                    <div style={{ fontSize:13, color:"var(--ink-60)" }}>Patients are waiting for confirmation.</div>
-                  </div>
-                  <button className="btn btn-primary btn-sm" onClick={()=>setTab("assign")}>Assign now →</button>
-                </div>
-              )}
+      {tab === "tests" && (
+        <>
+          <PageHeader eyebrow="Catalogue" title="Test catalogue." sub={`${testTypes.length} test type${testTypes.length === 1 ? "" : "s"}`}
+                      actions={<Button icon="plus" onClick={() => setTestModal(true)}>Add test</Button>} />
+          {loadingOrError || <DataTable caption="Test catalogue" rows={testTypes}
+            empty={<EmptyState icon="tube" title="No tests in the catalogue" action={<Button icon="plus" onClick={() => setTestModal(true)}>Add the first test</Button>}>Patients can only book tests listed here.</EmptyState>}
+            columns={[
+              { key: "name", header: "Test", render: (t) => <><span className="db-cell-strong">{t.name || "—"}</span>{t.preparation && <span className="db-cell-sub">{t.preparation}</span>}</> },
+              { key: "code", header: "Code", render: (t) => <span className="db-code">{t.code || "—"}</span> },
+              { key: "cat", header: "Category", render: (t) => <span className="db-tag">{t.category || "—"}</span> },
+              { key: "price", header: "Price", render: (t) => formatMoney(t.price) },
+              { key: "dur", header: "Turnaround", render: (t) => t.duration || "—" },
+              { key: "on", header: "Active", render: (t) => (t.isActive ? <span className="db-pill tone-green"><span className="db-pill-dot" />Active</span> : <span className="db-pill tone-grey"><span className="db-pill-dot" />Off</span>) },
+              { key: "act", header: "Actions", render: (t) => (
+                <span className="db-cell-actions">
+                  <Button size="sm" variant="ghost" onClick={() => { setEditTest({ name: t.name, code: t.code, price: t.price, duration: t.duration, category: t.category, preparation: t.preparation || "", description: t.description || "" }); setEditTestModal(t); }}>Edit</Button>
+                  {t.isActive && <Button size="sm" variant="danger" onClick={() => ask("Deactivate this test?", `${t.name} will no longer be bookable.`, "Deactivate", () => call(() => api.delete(`/test-types/${t._id}`), "Test deactivated."))}>Deactivate</Button>}
+                </span>
+              ) },
+            ]} />}
+        </>
+      )}
 
-              <h3 style={{ fontSize:15, fontWeight:700, margin:"0 0 12px" }}>Recent bookings</h3>
-              <div className="table scrollx">
-                <div>
-                  <TH cols="2fr 2fr 1.5fr 1fr 1.2fr" heads={["Patient","Test","Date","Amount","Status"]} />
-                  {safeB.slice(0,8).map(b=>(
-                    <div key={b._id} className="trow" style={{ display:"grid", gridTemplateColumns:"2fr 2fr 1.5fr 1fr 1.2fr" }}>
-                      <div style={{ fontSize:13, fontWeight:600 }}>{sUser(b)}</div>
-                      <div style={{ fontSize:12, color:"var(--ink-60)" }}>{sTest(b)}</div>
-                      <div style={{ fontSize:12, color:"var(--ink-60)" }}>{sDate(b.appointmentDate)}</div>
-                      <div style={{ fontFamily:"var(--monof)", fontSize:12.5, fontWeight:500, color:TEAL }}>{sAmount(b)}</div>
-                      <StatusBadge status={b.status} />
-                    </div>
-                  ))}
-                  {safeB.length===0 && <div style={{ padding:"40px", textAlign:"center", color:"var(--ink-40)", fontSize:14 }}>No bookings yet.</div>}
-                </div>
-              </div>
-            </div>
-          )}
+      {tab === "plans" && (
+        <>
+          <PageHeader eyebrow="Plans" title="Subscription plans." sub={`${plans.length} plan${plans.length === 1 ? "" : "s"}`}
+                      actions={<Button icon="plus" onClick={() => setPlanModal(true)}>Add plan</Button>} />
+          {loadingOrError || <DataTable caption="Subscription plans" rows={plans}
+            empty={<EmptyState icon="repeat" title="No plans yet" action={<Button icon="plus" onClick={() => setPlanModal(true)}>Add a plan</Button>}>Plans let patients book repeat visits.</EmptyState>}
+            columns={[
+              { key: "name", header: "Plan", render: (p) => <><span className="db-cell-strong">{p.name || "—"}</span>{p.description && <span className="db-cell-sub">{p.description}</span>}</> },
+              { key: "tests", header: "Tests", render: (p) => p.testTypes?.map((t) => t.name).join(", ") || "—" },
+              { key: "visits", header: "Visits", render: (p) => p.visitsPerCycle || "—" },
+              { key: "cycle", header: "Cycle", render: (p) => (p.cycleLengthDays ? `${p.cycleLengthDays} days` : "—") },
+              { key: "price", header: "Price", render: (p) => formatMoney(p.price) },
+              { key: "on", header: "Active", render: (p) => (p.isActive ? <span className="db-pill tone-green"><span className="db-pill-dot" />Active</span> : <span className="db-pill tone-grey"><span className="db-pill-dot" />Off</span>) },
+              { key: "act", header: "Actions", render: (p) => (
+                <span className="db-cell-actions">
+                  <Button size="sm" variant="ghost" onClick={() => { setEditPlan({ name: p.name, description: p.description || "", testTypeIds: p.testTypes?.map((t) => t._id) || [], visitsPerCycle: p.visitsPerCycle, cycleLengthDays: p.cycleLengthDays, price: p.price, isActive: p.isActive }); setEditPlanModal(p); }}>Edit</Button>
+                  {p.isActive && <Button size="sm" variant="danger" onClick={() => ask("Deactivate this plan?", `${p.name} will no longer be offered to patients.`, "Deactivate", () => call(() => api.delete(`/plans/${p._id}`), "Plan deactivated."))}>Deactivate</Button>}
+                </span>
+              ) },
+            ]} />}
+        </>
+      )}
 
-          {/* ALL BOOKINGS */}
-          {tab==="bookings" && (
-            <div className="fade-up">
-              <div className="head">
-                <SpecimenLabel code="HV-31" name="Bookings" cap={TEAL} />
-                <h1>All bookings.</h1>
-                <p className="sub">{safeB.length} total bookings</p>
-              </div>
-              <div className="table scrollx">
-                <div>
-                  <TH cols="1.2fr 1.5fr 1.5fr 1fr 1.2fr 1.5fr" heads={["Booking","Patient","Test","Amount","Status","Action"]} />
-                  {safeB.length===0
-                    ? <div style={{ padding:"40px", textAlign:"center", color:"var(--ink-40)", fontSize:14 }}>No bookings yet.</div>
-                    : safeB.map(b=>(
-                      <div key={b._id} className="trow" style={{ display:"grid", gridTemplateColumns:"1.2fr 1.5fr 1.5fr 1fr 1.2fr 1.5fr" }}>
-                        <div style={{ fontFamily:"var(--monof)", fontSize:10.5, color:"var(--ink-40)" }}>{sId(b)}</div>
-                        <div>
-                          <div style={{ fontSize:13, fontWeight:600 }}>{sUser(b)}</div>
-                          <div style={{ fontSize:11, color:"var(--ink-40)" }}>{b.user?.phone||"—"}</div>
-                        </div>
-                        <div style={{ fontSize:12, color:"var(--ink-60)" }}>{sTest(b)}</div>
-                        <div style={{ fontFamily:"var(--monof)", fontSize:12.5, color:TEAL }}>{sAmount(b)}</div>
-                        <StatusBadge status={b.status} />
-                        <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
-                          {b.status==="pending"&&!b.phlebotomist && <button className="act act-blue" onClick={()=>setAssignModal(b._id)}>Assign</button>}
-                          {b.status==="pending" && <button className="act act-green" onClick={()=>updateStatus(b._id,"confirmed")}>Confirm</button>}
-                          {b.status==="processing" && <button className="act act-green" onClick={()=>updateStatus(b._id,"completed")}>Complete</button>}
-                        </div>
-                      </div>
-                    ))
-                  }
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* ASSIGN */}
-          {tab==="assign" && (
-            <div className="fade-up">
-              <div className="head">
-                <SpecimenLabel code="HV-32" name="Assign" cap={GOLD} />
-                <h1>Assign jobs.</h1>
-                <p className="sub">{unassigned.length} unassigned bookings</p>
-              </div>
-              {unassigned.length===0
-                ? <div className="card" style={{ padding:"60px", textAlign:"center" }}>
-                    <div style={{ fontSize:40, marginBottom:12 }}>✅</div>
-                    <div style={{ fontWeight:600, color:"var(--ink-60)" }}>All bookings are assigned!</div>
-                  </div>
-                : unassigned.map(b=>(
-                  <div key={b._id} className="prow" style={{ borderLeft:`4px solid ${GOLD}` }}>
-                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", flexWrap:"wrap", gap:12 }}>
-                      <div>
-                        <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:6 }}>
-                          <div style={{ fontWeight:700, fontSize:15 }}>{sUser(b)}</div>
-                          <span style={{ fontFamily:"var(--monof)", fontSize:9, letterSpacing:"0.1em", textTransform:"uppercase", color:CRIMSON, background:"rgba(164,19,60,0.07)", border:"1px solid rgba(164,19,60,0.3)", borderRadius:20, padding:"2px 8px" }}>Unassigned</span>
-                        </div>
-                        <div style={{ fontSize:12, color:"var(--ink-60)", lineHeight:1.9 }}>
-                          🧪 {sTest(b)}<br />📅 {sDate(b.appointmentDate)} ⏰ {b.appointmentTime||"—"}<br />
-                          📍 {b.address||"—"}<br />📞 {b.user?.phone||"—"}<br />
-                          💰 {sAmount(b)} &nbsp; <span style={{ fontFamily:"var(--monof)", fontSize:10.5 }}>🔖 {sId(b)}</span>
+      {tab === "subscriptions" && (
+        <>
+          <PageHeader eyebrow="Subscriptions" title="All subscriptions." sub={`${subscriptions.length} subscription${subscriptions.length === 1 ? "" : "s"}`} />
+          {loadingOrError || (subscriptions.length === 0
+            ? <EmptyState icon="calendar" title="No subscriptions yet">Patients' repeat-visit plans will appear here.</EmptyState>
+            : <div className="db-stack">
+                {subscriptions.map((s, i) => (
+                  <Card key={s._id} i={i} tone={s.status === "active" ? "violet" : s.status === "paused" ? "amber" : "grey"}>
+                    <div className="db-row">
+                      <div className="db-row-main">
+                        <h3 className="db-card-title">{s.plan?.name || "Plan"} · {s.user?.name || "Unknown"}</h3>
+                        <div className="db-metas">
+                          <Meta icon="mail">{s.user?.email || "—"}</Meta>
+                          <Meta icon="phone">{s.user?.phone || "—"}</Meta>
+                          <Meta icon="repeat">{s.cycleVisitsUsed}/{s.visitsPerCycle} visits this cycle</Meta>
+                          <Meta icon="calendar">Next {formatDate(s.nextVisitDate)}</Meta>
+                          <Meta icon="pound">{formatMoney(s.price)} per cycle</Meta>
                         </div>
                       </div>
-                      <button className="btn btn-primary btn-sm" onClick={()=>setAssignModal(b._id)}>Assign phlebotomist →</button>
-                    </div>
-                  </div>
-                ))
-              }
-            </div>
-          )}
-
-          {/* TESTS */}
-          {tab==="tests" && (
-            <div className="fade-up">
-              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-end", marginBottom:26, flexWrap:"wrap", gap:12 }}>
-                <div>
-                  <SpecimenLabel code="HV-33" name="Catalog" cap={LAVENDER} />
-                  <h1>Test catalog.</h1>
-                  <p className="sub">{testTypes.length} test types</p>
-                </div>
-                <button className="btn btn-primary btn-sm" onClick={()=>setTestModal(true)}>+ Add test</button>
-              </div>
-              <div className="table scrollx">
-                <div>
-                  <TH cols="2fr 0.7fr 1.1fr 1fr 0.8fr 0.6fr 1.2fr" heads={["Test name","Code","Category","Price","Time","Active","Actions"]} />
-                  {testTypes.map(t=>(
-                    <div key={t._id} className="trow" style={{ display:"grid", gridTemplateColumns:"2fr 0.7fr 1.1fr 1fr 0.8fr 0.6fr 1.2fr" }}>
-                      <div>
-                        <div style={{ fontSize:13, fontWeight:600 }}>{t?.name||"—"}</div>
-                        {t?.preparation && <div style={{ fontSize:11, color:GOLD }}>⚠ {t.preparation?.slice(0,35)}</div>}
-                      </div>
-                      <div style={{ fontFamily:"var(--monof)", fontSize:11.5, color:"var(--ink-60)" }}>{t?.code||"—"}</div>
-                      <span className="cat-tag">{t?.category||"—"}</span>
-                      <div style={{ fontFamily:"var(--monof)", fontSize:12.5, color:TEAL }}>Rs.{t?.price?.toLocaleString()||"—"}</div>
-                      <div style={{ fontSize:12, color:"var(--ink-60)" }}>{t?.duration||"—"}</div>
-                      <div style={{ fontSize:12, fontWeight:700, color:t?.isActive?GREEN:"var(--ink-40)" }}>{t?.isActive?"✓":"✕"}</div>
-                      <div style={{ display:"flex", gap:6 }}>
-                        <button className="act act-blue"
-                          onClick={()=>{ setEditTest({ name:t.name, code:t.code, price:t.price, duration:t.duration, category:t.category, preparation:t.preparation||"", description:t.description||"" }); setEditTestModal(t); }}>
-                          Edit
-                        </button>
-                        <button className="act act-red" onClick={()=>deactivateTest(t._id)}>Off</button>
+                      <div className="db-row-side">
+                        <span className={`db-pill tone-${s.status === "active" ? "violet" : s.status === "paused" ? "amber" : "grey"}`}><span className="db-pill-dot" />{s.status}</span>
+                        <span className={`db-pill tone-${s.paymentStatus === "paid" ? "green" : "amber"}`}><span className="db-pill-dot" />{s.paymentStatus}</span>
+                        {s.paymentStatus !== "paid" && <Button size="sm" variant="soft" onClick={() => markSubPaid(s._id)}>Mark paid</Button>}
                       </div>
                     </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
+                  </Card>
+                ))}
+              </div>)}
+        </>
+      )}
 
-          {/* PLANS */}
-          {tab==="plans" && (
-            <div className="fade-up">
-              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-end", marginBottom:26, flexWrap:"wrap", gap:12 }}>
-                <div>
-                  <SpecimenLabel code="HV-36" name="Plans" cap={LAVENDER} />
-                  <h1>Subscription plans.</h1>
-                  <p className="sub">{plans.length} plan{plans.length!==1?"s":""}</p>
-                </div>
-                <button className="btn btn-primary btn-sm" onClick={()=>setPlanModal(true)}>+ Add plan</button>
-              </div>
-              <div className="table scrollx">
-                <div>
-                  <TH cols="1.6fr 1.6fr 0.8fr 0.9fr 0.8fr 0.6fr 1.2fr" heads={["Plan name","Tests included","Visits","Cycle","Price","Active","Actions"]} />
-                  {plans.map(p=>(
-                    <div key={p._id} className="trow" style={{ display:"grid", gridTemplateColumns:"1.6fr 1.6fr 0.8fr 0.9fr 0.8fr 0.6fr 1.2fr" }}>
-                      <div>
-                        <div style={{ fontSize:13, fontWeight:600 }}>{p?.name||"—"}</div>
-                        {p?.description && <div style={{ fontSize:11, color:"var(--ink-60)" }}>{p.description.slice(0,40)}</div>}
-                      </div>
-                      <div style={{ fontSize:12, color:"var(--ink-60)" }}>{p?.testTypes?.map(t=>t.name).join(", ")||"—"}</div>
-                      <div style={{ fontSize:12 }}>{p?.visitsPerCycle||"—"}</div>
-                      <div style={{ fontSize:12 }}>{p?.cycleLengthDays||"—"}d</div>
-                      <div style={{ fontFamily:"var(--monof)", fontSize:12.5, color:TEAL }}>Rs.{p?.price?.toLocaleString()||"—"}</div>
-                      <div style={{ fontSize:12, fontWeight:700, color:p?.isActive?GREEN:"var(--ink-40)" }}>{p?.isActive?"✓":"✕"}</div>
-                      <div style={{ display:"flex", gap:6 }}>
-                        <button className="act act-blue"
-                          onClick={()=>{ setEditPlan({ name:p.name, description:p.description||"", testTypeIds:p.testTypes?.map(t=>t._id)||[], visitsPerCycle:p.visitsPerCycle, cycleLengthDays:p.cycleLengthDays, price:p.price, isActive:p.isActive }); setEditPlanModal(p); }}>
-                          Edit
-                        </button>
-                        <button className="act act-red" onClick={()=>deactivatePlan(p._id)}>Off</button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* SUBSCRIPTIONS */}
-          {tab==="subscriptions" && (
-            <div className="fade-up">
-              <div className="head">
-                <SpecimenLabel code="HV-37" name="Subscriptions" cap={GOLD} />
-                <h1>All subscriptions.</h1>
-                <p className="sub">{subscriptions.length} subscription{subscriptions.length!==1?"s":""}</p>
-              </div>
-              {subscriptions.length===0
-                ? <div className="card" style={{ padding:"60px", textAlign:"center" }}>
-                    <div style={{ fontSize:40, marginBottom:12 }}>🔁</div>
-                    <div style={{ fontWeight:600, color:"var(--ink-60)" }}>No subscriptions yet</div>
-                  </div>
-                : subscriptions.map(s=>(
-                  <div key={s._id} className="prow" style={{ borderLeft:`4px solid ${s.status==="active"?LAVENDER:s.status==="paused"?GOLD:"var(--rule)"}` }}>
-                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", flexWrap:"wrap", gap:12 }}>
-                      <div>
-                        <div style={{ fontWeight:700, fontSize:15, marginBottom:3 }}>{s.plan?.name||"Plan"} — {s.user?.name||"Unknown"}</div>
-                        <div style={{ fontSize:12, color:"var(--ink-60)", lineHeight:1.8 }}>
-                          📧 {s.user?.email||"—"} &nbsp; 📞 {s.user?.phone||"—"}<br />
-                          🔁 {s.cycleVisitsUsed}/{s.visitsPerCycle} visits this cycle &nbsp; 📅 Next: {s.nextVisitDate?new Date(s.nextVisitDate).toDateString():"—"}<br />
-                          💰 Rs. {s.price?.toLocaleString()}/cycle
+      {tab === "phlebotomists" && (
+        <>
+          <PageHeader eyebrow="Team" title="Phlebotomists." sub={`${phlebotomists.length} team member${phlebotomists.length === 1 ? "" : "s"}`}
+                      actions={<Button icon="plus" onClick={() => setPhleModal(true)}>Add phlebotomist</Button>} />
+          {loadingOrError || (phlebotomists.length === 0
+            ? <EmptyState icon="users" title="No phlebotomists yet" action={<Button icon="plus" onClick={() => setPhleModal(true)}>Add the first phlebotomist</Button>}>Bookings cannot be assigned until there is at least one.</EmptyState>
+            : <div className="db-stack">
+                {phlebotomists.map((p, i) => (
+                  <Card key={p._id} i={i} tone="blue">
+                    <div className="db-row">
+                      <div className="db-row-main">
+                        <h3 className="db-card-title">{p.name || "—"}</h3>
+                        <div className="db-metas">
+                          <Meta icon="mail">{p.email || "—"}</Meta>
+                          <Meta icon="phone">{p.phone || "—"}</Meta>
+                          <Meta icon="pin">{p.serviceArea || "—"}</Meta>
+                          <span className="db-code">Licence {p.licenseNumber || "—"}</span>
+                          <Meta icon="user">{formatRatingSummary(p)}</Meta>
                         </div>
                       </div>
-                      <div style={{ display:"flex", alignItems:"center", gap:10, flexWrap:"wrap" }}>
-                        <span style={{ fontFamily:"var(--monof)", fontSize:10, letterSpacing:"0.1em", textTransform:"uppercase", color:s.status==="active"?LAVENDER:"var(--ink-40)" }}>{s.status}</span>
-                        <span style={{ fontFamily:"var(--monof)", fontSize:10, letterSpacing:"0.1em", textTransform:"uppercase", color:s.paymentStatus==="paid"?GREEN:GOLD }}>{s.paymentStatus}</span>
-                        {s.paymentStatus!=="paid" && (
-                          <button className="act act-blue" onClick={()=>markSubPaid(s._id)}>Mark paid</button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))
-              }
-            </div>
-          )}
-
-          {/* PHLEBOTOMISTS */}
-          {tab==="phlebotomists" && (
-            <div className="fade-up">
-              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-end", marginBottom:26, flexWrap:"wrap", gap:12 }}>
-                <div>
-                  <SpecimenLabel code="HV-34" name="Team" cap={BLUE} />
-                  <h1>Phlebotomists.</h1>
-                  <p className="sub">{phlebotomists.length} team members</p>
-                </div>
-                <button className="btn btn-primary btn-sm" onClick={()=>setPhleModal(true)}>+ Add phlebotomist</button>
-              </div>
-              {phlebotomists.length===0
-                ? <div className="card" style={{ padding:"60px", textAlign:"center" }}>
-                    <div style={{ fontSize:40, marginBottom:12 }}>🧪</div>
-                    <div style={{ fontWeight:600, color:"var(--ink-60)", marginBottom:12 }}>No phlebotomists yet</div>
-                    <button className="btn btn-primary btn-sm" onClick={()=>setPhleModal(true)}>Add first phlebotomist</button>
-                  </div>
-                : phlebotomists.map(p=>(
-                  <div key={p._id} className="prow" style={{ borderLeft:`4px solid ${BLUE}` }}>
-                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", flexWrap:"wrap", gap:12 }}>
-                      <div style={{ display:"flex", alignItems:"center", gap:14 }}>
-                        <div style={{ width:46, height:46, borderRadius:"50%", background:"rgba(62,108,158,0.10)", border:"1px solid rgba(62,108,158,0.3)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:20, flexShrink:0 }}>🧪</div>
-                        <div>
-                          <div style={{ fontWeight:700, fontSize:15, marginBottom:3 }}>{p?.name||"—"}</div>
-                          <div style={{ fontSize:12, color:"var(--ink-60)", lineHeight:1.8 }}>
-                            📧 {p?.email||"—"} &nbsp; 📞 {p?.phone||"—"}<br />
-                            📍 {p?.serviceArea||"—"} &nbsp; <span style={{ fontFamily:"var(--monof)", fontSize:10.5 }}>🪪 {p?.licenseNumber||"—"}</span><br />
-                            ⭐ {p?.rating?.toFixed(1)||"5.0"} · {p?.totalRatings||0} reviews
-                          </div>
-                        </div>
-                      </div>
-                      <div style={{ display:"flex", alignItems:"center", gap:10, flexWrap:"wrap" }}>
-                        <span style={{ fontFamily:"var(--monof)", fontSize:10, letterSpacing:"0.1em", textTransform:"uppercase", color:p?.isAvailable?GREEN:"var(--ink-40)", display:"flex", alignItems:"center", gap:5 }}>
-                          <span style={{ width:7, height:7, borderRadius:"50%", background:p?.isAvailable?GREEN:"var(--ink-40)", display:"inline-block" }} />
-                          {p?.isAvailable?"Online":"Offline"}
+                      <div className="db-row-side">
+                        <span className={`db-pill tone-${p.isAvailable ? "green" : "grey"}`}><span className="db-pill-dot" />{p.isAvailable ? "Online" : "Offline"}</span>
+                        <span className="db-cell-actions">
+                          <Button size="sm" variant="ghost" onClick={() => { setEditPhle({ name: p.name, phone: p.phone, serviceArea: p.serviceArea || "", licenseNumber: p.licenseNumber || "" }); setEditPhleModal(p); }}>Edit</Button>
+                          <Button size="sm" variant="danger" onClick={() => ask("Deactivate this phlebotomist?", `${p.name} will no longer be able to sign in or be assigned.`, "Deactivate", () => call(() => api.delete(`/phlebotomists/${p._id}`), "Phlebotomist deactivated."))}>Deactivate</Button>
                         </span>
-                        <button className="act act-blue"
-                          onClick={()=>{ setEditPhle({ name:p.name, phone:p.phone, serviceArea:p.serviceArea||"", licenseNumber:p.licenseNumber||"" }); setEditPhleModal(p); }}>
-                          Edit
-                        </button>
-                        <button className="act act-red"
-                          onClick={async()=>{ if(window.confirm("Deactivate?")) { try { await api.delete(`/phlebotomists/${p._id}`); toast.success("Deactivated."); fetchAll(); } catch { toast.error("Failed."); } } }}>
-                          Deactivate
-                        </button>
                       </div>
                     </div>
-                  </div>
-                ))
-              }
-            </div>
-          )}
-
-          {/* ANALYTICS */}
-          {tab==="analytics" && (
-            <div className="fade-up">
-              <div className="head">
-                <SpecimenLabel code="HV-35" name="Numbers" cap={GREEN} />
-                <h1>Analytics.</h1>
-                <p className="sub">Platform performance overview</p>
-              </div>
-              <div className="stats4" style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:12, marginBottom:22 }}>
-                {[
-                  { label:"Total revenue",   value:`Rs. ${revenue.toLocaleString()}`, tint:TEAL },
-                  { label:"Total bookings",  value:safeB.length,                      tint:BLUE },
-                  { label:"Completion rate", value:safeB.length?Math.round((completed.length/safeB.length)*100)+"%":"0%", tint:GREEN },
-                  { label:"Avg test value",  value:completed.length?"Rs."+Math.round(revenue/completed.length).toLocaleString():"—", tint:LAVENDER },
-                ].map(s=>(
-                  <div key={s.label} className="stat" style={{ "--tint":s.tint }}>
-                    <div className="stat-v">{s.value}</div>
-                    <div className="stat-l">{s.label}</div>
-                  </div>
+                  </Card>
                 ))}
-              </div>
-              <div className="cols2" style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:18 }}>
-                {[
-                  { title:"Status breakdown", items: Object.entries(STATUS_CONFIG).map(([s,c])=>({ name:c.label, count:safeB.filter(b=>b.status===s).length, color:c.color })).filter(i=>i.count>0) },
-                  { title:"Popular tests",    items: testCounts.filter(t=>t.count>0).map(t=>({ name:t.name, count:t.count, color:CRIMSON })) },
-                ].map(section=>(
-                  <div key={section.title} className="card" style={{ padding:20 }}>
-                    <div style={{ fontWeight:700, fontSize:15, marginBottom:18 }}>{section.title}</div>
-                    {section.items.length===0
-                      ? <div style={{ fontSize:13, color:"var(--ink-40)" }}>No data yet.</div>
-                      : section.items.map((item,i)=>{
-                          const total = section.items.reduce((s,x)=>s+x.count,0)||1;
-                          const pct   = Math.round((item.count/total)*100);
+              </div>)}
+        </>
+      )}
+
+      {tab === "analytics" && (
+        <>
+          <PageHeader eyebrow="Numbers" title="Analytics." sub="Computed from the bookings in this system. Prices are whatever the catalogue holds." />
+          {loadingOrError || (
+            <>
+              <Stats items={[
+                { label: "Revenue (completed)", value: formatMoney(revenue), icon: "pound", tone: "teal" },
+                { label: "Bookings", value: safeB.length, icon: "list", tone: "blue" },
+                { label: "Completion rate", value: safeB.length ? `${Math.round((completed.length / safeB.length) * 100)}%` : "—", icon: "check", tone: "green" },
+                { label: "Average completed booking", value: completed.length ? formatMoney(revenue / completed.length) : "—", icon: "chart", tone: "violet" },
+              ]} />
+              <div className="db-options" style={{ marginTop: 20, gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))" }}>
+                {[{ title: "Bookings by status", items: statusCounts }, { title: "Most booked tests", items: testCounts.map((t) => ({ ...t, tone: "teal" })) }].map((sec, si) => (
+                  <Card key={sec.title} i={si}>
+                    <h2 className="db-card-title">{sec.title}</h2>
+                    {sec.items.length === 0 ? <p className="db-fineprint">No data yet.</p> : (
+                      <div className="db-bars">
+                        {sec.items.map((it) => {
+                          const total = sec.items.reduce((s, x) => s + x.count, 0) || 1;
+                          const pct = Math.round((it.count / total) * 100);
                           return (
-                            <div key={i} style={{ marginBottom:14 }}>
-                              <div style={{ display:"flex", justifyContent:"space-between", marginBottom:5, fontSize:13 }}>
-                                <span style={{ color:"var(--ink-60)", fontWeight:500 }}>{item.name}</span>
-                                <span style={{ fontFamily:"var(--monof)", fontWeight:500, color:item.color }}>{item.count} ({pct}%)</span>
-                              </div>
-                              <div style={{ height:6, background:"rgba(23,19,16,0.06)", borderRadius:3, overflow:"hidden" }}>
-                                <div style={{ width:`${pct}%`, height:"100%", background:item.color, borderRadius:3, opacity:0.85, transition:"width 0.6s ease" }} />
+                            <div key={it.name} className={`db-bar-row tone-${it.tone || "teal"}`}>
+                              <div className="db-bar-head"><span>{it.name}</span><span className="db-code">{it.count} · {pct}%</span></div>
+                              <div className="db-bar-track" role="img" aria-label={`${it.name}: ${it.count} (${pct}%)`}>
+                                <div className="db-bar-fill" style={{ width: `${pct}%` }} />
                               </div>
                             </div>
                           );
-                        })
-                    }
-                  </div>
+                        })}
+                      </div>
+                    )}
+                  </Card>
                 ))}
               </div>
-            </div>
+            </>
           )}
+        </>
+      )}
 
-          {/* EMAIL & AUDIT */}
-          {tab==="audit" && <EmailAuditLog />}
+      {tab === "audit" && <EmailAuditLog />}
+
+      {/* ── Modals ── */}
+      <Modal open={!!assignFor} onClose={() => setAssignFor(null)} title="Assign a phlebotomist">
+        {assignBooking && <p className="db-sub" style={{ marginTop: 0, marginBottom: 14 }}>{patient(assignBooking)} · {testNames(assignBooking)} · {formatDate(assignBooking.appointmentDate)}</p>}
+        {phlebotomists.length === 0
+          ? <EmptyState icon="users" title="No phlebotomists yet">Add one under Phlebotomists first.</EmptyState>
+          : <div className="db-stack" role="list">
+              {phlebotomists.map((p) => (
+                <button key={p._id} type="button" role="listitem" className="db-option" onClick={() => assign(assignFor, p._id)}>
+                  <span className="db-option-name">{p.name || "—"}</span>
+                  <span className="db-metas">
+                    <Meta icon="pin">{p.serviceArea || "—"}</Meta>
+                    <Meta icon="user">{formatRating(p) ? `Rated ${formatRating(p)}` : "No reviews yet"}</Meta>
+                  </span>
+                  <span className={`db-pill tone-${p.isAvailable ? "green" : "grey"}`} style={{ width: "fit-content" }}><span className="db-pill-dot" />{p.isAvailable ? "Online" : "Offline"}</span>
+                </button>
+              ))}
+            </div>}
+      </Modal>
+
+      <Modal open={testModal} onClose={() => setTestModal(false)} title="Add a test">
+        {testForm(newTest, setNewTest, true)}
+        <Button className="db-btn-block" onClick={createTest}>Add test</Button>
+      </Modal>
+      <Modal open={!!editTestModal} onClose={() => setEditTestModal(null)} title="Edit test">
+        {testForm(editTest, setEditTest, false)}
+        <div className="db-actions"><Button variant="ghost" onClick={() => setEditTestModal(null)}>Cancel</Button><Button onClick={saveEditTest}>Save changes</Button></div>
+      </Modal>
+
+      <Modal open={planModal} onClose={() => setPlanModal(false)} title="Add a subscription plan">
+        {planForm(newPlan, setNewPlan)}
+        <Button className="db-btn-block" onClick={createPlan}>Add plan</Button>
+      </Modal>
+      <Modal open={!!editPlanModal} onClose={() => setEditPlanModal(null)} title="Edit plan">
+        {planForm(editPlan, setEditPlan)}
+        <div className="db-actions"><Button variant="ghost" onClick={() => setEditPlanModal(null)}>Cancel</Button><Button onClick={saveEditPlan}>Save changes</Button></div>
+      </Modal>
+
+      <Modal open={phleModal} onClose={() => setPhleModal(false)} title="Add a phlebotomist">
+        <Field label="Full name"><input autoComplete="off" value={newPhle.name} onChange={(e) => setNewPhle((p) => ({ ...p, name: e.target.value }))} /></Field>
+        <Field label="Email"><input type="email" autoComplete="off" placeholder="name@example.com" value={newPhle.email} onChange={(e) => setNewPhle((p) => ({ ...p, email: e.target.value }))} /></Field>
+        <Field label="Phone"><input type="tel" placeholder={locale.examplePhone} value={newPhle.phone} onChange={(e) => setNewPhle((p) => ({ ...p, phone: e.target.value }))} /></Field>
+        <Field label="Temporary password" hint={`At least ${PASSWORD_MIN} characters, with a letter and a number.`}>
+          <input type="password" autoComplete="new-password" value={newPhle.password} onChange={(e) => setNewPhle((p) => ({ ...p, password: e.target.value }))} />
+        </Field>
+        <div className="db-grid-2">
+          <Field label="Service area"><input placeholder="e.g. CF10" value={newPhle.serviceArea} onChange={(e) => setNewPhle((p) => ({ ...p, serviceArea: e.target.value }))} /></Field>
+          <Field label="Licence number"><input value={newPhle.licenseNumber} onChange={(e) => setNewPhle((p) => ({ ...p, licenseNumber: e.target.value }))} /></Field>
         </div>
-      </main>
+        <Button className="db-btn-block" onClick={createPhle}>Create account</Button>
+      </Modal>
+      <Modal open={!!editPhleModal} onClose={() => setEditPhleModal(null)} title="Edit phlebotomist">
+        <Field label="Full name"><input value={editPhle.name || ""} onChange={(e) => setEditPhle((p) => ({ ...p, name: e.target.value }))} /></Field>
+        <Field label="Phone"><input type="tel" value={editPhle.phone || ""} onChange={(e) => setEditPhle((p) => ({ ...p, phone: e.target.value }))} /></Field>
+        <div className="db-grid-2">
+          <Field label="Service area"><input value={editPhle.serviceArea || ""} onChange={(e) => setEditPhle((p) => ({ ...p, serviceArea: e.target.value }))} /></Field>
+          <Field label="Licence number"><input value={editPhle.licenseNumber || ""} onChange={(e) => setEditPhle((p) => ({ ...p, licenseNumber: e.target.value }))} /></Field>
+        </div>
+        <div className="db-actions"><Button variant="ghost" onClick={() => setEditPhleModal(null)}>Cancel</Button><Button onClick={saveEditPhle}>Save changes</Button></div>
+      </Modal>
 
-      {/* ASSIGN MODAL */}
-      {assignModal && (
-        <Modal title="Assign phlebotomist" onClose={()=>setAssignModal(null)}>
-          <p style={{ fontSize:13, color:"rgba(23,19,16,0.6)", marginBottom:16 }}>Click a phlebotomist to assign them to this booking.</p>
-          {phlebotomists.length===0
-            ? <div style={{ textAlign:"center", padding:"30px 0", color:"rgba(23,19,16,0.5)", fontSize:14 }}>No phlebotomists found. Add one first.</div>
-            : phlebotomists.map(p=>(
-              <div key={p._id} onClick={()=>assignPhlebotomist(assignModal,p._id)}
-                style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"14px 16px", borderRadius:10, border:"1px solid rgba(23,19,16,0.13)", marginBottom:10, cursor:"pointer", transition:"all 0.2s", background:"#fff" }}
-                onMouseOver={e=>{ e.currentTarget.style.borderColor=CRIMSON; e.currentTarget.style.background="rgba(164,19,60,0.04)"; }}
-                onMouseOut={e=>{ e.currentTarget.style.borderColor="rgba(23,19,16,0.13)"; e.currentTarget.style.background="#fff"; }}>
-                <div style={{ display:"flex", alignItems:"center", gap:12 }}>
-                  <div style={{ width:40, height:40, borderRadius:"50%", background:"rgba(164,19,60,0.07)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:18 }}>🧪</div>
-                  <div>
-                    <div style={{ fontWeight:700, fontSize:14 }}>{p?.name||"—"}</div>
-                    <div style={{ fontSize:12, color:"rgba(23,19,16,0.55)" }}>⭐ {p?.rating?.toFixed(1)||"5.0"} · {p?.serviceArea||"Jaffna"}</div>
-                  </div>
-                </div>
-                <span style={{ fontFamily:"var(--monof)", fontSize:10, letterSpacing:"0.08em", textTransform:"uppercase", color:p?.isAvailable?GREEN:"rgba(23,19,16,0.4)" }}>
-                  {p?.isAvailable?"● Online":"○ Offline"}
-                </span>
-              </div>
-            ))
-          }
-          <button className="btn btn-ghost btn-full" onClick={()=>setAssignModal(null)} style={{ marginTop:8 }}>Cancel</button>
-        </Modal>
-      )}
-
-      {/* ADD TEST MODAL */}
-      {testModal && (
-        <Modal title="Add new test" onClose={()=>setTestModal(false)}>
-          <FI label="Test name"   fkey="name"        type="text"   placeholder="e.g. Complete Blood Count" val={newTest.name}        setter={setNewTest} />
-          <FI label="Code"        fkey="code"        type="text"   placeholder="e.g. CBC"                  val={newTest.code}        setter={setNewTest} />
-          <FI label="Price (Rs.)" fkey="price"       type="number" placeholder="e.g. 2500"                val={newTest.price}       setter={setNewTest} />
-          <FI label="Turnaround"  fkey="duration"    type="text"   placeholder="e.g. 24h"                  val={newTest.duration}    setter={setNewTest} />
-          <FI label="Preparation" fkey="preparation" type="text"   placeholder="e.g. Fast for 8 hours"     val={newTest.preparation} setter={setNewTest} />
-          <div style={{ marginBottom:16 }}>
-            <Lbl c="Category" />
-            <select className="inp" value={newTest.category} onChange={e=>setNewTest(p=>({...p,category:e.target.value}))}>
-              {CATS.map(c=><option key={c} value={c}>{c}</option>)}
-            </select>
-          </div>
-          <button className="btn btn-primary btn-full" onClick={createTest}>Add test type</button>
-        </Modal>
-      )}
-
-      {/* EDIT TEST MODAL */}
-      {editTestModal && (
-        <Modal title="Edit test" onClose={()=>setEditTestModal(null)}>
-          <FI label="Test name"   fkey="name"        type="text"   placeholder="Test name"                val={editTest.name||""}        setter={setEditTest} />
-          <FI label="Price (Rs.)" fkey="price"       type="number" placeholder="Price"                    val={editTest.price||""}       setter={setEditTest} />
-          <FI label="Turnaround"  fkey="duration"    type="text"   placeholder="e.g. 24h"                 val={editTest.duration||""}    setter={setEditTest} />
-          <FI label="Preparation" fkey="preparation" type="text"   placeholder="Preparation instructions" val={editTest.preparation||""} setter={setEditTest} />
-          <div style={{ marginBottom:16 }}>
-            <Lbl c="Category" />
-            <select className="inp" value={editTest.category||"haematology"} onChange={e=>setEditTest(p=>({...p,category:e.target.value}))}>
-              {CATS.map(c=><option key={c} value={c}>{c}</option>)}
-            </select>
-          </div>
-          <div style={{ display:"flex", gap:10 }}>
-            <button className="btn btn-ghost" style={{ flex:1 }} onClick={()=>setEditTestModal(null)}>Cancel</button>
-            <button className="btn btn-primary" style={{ flex:2 }} onClick={saveEditTest}>Save changes</button>
-          </div>
-        </Modal>
-      )}
-
-      {/* ADD PLAN MODAL */}
-      {planModal && (
-        <Modal title="Add subscription plan" onClose={()=>setPlanModal(false)}>
-          <FI label="Plan name"        fkey="name"            type="text"   placeholder="e.g. Monthly Care Plan" val={newPlan.name}            setter={setNewPlan} />
-          <FI label="Description"      fkey="description"     type="text"   placeholder="Optional short blurb"   val={newPlan.description}     setter={setNewPlan} />
-          <FI label="Visits per cycle" fkey="visitsPerCycle"  type="number" placeholder="e.g. 4"                 val={newPlan.visitsPerCycle}  setter={setNewPlan} />
-          <FI label="Cycle length (days)" fkey="cycleLengthDays" type="number" placeholder="e.g. 30"             val={newPlan.cycleLengthDays} setter={setNewPlan} />
-          <FI label="Price per cycle (Rs.)" fkey="price"      type="number" placeholder="e.g. 8000"              val={newPlan.price}           setter={setNewPlan} />
-          <div style={{ marginBottom:16 }}>
-            <Lbl c="Tests included in every visit" />
-            <div style={{ display:"flex", flexWrap:"wrap", gap:8, maxHeight:160, overflowY:"auto" }}>
-              {testTypes.map(t=>(
-                <label key={t._id} style={{ display:"flex", alignItems:"center", gap:6, fontSize:12, background:newPlan.testTypeIds.includes(t._id)?"rgba(124,107,174,0.1)":"rgba(23,19,16,0.04)", border:`1px solid ${newPlan.testTypeIds.includes(t._id)?LAVENDER:"var(--rule)"}`, borderRadius:20, padding:"5px 10px", cursor:"pointer" }}>
-                  <input type="checkbox" checked={newPlan.testTypeIds.includes(t._id)} onChange={()=>toggleTestId(setNewPlan, t._id)} />
-                  {t.name}
-                </label>
-              ))}
-            </div>
-          </div>
-          <button className="btn btn-primary btn-full" onClick={createPlan}>Add plan</button>
-        </Modal>
-      )}
-
-      {/* EDIT PLAN MODAL */}
-      {editPlanModal && (
-        <Modal title="Edit plan" onClose={()=>setEditPlanModal(null)}>
-          <FI label="Plan name"        fkey="name"            type="text"   placeholder="Plan name"  val={editPlan.name||""}            setter={setEditPlan} />
-          <FI label="Description"      fkey="description"     type="text"   placeholder="Description" val={editPlan.description||""}     setter={setEditPlan} />
-          <FI label="Visits per cycle" fkey="visitsPerCycle"  type="number" placeholder="Visits"      val={editPlan.visitsPerCycle||""}  setter={setEditPlan} />
-          <FI label="Cycle length (days)" fkey="cycleLengthDays" type="number" placeholder="Days"     val={editPlan.cycleLengthDays||""} setter={setEditPlan} />
-          <FI label="Price per cycle (Rs.)" fkey="price"      type="number" placeholder="Price"       val={editPlan.price||""}           setter={setEditPlan} />
-          <div style={{ marginBottom:16 }}>
-            <Lbl c="Tests included in every visit" />
-            <div style={{ display:"flex", flexWrap:"wrap", gap:8, maxHeight:160, overflowY:"auto" }}>
-              {testTypes.map(t=>(
-                <label key={t._id} style={{ display:"flex", alignItems:"center", gap:6, fontSize:12, background:editPlan.testTypeIds?.includes(t._id)?"rgba(124,107,174,0.1)":"rgba(23,19,16,0.04)", border:`1px solid ${editPlan.testTypeIds?.includes(t._id)?LAVENDER:"var(--rule)"}`, borderRadius:20, padding:"5px 10px", cursor:"pointer" }}>
-                  <input type="checkbox" checked={editPlan.testTypeIds?.includes(t._id)||false} onChange={()=>toggleTestId(setEditPlan, t._id)} />
-                  {t.name}
-                </label>
-              ))}
-            </div>
-          </div>
-          <div style={{ display:"flex", gap:10 }}>
-            <button className="btn btn-ghost" style={{ flex:1 }} onClick={()=>setEditPlanModal(null)}>Cancel</button>
-            <button className="btn btn-primary" style={{ flex:2 }} onClick={saveEditPlan}>Save changes</button>
-          </div>
-        </Modal>
-      )}
-
-      {/* ADD PHLEBOTOMIST MODAL */}
-      {phleModal && (
-        <Modal title="Add phlebotomist" onClose={()=>setPhleModal(false)}>
-          <FI label="Full name"    fkey="name"          type="text"     placeholder="e.g. Daniel Turner"    val={newPhle.name}          setter={setNewPhle} />
-          <FI label="Email"        fkey="email"         type="email"    placeholder="email@example.com"   val={newPhle.email}         setter={setNewPhle} />
-          <FI label="Phone"        fkey="phone"         type="tel"      placeholder="+94 77 123 4567"     val={newPhle.phone}         setter={setNewPhle} />
-          <FI label="Password"     fkey="password"      type="password" placeholder="Min 6 characters"   val={newPhle.password}      setter={setNewPhle} />
-          <FI label="Service area" fkey="serviceArea"   type="text"     placeholder="e.g. Jaffna North"  val={newPhle.serviceArea}   setter={setNewPhle} />
-          <FI label="License no."  fkey="licenseNumber" type="text"     placeholder="e.g. HV-PHL-05"     val={newPhle.licenseNumber} setter={setNewPhle} />
-          <button className="btn btn-primary btn-full" onClick={createPhle}>Create account</button>
-        </Modal>
-      )}
-
-      {/* EDIT PHLEBOTOMIST MODAL */}
-      {editPhleModal && (
-        <Modal title="Edit phlebotomist" onClose={()=>setEditPhleModal(null)}>
-          <FI label="Full name"    fkey="name"          type="text" placeholder="Full name"       val={editPhle.name||""}          setter={setEditPhle} />
-          <FI label="Phone"        fkey="phone"         type="tel"  placeholder="Phone number"    val={editPhle.phone||""}         setter={setEditPhle} />
-          <FI label="Service area" fkey="serviceArea"   type="text" placeholder="Service area"    val={editPhle.serviceArea||""}   setter={setEditPhle} />
-          <FI label="License no."  fkey="licenseNumber" type="text" placeholder="License number"  val={editPhle.licenseNumber||""} setter={setEditPhle} />
-          <div style={{ display:"flex", gap:10 }}>
-            <button className="btn btn-ghost" style={{ flex:1 }} onClick={()=>setEditPhleModal(null)}>Cancel</button>
-            <button className="btn btn-primary" style={{ flex:2 }} onClick={saveEditPhle}>Save changes</button>
-          </div>
-        </Modal>
-      )}
-    </div>
+      <Modal open={!!confirm} onClose={() => setConfirm(null)} title={confirm?.title || ""}>
+        <p className="db-sub" style={{ marginTop: 0 }}>{confirm?.body}</p>
+        <div className="db-actions">
+          <Button variant="ghost" onClick={() => setConfirm(null)}>Cancel</Button>
+          <Button variant="danger" icon="x" onClick={() => { const a = confirm.action; setConfirm(null); a(); }}>{confirm?.label}</Button>
+        </div>
+      </Modal>
+    </Shell>
   );
 }

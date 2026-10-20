@@ -1,15 +1,29 @@
 const jwt  = require("jsonwebtoken");
+const {
+  isValidUkPhone, PHONE_MESSAGE,
+  normaliseUkPhone, normaliseUkPostcode, POSTCODE_MESSAGE,
+  isValidEmail, EMAIL_MESSAGE,
+  isValidPassword, PASSWORD_MESSAGE,
+} = require("../utils/validators");
+const locale = require("../config/locale");
 const User = require("../models/User");
 
 // ── Helper: generate JWT token ────────────────────────────────────
-// Signs a token with the user's id and our secret key.
-// Expires in 7 days (set in .env as JWT_EXPIRES_IN).
+/*
+ * Lifetime is controlled by JWT_EXPIRES_IN (default "7d").
+ *
+ * Accepts any value the jsonwebtoken library understands: "15m", "12h",
+ * "7d", or a number of seconds. Shorter is safer — this app stores the
+ * token in sessionStorage, which the browser clears when the tab closes,
+ * so the practical exposure is already bounded by the browser session.
+ *
+ * There is no refresh-token flow: when the token expires the user signs
+ * in again. Documented in README and .env.example.
+ */
+const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || "7d";
+
 const signToken = (id) =>
-  jwt.sign(
-    { id },
-    process.env.JWT_SECRET,
-    { expiresIn: process.env.JWT_EXPIRES_IN || "7d" }
-  );
+  jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
 
 // ── Helper: send token response ───────────────────────────────────
 // Creates the token and sends it back with the user object.
@@ -17,7 +31,7 @@ const sendToken = (user, statusCode, res) => {
   const token = signToken(user._id);
   res.status(statusCode).json({
     success: true,
-    token,   // frontend stores this in localStorage
+    token,   // frontend stores this in sessionStorage (cleared on tab close)
     user,    // user object (password already removed by toJSON())
   });
 };
@@ -28,7 +42,31 @@ const sendToken = (user, statusCode, res) => {
 // Phlebotomists and admins are created by admin only.
 exports.register = async (req, res, next) => {
   try {
-    const { name, email, phone, password, age, gender, address, addressParts } = req.body;
+    const {
+      name, email, phone, password, age, gender, address, addressParts,
+      privacyPolicyAccepted,
+    } = req.body;
+
+    if (!isValidEmail(email)) {
+      return res.status(400).json({ success: false, message: EMAIL_MESSAGE });
+    }
+
+    if (!isValidUkPhone(phone)) {
+      return res.status(400).json({ success: false, message: PHONE_MESSAGE });
+    }
+
+    // New accounts only. Existing passwords are never re-checked, so
+    // accounts created under the old 6-character rule keep working.
+    if (!isValidPassword(password)) {
+      return res.status(400).json({ success: false, message: PASSWORD_MESSAGE });
+    }
+
+    if (privacyPolicyAccepted !== true) {
+      return res.status(400).json({
+        success: false,
+        message: "Please confirm you have read the Privacy Policy before creating an account.",
+      });
+    }
 
     // Check if email already exists
     const existing = await User.findOne({ email });
@@ -50,6 +88,11 @@ exports.register = async (req, res, next) => {
       address,
       addressParts,
       role: "user",
+      consent: {
+        privacyPolicyAccepted: true,
+        acceptedAt:            new Date(),
+        policyVersion:         locale.policyVersion,
+      },
     });
 
     sendToken(user, 201, res);
@@ -132,6 +175,25 @@ exports.updateProfile = async (req, res, next) => {
       if (req.body[field] !== undefined) updates[field] = req.body[field];
     });
 
+    // A phlebotomist's availability toggle. The dashboard always sent
+    // this, but it was not in the allow-list, so it was silently dropped
+    // and the toggle never persisted. Phlebotomists only; boolean only.
+    if (req.user.role === "phlebotomist" && typeof req.body.isAvailable === "boolean") {
+      updates.isAvailable = req.body.isAvailable;
+    }
+
+    // findByIdAndUpdate bypasses the pre-save hooks, so normalise here.
+    if (updates.phone !== undefined) {
+      const phone = normaliseUkPhone(updates.phone);
+      if (!phone) return res.status(400).json({ success: false, message: PHONE_MESSAGE });
+      updates.phone = phone;
+    }
+    if (updates.addressParts?.postcode) {
+      const postcode = normaliseUkPostcode(updates.addressParts.postcode);
+      if (!postcode) return res.status(400).json({ success: false, message: POSTCODE_MESSAGE });
+      updates.addressParts = { ...updates.addressParts, postcode };
+    }
+
     const user = await User.findByIdAndUpdate(
       req.user._id,
       updates,
@@ -157,6 +219,13 @@ exports.changePassword = async (req, res, next) => {
         success: false,
         message: "Please provide current and new password.",
       });
+    }
+
+    // Only the NEW password is held to the rule. currentPassword is
+    // compared as-is, so a user whose existing password predates this
+    // rule can still authenticate in order to change it.
+    if (!isValidPassword(newPassword)) {
+      return res.status(400).json({ success: false, message: PASSWORD_MESSAGE });
     }
 
     // Get user with password field

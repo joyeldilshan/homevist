@@ -1,13 +1,35 @@
 import { useEffect, useRef } from "react";
 import { io } from "socket.io-client";
 
-// Single shared socket instance
+// Single shared socket instance, and the sign-in token it connected with.
 let socket = null;
+let socketToken = null;
 
+/*
+ * Socket.IO lives at the server's root, not under /api. VITE_API_URL is
+ * ".../api", and passing it straight to io() made socket.io treat "/api"
+ * as a namespace the server does not have: real-time updates silently
+ * failed wherever VITE_API_URL was set (i.e. every deployment).
+ */
+export function socketOrigin(apiUrl = import.meta.env.VITE_API_URL) {
+  if (!apiUrl) return "http://localhost:5000";
+  try { return new URL(apiUrl).origin; } catch { return apiUrl.replace(/\/api\/?$/, ""); }
+}
+
+/*
+ * The server accepts signed-in sockets only (backend utils/socketAuth.js)
+ * and checks every room join against that user. If the stored token has
+ * changed since the socket was made (logged out, or another account
+ * signed in), the old socket is dropped so it never carries the previous
+ * user's identity.
+ */
 function getSocket() {
+  const token = sessionStorage.getItem("token");
+  if (socket && socketToken !== token) { socket.disconnect(); socket = null; }
   if (!socket) {
-    const SOCKET_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
-socket = io(SOCKET_URL, {
+    socketToken = token;
+    socket = io(socketOrigin(), {
+      auth:            { token },
       autoConnect:     false,
       reconnection:    true,
       reconnectionDelay:    1000,
@@ -40,9 +62,10 @@ export function useBookingSocket(bookingIds = [], onStatusUpdate) {
     if (!s.connected) s.connect();
 
     // Join a room for each booking
-    bookingIds.forEach(id => {
-      if (id) s.emit("join_booking", id);
-    });
+    // Rooms do not survive a reconnect, so join on every (re)connect.
+    const join = () => bookingIds.forEach(id => { if (id) s.emit("join_booking", id); });
+    join();
+    s.on("connect", join);
 
     // Listen for status updates
     const handler = (data) => {
@@ -53,6 +76,7 @@ export function useBookingSocket(bookingIds = [], onStatusUpdate) {
 
     return () => {
       s.off("status_update", handler);
+      s.off("connect", join);
     };
   }, [bookingIds.join(",")]);
 }
@@ -71,7 +95,9 @@ export function useAdminSocket(onNewBooking) {
     const s = getSocket();
     if (!s.connected) s.connect();
 
-    s.emit("join_admin");
+    const join = () => s.emit("join_admin");
+    join();
+    s.on("connect", join);
 
     const handler = (data) => {
       console.log("🔴 New booking:", data);
@@ -81,6 +107,7 @@ export function useAdminSocket(onNewBooking) {
 
     return () => {
       s.off("new_booking", handler);
+      s.off("connect", join);
     };
   }, []);
 }

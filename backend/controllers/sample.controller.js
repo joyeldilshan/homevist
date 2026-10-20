@@ -1,5 +1,20 @@
 const Sample  = require("../models/Sample");
 const Booking = require("../models/Booking");
+const logger = require("../utils/logger");
+
+const SAMPLE_STATUSES = Sample.schema.path("status").enumValues;
+
+/*
+ * Patients follow a booking in real time by joining a socket room named
+ * after its bookingId (frontend hooks/useSocket.js, "join_booking") and
+ * listening for "status_update". Every step that changes a booking's
+ * status must emit there, or the patient's page never hears about it.
+ */
+const emitBookingStatus = (io, booking, status) => {
+  if (io && booking?.bookingId) {
+    io.to(booking.bookingId).emit("status_update", { bookingId: booking.bookingId, status });
+  }
+};
 
 /**
  * POST /api/samples
@@ -21,11 +36,18 @@ exports.sendToLab = async (req, res, next) => {
       return res.status(404).json({ success: false, message: "Booking not found." });
     }
 
-    // Compare assigned phlebotomist (handle populated object OR raw id).
-    // If the booking has no phlebotomist yet, allow any phlebotomist/admin.
+    // Only the phlebotomist assigned to the booking (populated object OR
+    // raw id). An unassigned booking used to be open to any phlebotomist,
+    // who then became its sample's collector. Someone else's booking is
+    // "not found", as everywhere else.
     const assignedId = booking.phlebotomist?._id || booking.phlebotomist;
-    if (assignedId && String(assignedId) !== String(req.user._id) && req.user.role !== "admin") {
-      return res.status(403).json({ success: false, message: "This booking is not assigned to you." });
+    if (!assignedId || String(assignedId) !== String(req.user._id)) {
+      return res.status(404).json({ success: false, message: "Booking not found." });
+    }
+    // Only a visit that is under way: not pending, cancelled, rejected or
+    // already with the lab beyond collection.
+    if (!["confirmed", "sample_collected"].includes(booking.status)) {
+      return res.status(409).json({ success: false, message: `A ${booking.status.replace("_", " ")} booking cannot be sent to the lab.` });
     }
 
     // If a sample already exists for this booking, just return it (no crash, no dup)
@@ -59,6 +81,7 @@ exports.sendToLab = async (req, res, next) => {
 
     booking.status = "sample_collected";
     await booking.save();
+    emitBookingStatus(req.io, booking, "sample_collected");
 
     if (req.io) {
       req.io.to("mlt_room").emit("new_sample", {
@@ -67,7 +90,7 @@ exports.sendToLab = async (req, res, next) => {
       });
     }
 
-    console.log(`🧫 Sample ${sample.sampleId} created for booking ${booking.bookingId}`);
+    logger.debug(`🧫 Sample ${sample.sampleId} created for booking ${booking.bookingId}`);
     res.status(201).json({ success: true, sample });
   } catch (err) { next(err); }
 };
@@ -80,7 +103,13 @@ exports.getSamples = async (req, res, next) => {
   try {
     let filter = {};
     if (req.user.role === "phlebotomist") filter.phlebotomist = req.user._id;
-    if (req.query.status) filter.status = req.query.status;
+    if (req.query.status !== undefined) {
+      // A plain status name only (status[$ne]=x would become an operator).
+      if (typeof req.query.status !== "string" || !SAMPLE_STATUSES.includes(req.query.status)) {
+        return res.status(400).json({ success: false, message: "Unknown status filter." });
+      }
+      filter.status = req.query.status;
+    }
 
     const samples = await Sample.find(filter)
       .populate("patient",      "name email phone")
@@ -96,21 +125,33 @@ exports.getSamples = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+// The states each lab step may start from. Forward only; "completed" is
+// not set here but by sending the report (POST /reports/:id/send), so a
+// sample cannot be marked done without one.
+const SAMPLE_FROM = {
+  received:   ["sent_to_lab", "collected"],
+  processing: ["received"],
+};
+
 /**
  * PATCH /api/samples/:id/status
- * MLT moves a sample: received -> processing -> completed.
+ * MLT moves a sample: received -> processing. It used to accept any of
+ * received/processing/completed from any state, so a sample could go
+ * backwards or skip straight to completed with no report.
  */
 exports.updateSampleStatus = async (req, res, next) => {
   try {
     const { status, note } = req.body;
-    const allowed = ["received", "processing", "completed"];
-    if (!allowed.includes(status)) {
+    if (!Object.hasOwn(SAMPLE_FROM, String(status))) {
       return res.status(400).json({ success: false, message: "Invalid lab status." });
     }
 
     const sample = await Sample.findById(req.params.id).populate("patient", "name email");
     if (!sample) {
       return res.status(404).json({ success: false, message: "Sample not found." });
+    }
+    if (!SAMPLE_FROM[status].includes(sample.status)) {
+      return res.status(409).json({ success: false, message: `A sample that is ${sample.status.replace(/_/g, " ")} cannot be marked ${status}.` });
     }
 
     sample.status = status;
@@ -120,6 +161,20 @@ exports.updateSampleStatus = async (req, res, next) => {
 
     if (req.io && sample.booking) {
       req.io.to(String(sample.booking)).emit("sample_update", { sampleId: sample.sampleId, status });
+    }
+
+    // The booking's own "processing" stage was never reached: lab steps
+    // only moved the sample, so the patient's tracker jumped from
+    // "sample collected" straight to "report ready". Starting processing
+    // now moves the booking too (only forward, from sample_collected).
+    if (status === "processing" && sample.booking) {
+      const booking = await Booking.findById(sample.booking);
+      if (booking && booking.status === "sample_collected") {
+        booking.status = "processing";
+        booking.statusHistory.push({ status: "processing", updatedBy: req.user._id, note: "Laboratory started processing" });
+        await booking.save();
+        emitBookingStatus(req.io, booking, "processing");
+      }
     }
 
     res.json({ success: true, sample });
