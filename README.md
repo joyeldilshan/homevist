@@ -187,6 +187,13 @@ also checks a wrong password, a patient opening admin pages and admin API
 routes, sign-in with a short pre-2026 password, the 404 page, an expired
 session, and keyboard use (skip link, navigation, modal focus).
 
+The same command also runs `e2e/forms.e2e.mjs`: it types into every text
+field of every dialog and form (the four dashboards, sign-in and register)
+one real keystroke at a time through the keyboard, and fails if focus leaves
+the field being typed in, if any field ends up with another field's text, or
+if closing a dialog does not return focus to the button that opened it.
+Nothing is submitted.
+
 Run it against a **development database only**:
 
 1. `backend`: `EMAIL_USER= EMAIL_PASS= CLIENT_URL=http://localhost:4173 node server.js`
@@ -460,11 +467,11 @@ any real patient result is reported.
 - **Test coverage** (all passing on 2026-10-18). 93 backend tests (validators,
   formatters, rate limiting, the seed and startup database guards, email mock
   mode and the report notification, the sender name, the report generator and
-  report files, the error handler, socket disconnects, `create-user`), 33
+  report files, the error handler, socket disconnects, `create-user`), 35
   frontend tests (render tests for
   every page, the landing's copy and numbers, the legal pages, the socket URL,
-  sign-in return links), a 21-step browser end-to-end suite across all four
-  roles, and 24 API tests for passwords and authorization (see above).
+  sign-in return links, dialog focus), a 21-step browser end-to-end suite across
+  all four roles, a 12-test browser sweep typing into every dialog and form, and 24 API tests for passwords and authorization (see above).
 - **Images.** The hero ships as AVIF/WebP with a JPEG fallback. `image 5.png`
   (660 kB, an old logo with "HOME VISIT MOBILE LAB" baked in) is no longer used.
 
