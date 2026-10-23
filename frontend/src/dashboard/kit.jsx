@@ -371,15 +371,25 @@ export function Modal({ open, onClose, title, children, sheet = false, wide = fa
   const panel = useRef(null);
   const titleId = useId();
 
+  // Callers pass onClose as an inline arrow, a new function on every
+  // render. It used to be a dependency of the effect below, so every
+  // keystroke in a dialog's form (state change -> parent re-render -> new
+  // onClose) re-ran the effect: focus jumped back to the first field after
+  // one character, and the "opener" to return to was re-captured as that
+  // field. The latest onClose is read from a ref instead, so the effect
+  // runs once per opening.
+  const closeRef = useRef(onClose);
+  useEffect(() => { closeRef.current = onClose; });
+
   useEffect(() => {
     if (!open) return;
-    const opener = document.activeElement;
+    const opener = document.activeElement;   // the trigger; focus returns here on close
     const el = panel.current;
     const focusables = () => [...el.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])')]
       .filter((n) => !n.disabled && n.offsetParent !== null);
     (focusables()[1] || focusables()[0] || el)?.focus();   // [0] is the close button
     const onKey = (e) => {
-      if (e.key === "Escape") { e.stopPropagation(); onClose(); return; }
+      if (e.key === "Escape") { e.stopPropagation(); closeRef.current(); return; }
       if (e.key !== "Tab") return;
       const f = focusables();
       if (!f.length) return;
@@ -394,7 +404,7 @@ export function Modal({ open, onClose, title, children, sheet = false, wide = fa
       document.body.style.overflow = prev;
       opener?.focus?.();
     };
-  }, [open, onClose]);
+  }, [open]);
 
   return (
     <AnimatePresence>
